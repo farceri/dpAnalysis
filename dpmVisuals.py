@@ -180,8 +180,8 @@ def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,
     rad = np.array(np.loadtxt(dirName + os.sep + "radii.dat"))
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype=int)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    #setDPMAxes(boxSize, ax)
-    setBigBoxAxes(boxSize, ax)
+    setDPMAxes(boxSize, ax)
+    #setBigBoxAxes(boxSize, ax)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     plotDeformableParticles(ax, pos, rad, nv, faceColor, edgeColor, colorMap, edgeColorMap, alpha)

@@ -151,7 +151,7 @@ def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx
     ax.set_ylabel(ylabel, fontsize=17)
     plt.tight_layout()
     if(show == True):
-        plt.show()
+        plt.pause(0.5)
 
 ########################### Pair Correlation Function ##########################
 def computePairCorr(dirName, plot=True):
@@ -265,7 +265,9 @@ def computeParticleSelfCorr(dirName, maxPower):
     phi = readFromParams(dirName, "phi")
     timeStep = readFromParams(dirName, "dt")
     #pWaveVector = np.pi / (2 * np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
-    pWaveVector = np.pi / computePairCorr(dirName, plot=False)
+    #pWaveVector = np.pi / computePairCorr(dirName, plot=False)
+    pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
+    pWaveVector = np.pi / pRad
     print("wave vector: ", pWaveVector)
     particleCorr = []
     # get trajectory directories
@@ -295,7 +297,9 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
     T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
     print(timeStep)
     #pWaveVector = np.pi / (np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
-    pWaveVector = np.pi /computePairCorr(dirName, plot=False)
+    #pWaveVector = np.pi /computePairCorr(dirName, plot=False)
+    pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
+    pWaveVector = np.pi / pRad
     print("wave vector: ", pWaveVector)
     tau = []
     diff = []
@@ -320,7 +324,7 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
         particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,3))
         stepBlock = stepBlock[1:]-(block-1)*decade#discard initial time
         if(plot=="plot"):
-            plotCorrelation(stepBlock*timeStep, particleCorr[:,1], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color=colorList(block/10), show=False)
+            plotCorrelation(stepBlock*timeStep, particleCorr[:,0], "$MSD(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color=colorList(block/10), show=False)
             plt.pause(0.2)
         if(computeTau=="tau"):
             diff.append(particleCorr[-10,0]/4*stepBlock[-10])
@@ -718,8 +722,7 @@ def computeLocalDensity(dirName, numBins, plot = False):
     localDensity = np.sort(localDensity.flatten())
     cdf = np.arange(len(localDensity))/len(localDensity)
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 30), density=True)
-    edges = (edges[:-1] + edges[1:])/2
-    edges /= np.max(edges)
+    edges = (edges[1:] + edges[:-1])/2
     print("data stats: ", np.min(localDensity), np.max(localDensity), np.mean(localDensity), np.std(localDensity))
     if(plot=="plot"):
         fig = plt.figure(dpi=120)
@@ -751,13 +754,12 @@ def averageLocalDensity(dirName, numBins, plot = False):
             pPos[:,1] -= np.floor(pPos[:,1]/boxSize[1]) * boxSize[1]
             computeLocalAreaGrid(pPos, area, xbin, ybin, localArea)
             localDensity = localArea/localSquare
-            sampleDensity.append(localArea.flatten())
+            sampleDensity.append(localDensity.flatten())
     sampleDensity = np.sort(sampleDensity)
     cdf = np.arange(len(sampleDensity))/len(sampleDensity)
-    pdf, edges = np.histogram(sampleDensity, bins=np.linspace(np.min(sampleDensity), np.max(sampleDensity), 50), density=True)
+    pdf, edges = np.histogram(sampleDensity, bins=np.linspace(np.min(sampleDensity), np.max(sampleDensity), 30), density=True)
     edges = (edges[:-1] + edges[1:])/2
-    edges /= np.max(edges)
-    print("data stats: ", np.min(localDensity), np.max(localDensity), np.mean(localDensity), np.std(localDensity))
+    print("data stats: ", np.min(sampleDensity), np.max(sampleDensity), np.mean(sampleDensity), np.std(sampleDensity))
     if(plot=="plot"):
         fig = plt.figure(dpi=120)
         ax = plt.gca()
