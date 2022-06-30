@@ -177,7 +177,7 @@ def computePairCorr(dirName, plot=True):
     else:
         return firstPeak
 
-########################## Particle Self Correlations ##########################
+##################### Particle Self Velocity Correlations ######################
 def computeParticleVelCorr(dirName, maxPower):
     numParticles = readFromParams(dirName, "numParticles")
     timeStep = readFromParams(dirName, "dt")
@@ -197,7 +197,7 @@ def computeParticleVelCorr(dirName, maxPower):
     np.savetxt(dirName + os.sep + "vel-corr.dat", np.column_stack((stepRange, particleVelCorr)))
     plotCorrelation((stepRange + 1) * timeStep, particleVelCorr, "$\\frac{\\langle \\vec{v}(t) \\cdot \\vec{v}(0) \\rangle}{\\langle | \\vec{v}(0) |^2 \\rangle}$", "$Simulation$ $time$", logx = True, color='k')
 
-########### Time-averaged Self Correlations in log-spaced time window ##########
+############# Time-averaged Self Vel Corr in log-spaced time window ############
 def computeParticleLogVelCorr(dirName, startBlock, maxPower, freqPower):
     numParticles = readFromParams(dirName, "numParticles")
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
@@ -236,7 +236,7 @@ def computeParticleLogVelCorr(dirName, startBlock, maxPower, freqPower):
     np.savetxt(dirName + os.sep + "vel-corr.dat", np.column_stack((stepList, particleVelCorr)))
     plotCorrelation(stepList, particleVelCorr[:,1], "$\\langle \\hat{n}(t) \\cdot \\hat{n}(t') \\rangle$", "$time$ $interval,$ $\\Delta t = t - t'$", logx = True, color = 'g')
 
-########################## Particle Self Correlations ##########################
+############################ Particle Susceptibility ###########################
 def computeParticleSusceptibility(dirName, maxPower):
     numParticles = readFromParams(dirName, "numParticles")
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
@@ -256,6 +256,7 @@ def computeParticleSusceptibility(dirName, maxPower):
     particleChi = np.array(particleChi)
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "susceptibility.dat", np.column_stack((stepRange * timeStep, particleChi)))
+    print("susceptibility ", np.mean(particleChi[-20:]/stepRange[-20:]*timeStep), " ", np.std(particleChi[-20:]/stepRange[-20:]*timeStep))
     plotCorrelation(stepRange * timeStep, particleChi / (stepRange * timeStep), "$\\chi / t$", "$Simulation$ $step$", logx = True, color='k')
 
 ########################## Particle Self Correlations ##########################
@@ -411,7 +412,7 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
         with open(dirName + "../tauDiff.dat", "ab") as f:
             np.savetxt(f, np.array([[timeStep, pWaveVector, phi, T, tau, diff]]))
 
-########### Time-averaged Self Correlations in log-spaced time window ##########
+########### One Dim Time-averaged Self Corr in log-spaced time window ##########
 def computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower):
     numParticles = readFromParams(dirName, "numParticles")
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
