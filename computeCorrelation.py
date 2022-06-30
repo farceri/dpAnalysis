@@ -39,7 +39,7 @@ def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False)
     delta = np.linalg.norm(pos1 - pos2, axis=1)
     if(oneDim == True):
         delta = pos1[:,0] - pos2[:,0]
-    #delta -= np.mean(delta)
+    delta -= np.mean(delta)
     msd = np.mean(delta**2)
     isf = np.mean(np.sin(waveVector * delta) / (waveVector * delta))
     chi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isf*isf
@@ -151,7 +151,8 @@ def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx
     ax.set_ylabel(ylabel, fontsize=17)
     plt.tight_layout()
     if(show == True):
-        plt.pause(0.5)
+        #plt.pause(0.5)
+        plt.show()
 
 ########################### Pair Correlation Function ##########################
 def computePairCorr(dirName, plot=True):
@@ -409,6 +410,50 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
             print("not enough data to compute relaxation time")
         with open(dirName + "../tauDiff.dat", "ab") as f:
             np.savetxt(f, np.array([[timeStep, pWaveVector, phi, T, tau, diff]]))
+
+########### Time-averaged Self Correlations in log-spaced time window ##########
+def computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower):
+    numParticles = readFromParams(dirName, "numParticles")
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
+    phi = readFromParams(dirName, "phi")
+    timeStep = readFromParams(dirName, "dt")
+    T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
+    pWaveVector = np.pi / pRad
+    print("wave vector: ", pWaveVector)
+    particleCorr = []
+    stepList = []
+    freqDecade = int(10**freqPower)
+    decadeSpacing = 10
+    spacingDecade = 1
+    stepDecade = 10
+    numBlocks = int(10**(maxPower-freqPower))
+    for power in range(maxPower):
+        for spacing in range(1,decadeSpacing):
+            stepRange = np.arange(0,stepDecade,spacing*spacingDecade,dtype=int)
+            #print(stepRange, spacing*spacingDecade)
+            stepParticleCorr = []
+            numPairs = 0
+            for multiple in range(startBlock, numBlocks):
+                for i in range(stepRange.shape[0]-1):
+                    if(checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
+                        #print(multiple, i, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        pPos1, pPos2 = readParticlePair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        stepParticleCorr.append(computeCorrFunctions(pPos1, pPos2, boxSize, pWaveVector, pRad**2, oneDim = True))
+                        numPairs += 1
+            if(numPairs > 0):
+                stepList.append(spacing*spacingDecade)
+                particleCorr.append(np.mean(stepParticleCorr, axis=0))
+        stepDecade *= 10
+        spacingDecade *= 10
+    stepList = np.array(stepList)
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
+    particleCorr = particleCorr[np.argsort(stepList)]
+    np.savetxt(dirName + os.sep + "corr-log-xdim.dat", np.column_stack((stepList, particleCorr)))
+    print("diffusivity on x: ", particleCorr[-1:,0]/(2 * stepList[-1:] * timeStep))
+    #plotCorrelation(stepList * timeStep, particleCorr[:,0], "$MSD(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color = 'r')
+    plotCorrelation(stepList * timeStep, particleCorr[:,0]/(stepList*timeStep), "$MSD(\\Delta t)/\\Delta t$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color = 'r')
+    #plotCorrelation(stepList * timeStep, particleCorr[:,1], "$ISF(t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
 
 ############################### Self Correlations ##############################
 def computeSelfCorr(dirName, maxPower):
@@ -878,6 +923,12 @@ if __name__ == '__main__':
         freqPower = int(sys.argv[5])
         qFrac = sys.argv[6]
         computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac)
+
+    elif(whichCorr == "plogcorrx"):
+        startBlock = int(sys.argv[3])
+        maxPower = int(sys.argv[4])
+        freqPower = int(sys.argv[5])
+        computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower)
 
     elif(whichCorr == "density"):
         numBins = int(sys.argv[3])
