@@ -45,6 +45,14 @@ def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False)
     chi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isf*isf
     return msd / scale, isf, chi4
 
+def computeSingleParticleISF(pos1, pos2, boxSize, waveVector, scale):
+    #delta = np.linalg.norm(pbcDistance(pos1, pos2, boxSize), axis=1)
+    delta = np.linalg.norm(pos1 - pos2, axis=1)
+    delta -= np.mean(delta)
+    #msd = delta**2
+    isf = np.sin(waveVector * delta) / (waveVector * delta)
+    return isf
+
 def computeSusceptibility(pos1, pos2, field, scale):
     delta = pos1[:,0] - pos2[:,0]
     delta -= np.mean(delta)
@@ -151,8 +159,8 @@ def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx
     ax.set_ylabel(ylabel, fontsize=17)
     plt.tight_layout()
     if(show == True):
-        #plt.pause(0.5)
-        plt.show()
+        plt.pause(0.5)
+        #plt.show()
 
 ########################### Pair Correlation Function ##########################
 def computePairCorr(dirName, plot=True):
@@ -411,6 +419,64 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
             print("not enough data to compute relaxation time")
         with open(dirName + "../tauDiff.dat", "ab") as f:
             np.savetxt(f, np.array([[timeStep, pWaveVector, phi, T, tau, diff]]))
+
+########## Time-averaged Single Correlations in log-spaced time window #########
+def computeSingleParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac = 1):
+    numParticles = int(readFromParams(dirName, "numParticles"))
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
+    phi = readFromParams(dirName, "phi")
+    timeStep = readFromParams(dirName, "dt")
+    T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
+    pWaveVector = 2 * np.pi / (float(qFrac) * 2 * pRad)
+    print("wave vector: ", pWaveVector)
+    particleCorr = []
+    stepList = []
+    freqDecade = int(10**freqPower)
+    decadeSpacing = 10
+    spacingDecade = 1
+    stepDecade = 10
+    numBlocks = int(10**(maxPower-freqPower))
+    for power in range(maxPower):
+        for spacing in range(1,decadeSpacing):
+            stepRange = np.arange(0,stepDecade,spacing*spacingDecade,dtype=int)
+            #print(stepRange, spacing*spacingDecade)
+            stepParticleCorr = np.zeros(numParticles)
+            numPairs = 0
+            for multiple in range(startBlock, numBlocks):
+                for i in range(stepRange.shape[0]-1):
+                    if(checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
+                        #print(multiple, i, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        pPos1, pPos2 = readParticlePair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        stepParticleCorr += computeSingleParticleISF(pPos1, pPos2, boxSize, pWaveVector, pRad**2)
+                        numPairs += 1
+            if(numPairs > 0):
+                stepList.append(spacing*spacingDecade)
+                particleCorr.append(stepParticleCorr/numPairs)
+        stepDecade *= 10
+        spacingDecade *= 10
+    stepList = np.array(stepList)
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],numParticles))
+    particleCorr = particleCorr[np.argsort(stepList)]
+    tau = []
+    step = stepList
+    for i in range(0,numParticles,20):
+        #plotCorrelation(stepList * timeStep, particleCorr[:,0]/(stepList*timeStep), "$MSD(\\Delta t)/\\Delta t$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
+        #plotCorrelation(stepList * timeStep, particleCorr[:,i], "$ISF(t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
+        ISF = particleCorr[:,i]
+        relStep = np.argwhere(ISF>np.exp(-1))[-1,0]
+        #tau.append(step[relStep] * timeStep)
+        if(relStep + 1 < step.shape[0]):
+            t1 = step[relStep]
+            t2 = step[relStep+1]
+            ISF1 = ISF[relStep]
+            ISF2 = ISF[relStep+1]
+            slope = (ISF2 - ISF1)/(t2 - t1)
+            intercept = ISF2 - slope * t2
+            tau.append(timeStep*(np.exp(-1) - intercept)/slope)
+        #    print("relaxation time: ", tau[i])
+    print("mean relaxation time: ", np.mean(tau), ", std: ", np.std(tau))
+    np.savetxt(dirName + "tauSingles.dat", np.array([[timeStep, pWaveVector, phi, T, np.mean(tau), np.var(tau), np.std(tau)]]))
 
 ########### One Dim Time-averaged Self Corr in log-spaced time window ##########
 def computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower):
@@ -923,7 +989,15 @@ if __name__ == '__main__':
         maxPower = int(sys.argv[4])
         freqPower = int(sys.argv[5])
         qFrac = sys.argv[6]
-        computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac)
+        computeTau = sys.argv[7]
+        computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac, computeTau=computeTau)
+
+    elif(whichCorr == "pcorrsingle"):
+        startBlock = int(sys.argv[3])
+        maxPower = int(sys.argv[4])
+        freqPower = int(sys.argv[5])
+        qFrac = sys.argv[6]
+        computeSingleParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac)
 
     elif(whichCorr == "plogcorrx"):
         startBlock = int(sys.argv[3])

@@ -23,8 +23,8 @@ def getStepList(numFrames, firstStep, stepFreq):
         stepList = stepList[-numFrames:]
     return stepList
 
-def plotParticleCorr(ax, x, y, ylabel, color, legendLabel = None, logx = True, logy = False):
-    ax.plot(x, y, linewidth=1.5, color=color, label=legendLabel)
+def plotParticleCorr(ax, x, y, ylabel, color, legendLabel = None, logx = True, logy = False, linestyle = 'solid'):
+    ax.plot(x, y, linewidth=1.5, color=color, linestyle = linestyle, label=legendLabel)
     ax.tick_params(axis='both', labelsize=15)
     ax.set_ylabel(ylabel, fontsize=18)
     if(logx == True):
@@ -522,53 +522,25 @@ def plotParticleEnergyScale(dirName, sampleName, figureName):
     plt.savefig("/home/francesco/Pictures/soft/soft-Tp-" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotParticleDensity(dirName, sampleName, numBins, figureName):
-    dataSetList = np.array(["2e01", "4e01", "6e01", "8e01", "1e02"])
-    colorList = cm.get_cmap('plasma', dataSetList.shape[0]+1)
-    fig, ax = plt.subplots(dpi = 120)
-    data = np.loadtxt(dirName + "../../langevin/T1e-01/dynamics/localDensity-N" + numBins + ".dat")
-    data = data[data[:,1]>0]
-    ax.plot(data[1:,0], data[1:,1], linewidth=1.2, marker='s', markersize=8, color='g')
-    for i in range(dataSetList.shape[0]):
-        if(os.path.exists(dirName + "/Dr" + sampleName + "-f0" + dataSetList[i] + "/dynamics/")):
-            data = np.loadtxt(dirName + "/Dr" + sampleName + "-f0" + dataSetList[i] + "/dynamics/localDensity-N" + numBins + ".dat")
-            data = data[data[:,1]>0]
-            ax.plot(data[1:,0], data[1:,1], linewidth=1.2, marker='o', markersize=4, color=colorList((i)/dataSetList.shape[0]))
-    ax.tick_params(axis='both', labelsize=15)
-    ax.set_ylabel('$P(\\varphi)$', fontsize=18)
-    ax.set_xlabel('$\\varphi$', fontsize=18)
-    ax.set_yscale('log')
-    #ax.set_xlim(-0.02, 1.02)
-    plt.tight_layout()
-    plt.savefig("/home/francesco/Pictures/soft/densityPDF-" + figureName + ".png", transparent=False, format = "png")
-    plt.show()
-
-def plotParticleFDT(dirName, figureName):
-    tmeasure = 20
-    fextStr = np.array(["1", "2", "3", "4", "5"])
+def plotParticleFDT(dirName, figureName, Dr, driving):
+    tmeasure = 100
+    fextStr = np.array(["2", "3", "4"])
     fext = fextStr.astype(float)
-    #diff = np.zeros((fextStr.shape[0],2))
     mu = np.zeros((fextStr.shape[0],2))
     T = np.zeros((fextStr.shape[0],2))
     fig, ax = plt.subplots(1, 2, figsize = (12.5, 5), dpi = 120)
-    corr = np.loadtxt(dirName + os.sep + "dynamics/corr-log-xdim.dat")
+    corr = np.loadtxt(dirName + os.sep + "dynamics/corr-log-q1.dat")
     timeStep = computeCorrelation.readFromParams(dirName + os.sep + "dynamics", "dt")
-    diff = corr[-1,1]/(2*corr[-1,0]*timeStep)
-    print(diff)
+    diff = np.mean(corr[corr[:,0]*timeStep>tmeasure,1]/(2*corr[corr[:,0]*timeStep>tmeasure,0]*timeStep))
     for i in range(fextStr.shape[0]):
-        #corr = np.loadtxt(dirName + os.sep + "dynamics-fext" + fextStr[i] + "/corr-lin.dat")
-        #corr = corr[tmeasure:,:]
-        #diff[i,0] = np.mean(corr[:,1]/(2*corr[:,0]))
-        #diff[i,1] = np.std(corr[:,1]/(2*corr[:,0]))
         sus = np.loadtxt(dirName + os.sep + "dynamics-fext" + fextStr[i] + "/susceptibility.dat")
-        sus = sus[tmeasure:,:]
+        sus = sus[sus[:,0]>tmeasure,:]
         mu[i,0] = np.mean(sus[:,1]/sus[:,0])
         mu[i,1] = np.std(sus[:,1]/sus[:,0])
         energy = np.loadtxt(dirName + os.sep + "dynamics-fext" + fextStr[i] + "/energy.dat")
         energy = energy[energy[:,0]>tmeasure,:]
         T[i,0] = np.mean(energy[:,4])
         T[i,1] = np.std(energy[:,4])
-    print(mu, diff, diff/mu)
     ax[0].errorbar(fext, mu[:,0], mu[:,1], color='k', marker='o', markersize=8, lw=1, ls='--', capsize=3)
     ax[1].errorbar(fext, T[:,0], T[:,1], color='b', marker='D', fillstyle='none', markeredgecolor = 'b', markeredgewidth = 1.5, markersize=8, lw=1, ls='--', capsize=3)
     ax[1].errorbar(fext, diff/mu[:,0], mu[:,1], color='k', marker='o', markersize=8, lw=1, ls='--', capsize=3)
@@ -580,7 +552,12 @@ def plotParticleFDT(dirName, figureName):
     ax[1].legend(("$Kinetic,$ $T$", "$FDT,$ $D/ \\mu = T_{FDT}$"), loc="lower right", fontsize=12)
     fig.tight_layout()
     fig.subplots_adjust(wspace=0.3)
-    fig.savefig("/home/francesco/Pictures/soft/pFDT-" + figureName + ".png", transparent=True, format = "png")
+    #fig.savefig("/home/francesco/Pictures/soft/pFDT-" + figureName + ".png", transparent=True, format = "png")
+    pSize = 2 * np.mean(np.array(np.loadtxt(dirName + os.sep + "dynamics/particleRad.dat")))
+    Pe = pSize * driving / 1e-02
+    Pev = ((driving / 1e03) / Dr) / pSize
+    print("Pe: ", Pev, " susceptibility: ",  np.mean(mu[i,0]), " diffusivity: ", diff, " T_FDT: ", diff/np.mean(mu[i,0]))
+    np.savetxt(dirName + "FDTtemp.dat", np.column_stack((Pe, Pev, np.mean(T[:,0]), np.std(T[:,0]), np.mean(mu[:,0]), np.std(mu[:,0]), diff)))
     plt.show()
 
 def plotParticleTeff(dirName, sampleName, figureName):
@@ -663,21 +640,23 @@ def plotParticleDynamics(dirName, sampleName, figureName):
     colorList = cm.get_cmap('plasma', dataSetList.shape[0])
     fig, ax = plt.subplots(dpi = 150)
     # plot brownian dynamics
-    data = np.loadtxt(dirName + "../../langevin/T1e-01/dynamics/corr-log-q1.dat")
-    timeStep = computeCorrelation.readFromParams(dirName + "../../langevin/T1e-01/dynamics/", "dt")
-    ax.semilogx(data[1:,0]*timeStep, data[1:,1], color='g', linestyle='--', linewidth=1.2, markersize = 10, markeredgewidth = 0.2, label = "passive")
-    #ax.semilogx(data[1:,0]*timeStep, data[1:,1]/(data[1:50,0]*timeStep), color='g', linestyle='--', linewidth=1.2, markersize = 10, markeredgewidth = 0.2, label = "passive")
+    data = np.loadtxt(dirName + "../../langevin/T1e-02/dynamics/corr-log-q1.dat")
+    timeStep = computeCorrelation.readFromParams(dirName + "../../langevin/T1e-02/dynamics/", "dt")
+    ax.semilogx(data[1:,0]*timeStep, data[1:,2], color='g', linestyle='--', linewidth=1.2, markersize = 10, markeredgewidth = 0.2, label = "passive")
+    #ax.semilogx(data[1:,0]*timeStep, data[1:,1]/(data[1:,0]*timeStep), color='g', linestyle='--', linewidth=1.2, markersize = 10, markeredgewidth = 0.2, label = "passive")
     # plot all the active dynamics
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + "/Dr" + sampleName + "-f0" + dataSetList[i] + "/dynamics/")):
             timeStep = computeCorrelation.readFromParams(dirName + "/Dr" + sampleName + "-f0" + dataSetList[i] + "/dynamics/", "dt")
             data = np.loadtxt(dirName + "/Dr" + sampleName + "-f0" + dataSetList[i] + "/dynamics/corr-log-q1.dat")
+            print("diffusivity: " , np.mean(data[data[:,0]*timeStep>100,1]/(4*data[data[:,0]*timeStep>100,0]*timeStep)))
+            print("relaxation time: ", timeStep*computeTau(data))
             legendlabel = "$D_r=$" + sampleName + ", $f_0=$" + dataSetList[i]
-            #plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,2], "$ISF(\\Delta t)$", color = colorList((i)/dataSetList.shape[0]), legendLabel = legendlabel)
-            plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,1], "$MSD(\\Delta t)$", color = colorList((i)/dataSetList.shape[0]), legendLabel = legendlabel, logy=True)
+            plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,2], "$ISF(\\Delta t)$", color = colorList((i)/dataSetList.shape[0]), legendLabel = legendlabel)
+            #plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,1], "$MSD(\\Delta t)$", color = colorList((i)/dataSetList.shape[0]), legendLabel = legendlabel, logy=True)
             #plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,1]/(data[1:,0]*timeStep), "$MSD(\\Delta t) / \\Delta t$", color = colorList((i)/dataSetList.shape[0]), legendLabel = legendlabel, logy = True)
     #ax.plot(np.linspace(1e-05,1e10,50), np.exp(-1)*np.ones(50), linestyle='--', linewidth=1.2, color='k')
-    ax.legend(fontsize=10, loc="upper left")
+    ax.legend(fontsize=10, loc="lower left")
     #ax.legend(loc = "upper right", fontsize = 11)
     ax.set_xlabel("$Time$ $interval,$ $\\Delta t$", fontsize=18)
     #ax.set_xlim(2e-04, 4e02)
@@ -685,11 +664,54 @@ def plotParticleDynamics(dirName, sampleName, figureName):
     plt.savefig("/home/francesco/Pictures/soft/p" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
+def compareParticleDynamicsFDT(dirName, sampleName, figureName):
+    f0SetList = np.array(["1e01", "2e01", "4e01", "6e01", "8e01", "1e02"])
+    fdtSetList = np.array(["0.02", "0.08", "0.15", "0.21", "0.31", "0.48"])#0.21
+    colorList = cm.get_cmap('plasma', f0SetList.shape[0])
+    fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
+    for i in range(f0SetList.shape[0]):
+        if(os.path.exists(dirName + "/Dr" + sampleName + "-f0" + f0SetList[i] + "/dynamics/")):
+            data = np.loadtxt(dirName + "/Dr" + sampleName + "-f0" + f0SetList[i] + "/dynamics/corr-log-q1.dat")
+            timeStep = computeCorrelation.readFromParams(dirName + "/Dr" + sampleName + "-f0" + f0SetList[i] + "/dynamics/", "dt")
+            #plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,1], "$MSD(\\Delta t)$", color = colorList(i/dataSetList.shape[0]), logy = 'log')
+            plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,2], "$ISF(\\Delta t)$", color = colorList(i/f0SetList.shape[0]))
+            data = np.loadtxt(dirName + "../../../glassFDT/langevin/T" + fdtSetList[i] + "/dynamics/corr-log-q1.dat")
+            timeStep = computeCorrelation.readFromParams(dirName + "../../../glassFDT/langevin/T" + fdtSetList[i] + "/dynamics/", "dt")
+            #plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,1], "$MSD(\\Delta t)$", color = colorList(i/dataSetList.shape[0]), logy = 'log')
+            plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,2], "$ISF(\\Delta t)$", linestyle='--', color = colorList(i/f0SetList.shape[0]))
+    #ax.plot(np.linspace(1e-03,1e10,50), np.exp(-1)*np.ones(50), linestyle='--', linewidth=1.5, color='k')
+    ax.set_xlabel("$Time$ $interval,$ $\\Delta t$", fontsize=18)
+    #ax.set_xlim(4e-04, 4e07)
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/soft/pcompare-active-thermalFDT-" + figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
+def plotParticleDensity(dirName, sampleName, numBins, figureName):
+    dataSetList = np.array(["1e01", "2e01", "4e01", "6e01", "8e01", "1e02"])
+    colorList = cm.get_cmap('plasma', dataSetList.shape[0]+1)
+    fig, ax = plt.subplots(dpi = 120)
+    data = np.loadtxt(dirName + "../../langevin/T1e-02/dynamics/localDensity-N" + numBins + ".dat")
+    data = data[data[:,1]>0]
+    ax.plot(data[1:,0], data[1:,1], linewidth=1.2, marker='s', markersize=8, color='g')
+    for i in range(dataSetList.shape[0]):
+        if(os.path.exists(dirName + "/Dr" + sampleName + "-f0" + dataSetList[i] + "/dynamics/")):
+            data = np.loadtxt(dirName + "/Dr" + sampleName + "-f0" + dataSetList[i] + "/dynamics/localDensity-N" + numBins + ".dat")
+            data = data[data[:,1]>0]
+            ax.plot(data[1:,0], data[1:,1], linewidth=1.2, marker='o', markersize=4, color=colorList((i)/dataSetList.shape[0]))
+    ax.tick_params(axis='both', labelsize=15)
+    ax.set_ylabel('$P(\\varphi)$', fontsize=18)
+    ax.set_xlabel('$\\varphi$', fontsize=18)
+    ax.set_yscale('log')
+    #ax.set_xlim(-0.02, 1.02)
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/soft/densityPDF-" + figureName + ".png", transparent=False, format = "png")
+    plt.show()
+
 def plotParticleDynamicsVStemp(dirName, figureName):
     T = []
     Deff = []
     tau = []
-    dataSetList = np.array(["1e-01", "8e-02", "6e-02", "4e-02"])
+    dataSetList = np.array(["1e-01", "8e-02", "6e-02"])
     colorList = cm.get_cmap('plasma', dataSetList.shape[0])
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
     for i in range(dataSetList.shape[0]):
@@ -723,10 +745,10 @@ def plotParticleDynamicsVStemp(dirName, figureName):
     plt.show()
 
 def plotParticleTauVStemp(dirName, figureName):
-    phiJ = 0.84267
-    mu = 1.25
-    delta = 1.1
-    dataSetList = np.array(["0", "1", "2", "3", "4", "5", "6", "7"])
+    phiJ = 0.84567
+    mu = 1.5
+    delta = 1.05
+    dataSetList = np.array(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"])
     colorList = cm.get_cmap('viridis', dataSetList.shape[0]+10)
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
     for i in range(dataSetList.shape[0]):
@@ -735,7 +757,8 @@ def plotParticleTauVStemp(dirName, figureName):
             phi = computeCorrelation.readFromParams(dirName + dataSetList[i], "phi")
             #ax.loglog(1/data[:,0], np.log(data[:,2]), linewidth=1.5, color=colorList((dataSetList.shape[0]-i)/dataSetList.shape[0]), marker='o')
             ax.loglog(np.abs(phi - phiJ)**(2/mu)/data[:,0], np.abs(phiJ - phi)**(delta) * np.log(np.sqrt(data[:,0])*data[:,2]), linewidth=1.5, color=colorList((dataSetList.shape[0]-i)/dataSetList.shape[0]), marker='o')
-    #ax.set_ylim(1.8, 15)
+    ax.set_xlim(2.6e-03, 4.2e02)
+    ax.set_ylim(6.3e-03, 1.2)
     ax.tick_params(axis='both', labelsize=14)
     #ax.set_xlabel("$Inverse$ $temperature,$ $1/T$", fontsize=17)
     ax.set_xlabel("$|\\varphi - \\varphi_J|^{2/\\mu}/T$", fontsize=17)
@@ -828,7 +851,7 @@ def plotParticleISFVSphi(dirName, sampleName, figureName):
     phi = []
     tau = []
     dirDyn = "/langevin/"
-    dataSetList = np.array(["0", "1", "2", "3", "4", "5", "6", "7"])
+    dataSetList = np.array(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"])
     colorList = cm.get_cmap('viridis', dataSetList.shape[0])
     fig, ax = plt.subplots(dpi = 150)
     for i in range(dataSetList.shape[0]):
@@ -839,14 +862,6 @@ def plotParticleISFVSphi(dirName, sampleName, figureName):
             tau.append(timeStep*computeTau(data))
             legendlabel = "$\\varphi=$" + str(np.format_float_positional(phi[-1],4))
             plotParticleCorr(ax, data[1:,0]*timeStep, data[1:,2], "$ISF(\\Delta t)$", color = colorList((dataSetList.shape[0]-i)/dataSetList.shape[0]), legendLabel = legendlabel)
-            xdata = data[20:,0] * timeStep
-            ydata = data[20:,2]
-            #pWaveVector = np.pi / np.mean(np.array(np.loadtxt(dirName + dataSetList[i] + dirDyn + "/T" + sampleName + "/dynamics/particleRad.dat")))
-            popt, pcov = curve_fit(func, xdata, ydata, p0 = (1, 0.5, tau[-1])) # popt are optimal paramters from the fit
-            print(popt)
-            ax.plot(xdata, func(xdata, *popt), '--', color = colorList((dataSetList.shape[0]-i)/dataSetList.shape[0]))
-            #ax.plot(xdata, func(xdata, 1, 0.9, tau[-1]), '--', color = colorList((dataSetList.shape[0]-i)/dataSetList.shape[0]))
-            #ax.plot(xdata, np.exp(-xdata**0.7 / tau[-1]), '--', color = colorList((dataSetList.shape[0]-i)/dataSetList.shape[0]))
     #ax.plot(np.linspace(1e-03,1e10,50), np.exp(-1)*np.ones(50), linestyle='--', linewidth=1.5, color='k')
     #ax.set_ylim(3e-06,37100)#2.3e-04
     ax.legend(loc = "lower left", fontsize = 11, ncol = 2)
@@ -1185,7 +1200,9 @@ elif(whichPlot == "pdensity"):
 
 elif(whichPlot == "pfdt"):
     figureName = sys.argv[3]
-    plotParticleFDT(dirName, figureName)
+    Dr = float(sys.argv[4])
+    driving = float(sys.argv[5])
+    plotParticleFDT(dirName, figureName, Dr, driving)
 
 elif(whichPlot == "pteff"):
     sampleName = sys.argv[3]
@@ -1196,6 +1213,11 @@ elif(whichPlot == "pdyn"):
     sampleName = sys.argv[3]
     figureName = sys.argv[4]
     plotParticleDynamics(dirName, sampleName, figureName)
+
+elif(whichPlot == "pcomparefdt"):
+    sampleName = sys.argv[3]
+    figureName = sys.argv[4]
+    compareParticleDynamicsFDT(dirName, sampleName, figureName)
 
 elif(whichPlot == "pdynphi"):
     sampleName = sys.argv[3]
