@@ -41,9 +41,10 @@ def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False)
         delta = pos1[:,0] - pos2[:,0]
     delta -= np.mean(delta)
     msd = np.mean(delta**2)
+    forth = np.mean(delta**4)
     isf = np.mean(np.sin(waveVector * delta) / (waveVector * delta))
     chi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isf*isf
-    return msd / scale, isf, chi4
+    return msd / scale, isf, chi4, forth/(2*msd**2)-1
 
 def computeSingleParticleISF(pos1, pos2, boxSize, waveVector, scale):
     #delta = np.linalg.norm(pbcDistance(pos1, pos2, boxSize), axis=1)
@@ -159,8 +160,8 @@ def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx
     ax.set_ylabel(ylabel, fontsize=17)
     plt.tight_layout()
     if(show == True):
-        plt.pause(0.5)
-        #plt.show()
+        #plt.pause(0.5)
+        plt.show()
 
 ########################### Pair Correlation Function ##########################
 def computePairCorr(dirName, plot=True):
@@ -184,6 +185,19 @@ def computePairCorr(dirName, plot=True):
         plotCorrelation(binCenter, pairCorr, "$Pair$ $correlation$ $function,$ $g(r)$")
     else:
         return firstPeak
+
+def computeParticleVelPDF(dirName, plot=True):
+    vel = []
+    for dir in os.listdir(dirName):
+        if(os.path.isdir(dirName + os.sep + dir)):
+            vel.append(np.loadtxt(dirName + os.sep + dir + os.sep + "particleVel.dat"))
+    vel = np.array(vel).flatten()
+    Temp = np.var(vel)
+    vel /= np.sqrt(2*Temp)
+    velPDF, edges = np.histogram(vel, bins=np.linspace(np.min(vel), np.max(vel), 100), density=True)
+    edges = 0.5 * (edges[:-1] + edges[1:])
+    print("Variance of the velocity pdf:", Temp)
+    plotCorrelation(edges, velPDF, "$Velocity$ $distribution,$ $P(c)$", logy = True)
 
 ##################### Particle Self Velocity Correlations ######################
 def computeParticleVelCorr(dirName, maxPower):
@@ -290,7 +304,7 @@ def computeParticleSelfCorr(dirName, maxPower):
     for i in range(1,stepRange.shape[0]):
         pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particlePos.dat"))
         particleCorr.append(computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
-    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
+    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,4))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin.dat", np.column_stack((stepRange * timeStep, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-computeFrom:,0]/(2 * stepRange[-computeFrom:] * timeStep)), np.var(particleCorr[-computeFrom:,0]/(2 * stepRange[-computeFrom:] * timeStep)))
@@ -331,7 +345,7 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
         for i in range(1,stepBlock.shape[0]):
             pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepBlock[i]) + "/particlePos.dat"))
             particleCorr.append(computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
-        particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,3))
+        particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,4))
         stepBlock = stepBlock[1:]-(block-1)*decade#discard initial time
         if(plot=="plot"):
             plotCorrelation(stepBlock*timeStep, particleCorr[:,0], "$MSD(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color=colorList(block/10), show=False)
@@ -394,7 +408,7 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
-    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],4))
     particleCorr = particleCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log-q" + str(qFrac) + ".dat", np.column_stack((stepList, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-1:,0]/(2 * stepRange[-1:] * timeStep)))
@@ -514,7 +528,7 @@ def computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower):
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
-    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],4))
     particleCorr = particleCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log-xdim.dat", np.column_stack((stepList, particleCorr)))
     print("diffusivity on x: ", particleCorr[-1:,0]/(2 * stepList[-1:] * timeStep))
@@ -546,8 +560,8 @@ def computeSelfCorr(dirName, maxPower):
         pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/positions.dat"))
         particleCorr.append(computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, boxSize))
         vertexCorr.append(computeCorrFunctions(pos, pos0, boxSize, waveVector, boxSize))
-    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
-    vertexCorr = np.array(vertexCorr).reshape((stepRange.shape[0]-1,3))
+    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,4))
+    vertexCorr = np.array(vertexCorr).reshape((stepRange.shape[0]-1,4))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin.dat", np.column_stack((stepRange, particleCorr, vertexCorr)))
     plotCorrelation(stepRange, particleCorr[:,1], "$ISF$", "$Simulation$ $step$", logx = True, color='k')
@@ -584,8 +598,8 @@ def checkSelfCorr(dirName, numBlocks, maxPower):
             pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepBlock[i]) + "/positions.dat"))
             particleCorr.append(computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, boxSize))
             vertexCorr.append(computeCorrFunctions(pos, pos0, boxSize, waveVector, boxSize))
-        particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,3))
-        vertexCorr = np.array(vertexCorr).reshape((stepBlock.shape[0]-1,3))
+        particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,4))
+        vertexCorr = np.array(vertexCorr).reshape((stepBlock.shape[0]-1,4))
         stepBlock = stepBlock[1:]-(block-1)*decade#discard initial time
         plotCorrelation(stepBlock, particleCorr[:,1], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color=colorList(block/10), show=False)
         plt.pause(0.2)
@@ -632,8 +646,8 @@ def computeLogSelfCorr(dirName, startBlock, maxPower, freqPower):
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
-    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
-    vertexCorr = np.array(vertexCorr).reshape((stepList.shape[0],3))
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],4))
+    vertexCorr = np.array(vertexCorr).reshape((stepList.shape[0],4))
     particleCorr = particleCorr[np.argsort(stepList)]
     vertexCorr = vertexCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log.dat", np.column_stack((stepList, particleCorr, vertexCorr)))
@@ -675,8 +689,8 @@ def computeBlockSelfCorr(dirName, startBlock, maxPower, freqPower):
                 #print(stepList[-1], np.var(stepParticleCorr, axis=0))
         print(decade, stepList[-1])
     stepList = np.array(stepList)
-    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
-    vertexCorr = np.array(vertexCorr).reshape((stepList.shape[0],3))
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],4))
+    vertexCorr = np.array(vertexCorr).reshape((stepList.shape[0],4))
     particleCorr = particleCorr[np.argsort(stepList)]
     vertexCorr = vertexCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log.dat", np.column_stack((stepList, particleCorr, vertexCorr)))
@@ -958,6 +972,9 @@ if __name__ == '__main__':
 
     if(whichCorr == "paircorr"):
         computePairCorr(dirName)
+
+    elif(whichCorr == "pvelpdf"):
+        computeParticleVelPDF(dirName)
 
     elif(whichCorr == "pvel"):
         maxPower = int(sys.argv[3])
