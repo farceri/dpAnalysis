@@ -719,11 +719,47 @@ def plotParticleDensity(dirName, sampleName, numBins, figureName):
     plt.savefig("/home/francesco/Pictures/soft/densityPDF-" + figureName + ".png", transparent=False, format = "png")
     plt.show()
 
+def plotParticleDensityVSTime(dirName, sampleName, numBins, figureName):
+    dataSetList = np.array(["1", "1e-01", "1e-02"])
+    pressureList = np.array(["590", "650", "780"])
+    colorList = ['k', 'b', 'g']
+    markerList = ['o', 'v', '*']
+    fig, ax = plt.subplots(dpi = 120)
+    for i in range(dataSetList.shape[0]):
+        var = []
+        phi = []
+        step = []
+        dirSample = dirName + "Dr" + dataSetList[i] + "/Dr" + dataSetList[i] + "-f0" + sampleName + "/dynamics-p0" + pressureList[i] + "/"
+        for dir in os.listdir(dirSample):
+            if(os.path.exists(dirSample + os.sep + dir + os.sep + "restAreas.dat")):
+                if(float(dir[1:])%1e04 == 0):
+                    var.append(np.var(computeCorrelation.computeLocalDensity(dirSample + os.sep + dir, numBins)))
+                    phi.append(computeCorrelation.readFromParams(dirSample + os.sep + dir, "phi"))
+                    step.append(int(dir[1:]))
+        var = np.array(var)
+        phi = np.array(phi)
+        step = np.array(step)
+        var = var[np.argsort(step)]
+        phi = phi[np.argsort(step)]
+        step = np.sort(step)
+        plt.plot(phi, var, color=colorList[i], lw=0.3, marker=markerList[i])
+    ax.tick_params(axis='both', labelsize=12)
+    ax.set_xlabel('$Simulation$ $step$', fontsize=18)
+    ax.set_xlabel('$Packing$ $fraction$', fontsize=18)
+    ax.set_ylabel('$Variance$ $of$ $local$ $density$', fontsize=18)
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/soft/localDensity-vsPhi-" + figureName + ".png", transparent=False, format = "png")
+    plt.show()
+
 def plotParticleDynamicsVStemp(dirName, figureName):
     T = []
     Deff = []
     tau = []
-    dataSetList = np.array(["1e-01", "8e-02", "6e-02"])
+    #dataSetList = np.array(["1e-01", "8e-02", "6e-02"])
+    dataSetList = np.array(["0.03", "0.04", "0.05", "0.06", "0.07", "0.08", "0.09", "0.1",
+                            "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18",
+                            "0.19", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9",
+                            "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
     colorList = cm.get_cmap('plasma', dataSetList.shape[0])
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
     for i in range(dataSetList.shape[0]):
@@ -731,7 +767,7 @@ def plotParticleDynamicsVStemp(dirName, figureName):
             data = np.loadtxt(dirName + "/T" + dataSetList[i] + "/dynamics/corr-log-q1.dat")
             timeStep = computeCorrelation.readFromParams(dirName + "/T" + dataSetList[i] + "/dynamics/", "dt")
             energy = np.loadtxt(dirName + "/T" + dataSetList[i] + "/dynamics/energy.dat")
-            T.append(np.mean(energy[10:,4]))
+            T.append(computeCorrelation.readFromParams(dirName + "/T" + dataSetList[i] + "/dynamics/", "temperature"))
             Deff.append(data[-1,1]/(4 * data[-1,0] * timeStep))
             tau.append(timeStep*computeTau(data))
             #tau.append(0.5*(data[relStep,0]+data[relStep+1,0])*timeStep)
@@ -746,11 +782,11 @@ def plotParticleDynamicsVStemp(dirName, figureName):
     T = np.array(T)
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
     #ax[1].semilogy(phi, Deff, linewidth=1.5, color='k', marker='o')
-    ax.loglog(1/T, np.log(tau), linewidth=1.5, color='k', marker='o')
+    ax.loglog(1/T, tau*np.sqrt(T), linewidth=1.5, color='k', marker='o')
     ax.tick_params(axis='both', labelsize=14)
     ax.set_xlabel("$Inverse$ $temperature,$ $1/T$", fontsize=17)
     #ax[1].set_ylabel("$Diffusivity,$ $D_{eff}$", fontsize=17)
-    ax.set_ylabel("$log(\\tau)$", fontsize=17)
+    ax.set_ylabel("$\\tau \\sqrt{T}$", fontsize=17)
     plt.tight_layout()
     np.savetxt(dirName + "../diff-tau-vs-temp.dat", np.column_stack((T, Deff, tau)))
     plt.savefig("/home/francesco/Pictures/soft/ptau-T-" + figureName + ".png", transparent=True, format = "png")
@@ -1211,6 +1247,12 @@ elif(whichPlot == "pdensity"):
     numBins = sys.argv[4]
     figureName = sys.argv[5]
     plotParticleDensity(dirName, sampleName, numBins, figureName)
+
+elif(whichPlot == "pdensityvstime"):
+    sampleName = sys.argv[3]
+    numBins = int(sys.argv[4])
+    figureName = sys.argv[5]
+    plotParticleDensityVSTime(dirName, sampleName, numBins, figureName)
 
 elif(whichPlot == "pfdt"):
     figureName = sys.argv[3]
