@@ -68,13 +68,6 @@ def computeSingleParticleISF(pos1, pos2, boxSize, waveVector, scale):
     isf = np.sin(waveVector * delta) / (waveVector * delta)
     return isf
 
-def computeSusceptibility(pos1, pos2, field, scale):
-    delta = pos1[:,0] - pos2[:,0]
-    delta -= np.mean(delta)
-    sus = delta / field
-    chi = np.mean(sus)
-    return chi / scale
-
 def computeShapeCorrFunction(shape1, shape2):
     return (np.mean(shape1 * shape2) - np.mean(shape1)**2) / (np.mean(shape1**2) - np.mean(shape1)**2)
 
@@ -174,8 +167,8 @@ def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx
     ax.set_ylabel(ylabel, fontsize=17)
     plt.tight_layout()
     if(show == True):
-        plt.pause(1)
-        #plt.show()
+        #plt.pause(1)
+        plt.show()
 
 ########################### Pair Correlation Function ##########################
 def computePairCorr(dirName, plot=True):
@@ -275,28 +268,48 @@ def computeParticleLogVelCorr(dirName, startBlock, maxPower, freqPower):
     np.savetxt(dirName + os.sep + "vel-logcorr.dat", np.column_stack((stepList, particleVelCorr)))
     plotCorrelation(stepList, particleVelCorr[:,1], "$\\langle \\hat{n}(t) \\cdot \\hat{n}(t') \\rangle$", "$time$ $interval,$ $\\Delta t = t - t'$", logx = True, color = 'g')
 
+def computeSusceptibility(pos1, pos2, field, waveVector, scale):
+    delta = pos1[:,0] - pos2[:,0]
+    delta -= np.mean(delta)
+    chi = np.mean(delta / field)
+    isf = np.exp(1.j*waveVector*delta/field)
+    chiq = np.mean(isf**2) - np.mean(isf)**2
+    return chi / scale, np.real(chiq)
+
 ############################ Particle Susceptibility ###########################
-def computeParticleSusceptibility(dirName, maxPower):
+def computeParticleSusceptibility(dirName, sampleName, maxPower):
     numParticles = readFromParams(dirName, "numParticles")
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     timeStep = readFromParams(dirName, "dt")
     particleChi = []
+    particleCorr = []
     # get trajectory directories
     stepRange = getDirectories(dirName)
     stepRange = np.array(np.char.strip(stepRange, 't'), dtype=int)
     stepRange = np.sort(stepRange)
     pPos0 = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[0]) + "/particlePos.dat"))
+    pos0 = np.array(np.loadtxt(dirName + os.sep + "../" + sampleName + "/t" + str(stepRange[0]) + "/particlePos.dat"))
     pField = np.array(np.loadtxt(dirName + os.sep + "externalField.dat"))
     pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[0]) + "/particleRad.dat")))
+    pWaveVector = np.pi / pRad
+    damping = 1e03
+    scale = pRad**2
     stepRange = stepRange[stepRange<int(10**maxPower)]
     for i in range(1,stepRange.shape[0]):
         pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particlePos.dat"))
-        particleChi.append(computeSusceptibility(pPos, pPos0, pField, pRad**2))
+        pos = np.array(np.loadtxt(dirName + os.sep + "../" + sampleName + "/t" + str(stepRange[i]) + "/particlePos.dat"))
+        particleChi.append(computeSusceptibility(pPos, pPos0, pField, pWaveVector, scale))
+        #particleChi.append(computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, scale, oneDim = True))
+        particleCorr.append(computeCorrFunctions(pos, pos0, boxSize, pWaveVector, scale, oneDim = True))
     particleChi = np.array(particleChi)
+    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
     stepRange = stepRange[1:]#discard initial time
-    np.savetxt(dirName + os.sep + "susceptibility.dat", np.column_stack((stepRange*timeStep, particleChi)))
-    print("susceptibility ", np.mean(particleChi[-20:]/(stepRange[-20:]*timeStep)), " ", np.std(particleChi[-20:]/(stepRange[-20:]*timeStep)))
-    plotCorrelation(stepRange*timeStep, particleChi/(stepRange*timeStep), "$\\chi / t$", "$Simulation$ $step$", logx = True, color='k')
+    np.savetxt(dirName + os.sep + "sus-lin-xdim.dat", np.column_stack((stepRange*timeStep, particleChi)))
+    np.savetxt(dirName + os.sep + "../dynamics-test/corr-lin-xdim.dat", np.column_stack((stepRange*timeStep, particleCorr)))
+    print("susceptibility: ", np.mean(particleChi[-20:,0]/(stepRange[-20:]*timeStep)), " ", np.std(particleChi[-20:,0]/(stepRange[-20:]*timeStep)))
+    #plotCorrelation(stepRange*timeStep, particleChi[:,0]/(stepRange*timeStep), "$\\chi_0/t$", "$Simulation$ $step$", logx = True, color='k')
+    #plotCorrelation(stepRange*timeStep, particleCorr[:,0]/(2*particleChi[:,0]), "$T_{FDT}$", "$Simulation$ $step$", logx = True, color='k')
+    plotCorrelation(particleCorr[:,1], particleChi[:,1], "$\\chi$", "$ISF$", color='k')
 
 ###################### One Dim Particle Self Correlations ######################
 def computeParticleSelfCorrOneDim(dirName, maxPower):
@@ -324,8 +337,8 @@ def computeParticleSelfCorrOneDim(dirName, maxPower):
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin-xdim.dat", np.column_stack((stepRange * timeStep, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-20:,0]/(2*stepRange[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(2*stepRange[-20:]*timeStep)))
-    #plotCorrelation(stepRange * timeStep, particleCorr[:,0]/(stepRange * timeStep), "$MSD/t$", "$Simulation$ $time,$ $t$", logx = True, logy = True, color='k')
-    plotCorrelation(stepRange * timeStep, particleCorr[:,2], "$\\gamma_2(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color='k')
+    plotCorrelation(stepRange * timeStep, particleCorr[:,0]/(stepRange*timeStep), "$MSD(t)/t$", "$Simulation$ $time,$ $t$", logx = True, color='k')
+    #plotCorrelation(stepRange * timeStep, particleCorr[:,0], "$MSD(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color='k')
 
 ########### One Dim Time-averaged Self Corr in log-spaced time window ##########
 def computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower):
@@ -367,8 +380,8 @@ def computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower):
     particleCorr = particleCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log-xdim.dat", np.column_stack((stepList * timeStep, particleCorr)))
     print("diffusivity on x: ", np.mean(particleCorr[-20:,0]/(2*stepList[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(2*stepList[-20:]*timeStep)))
+    plotCorrelation(stepList * timeStep, particleCorr[:,0]/(stepList*timeStep), "$MSD(\\Delta t)/\\Delta t$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
     #plotCorrelation(stepList * timeStep, particleCorr[:,0], "$MSD(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color = 'r')
-    plotCorrelation(stepList * timeStep, particleCorr[:,0]/(stepList*timeStep), "$MSD(\\Delta t)/\\Delta t$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color = 'r')
     #plotCorrelation(stepList * timeStep, particleCorr[:,1], "$ISF(t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
 
 ########################## Particle Self Correlations ##########################
@@ -399,7 +412,7 @@ def computeParticleSelfCorr(dirName, maxPower):
     np.savetxt(dirName + os.sep + "corr-lin.dat", np.column_stack((stepRange*timeStep, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)))
     #plotCorrelation(stepRange * timeStep, particleCorr[:,0]/(stepRange * timeStep), "$MSD/t$", "$Simulation$ $time,$ $t$", logx = True, logy = True, color='k')
-    plotCorrelation(stepRange * timeStep, particleCorr[:,2], "$\\gamma_2(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color='k')
+    plotCorrelation(stepRange * timeStep, particleCorr[:,2], "$\\ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color='k')
 
 ########## Check Self Correlations by logarithmically spaced blocks ############
 def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau="tau"):
@@ -438,7 +451,7 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
         stepBlock = stepBlock[1:]-(block-1)*decade#discard initial time
         if(plot=="plot"):
             #plotCorrelation(stepBlock*timeStep, particleCorr[:,0], "$MSD(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color=colorList(block/10), show=False)
-            plotCorrelation(stepBlock*timeStep, particleCorr[:,1], "$\\alpha_2(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color=colorList(block/10), show=False)
+            plotCorrelation(stepBlock*timeStep, particleCorr[:,1], "$\\ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color=colorList(block/10), show=False)
             plt.pause(0.2)
         if(computeTau=="tau"):
             diff.append(particleCorr[-10,0]/4*stepBlock[-10])
@@ -1035,8 +1048,9 @@ if __name__ == '__main__':
         computeParticleLogVelCorr(dirName, startBlock, maxPower, freqPower)
 
     elif(whichCorr == "psus"):
-        maxPower = int(sys.argv[3])
-        computeParticleSusceptibility(dirName, maxPower)
+        sampleName = sys.argv[3]
+        maxPower = int(sys.argv[4])
+        computeParticleSusceptibility(dirName, sampleName, maxPower)
 
     elif(whichCorr == "pcorr"):
         maxPower = int(sys.argv[3])
