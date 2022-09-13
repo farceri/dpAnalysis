@@ -8,16 +8,33 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 import sys
 import os
+import utilsCorr as ucorr 
 
-def pbcDistance(r1, r2, boxSize):
-    delta = r1 - r2
-    delta += boxSize / 2
-    delta %= boxSize
-    delta -= boxSize / 2
-    return delta
+################################ shape reading #################################
+def readShape(dirName, boxSize, nv):
+    pos = np.array(np.loadtxt(dirName + os.sep + "positions.dat"))
+    area = np.loadtxt(dirName + os.sep + "areas.dat")
+    _, perimeter = shapeDescriptors.getAreaAndPerimeterList(pos, boxSize, nv)
+    np.savetxt(dirName + os.sep + "perimeters.dat", perimeter)
+    return perimeter**2/(4*np.pi*area)
 
-def computeCorrelation(data1, data2):
-    return (data2 - data1)**2
+def readShapePair(dirName, index1, index2):
+    perimeter1 = np.loadtxt(dirName + os.sep + "t" + str(index1) + "/perimeters.dat")
+    area1 = np.loadtxt(dirName + os.sep + "t" + str(index1) + "/areas.dat")
+    perimeter2 = np.loadtxt(dirName + os.sep + "t" + str(index2) + "/perimeters.dat")
+    area2 = np.loadtxt(dirName + os.sep + "t" + str(index2) + "/areas.dat")
+    return perimeter1**2/(4*np.pi*area1), perimeter2**2/(4*np.pi*area2)
+
+def calcShapePair(dirName, index1, index2, boxSize, nv):
+    area1 = np.loadtxt(dirName + os.sep + "t" + str(index1) + "/areas.dat")
+    pos1 = np.array(np.loadtxt(dirName + os.sep + "t" + str(index1) + os.sep + "positions.dat"))
+    _, perimeter1 = shapeDescriptors.getAreaAndPerimeterList(pos1, boxSize, nv)
+    np.savetxt(dirName + os.sep + "t" + str(index1) + os.sep + "perimeters.dat", perimeter1)
+    area2 = np.loadtxt(dirName + os.sep + "t" + str(index2) + "/areas.dat")
+    pos2 = np.array(np.loadtxt(dirName + os.sep + "t" + str(index2) + os.sep + "positions.dat"))
+    _, perimeter2 = shapeDescriptors.getAreaAndPerimeterList(pos2, boxSize, nv)
+    np.savetxt(dirName + os.sep + "t" + str(index2) + os.sep + "perimeters.dat", perimeter2)
+    return perimeter1**2/(4*np.pi*area1), perimeter2**2/(4*np.pi*area2)
 
 def computePDF(data, bins, density=True):
     pdf, edges = np.histogram(data, bins=bins, density=density)
@@ -50,7 +67,7 @@ def getAreaAndPerimeterList(pos, boxSize, nv):
             nextId = vId + 1
             if(vId == idList[-1]):
                 nextId = idList[0]
-            delta = pbcDistance(pos[nextId,:], currentPos, boxSize)
+            delta = ucorr.pbcDistance(pos[nextId,:], currentPos, boxSize)
             nextPos = pos[nextId,:] + delta
             area[pId] += currentPos[0] * nextPos[1] - nextPos[0] * currentPos[1]
             perimeter[pId] += np.linalg.norm(delta)
@@ -119,7 +136,7 @@ def computeInertiaTensor(dirName, boxSize, nv, numBins = 20, plot=True):
     for pId in range(numParticles):
         idList = np.arange(firstVertex, firstVertex+nv[pId], 1)
         for vId in idList:
-            delta = pbcDistance(pos[vId,:], pPos[pId], boxSize)
+            delta = ucorr.pbcDistance(pos[vId,:], pPos[pId], boxSize)
             moment[pId,0] += delta[0]**2
             moment[pId,1] += delta[0]*delta[1]
             moment[pId,2] += delta[1]*delta[0]
@@ -145,7 +162,7 @@ def computeStretchTensor(dirName, boxSize, nv, numBins = 20, plot=True):
             nextId = vId + 1
             if(vId == idList[-1]):
                 nextId = idList[0]
-            delta = pbcDistance(pos[nextId,:], currentPos, boxSize)
+            delta = ucorr.pbcDistance(pos[nextId,:], currentPos, boxSize)
             nextPos = pos[nextId,:] + delta
             moment[pId,0] += delta[0]**2
             moment[pId,1] += delta[0]*delta[1]
@@ -166,12 +183,12 @@ def computeParticleElongation(pos, boxSize):
         for j in range(i):
             if(distances[i,j] > longestDistance):
                 longestDistance = distances[i,j]
-                longestDelta = pbcDistance(pos[i], pos[j], boxSize)
+                longestDelta = ucorr.pbcDistance(pos[i], pos[j], boxSize)
     longestPerpendicularDistance = 0
     highestSinangle = 0
     for i in range(pos.shape[0]):
         for j in range(i):
-            delta = pbcDistance(pos[i], pos[j], boxSize)
+            delta = ucorr.pbcDistance(pos[i], pos[j], boxSize)
             sinangle = np.sin(np.dot(delta, longestDelta) / (distances[i,j] * longestDistance))
             if(sinangle > highestSinangle):
                 highestSisngle = sinangle
@@ -257,6 +274,43 @@ def clusterVectorField(dirName, field, intensity, angleTh=15, numParticles=128):
             if(particleLabel[particleLabel==label].shape[0]>3):
                 clusterAngle[label] = np.degrees(np.arccos(np.abs(np.dot(field[np.argwhere(particleLabel==label)[0,0]], x))))
         return clusterList, particleLabel, clusterAngle
+
+########## Time-averaged Shape Correlations in log-spaced time window ##########
+def computeLogShapeCorr(dirName, startBlock, maxPower, freqPower):
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype = int)
+    numParticles = nv.shape[0]
+    shapeCorr = []
+    stepList = []
+    freqDecade = int(10**freqPower)
+    decadeSpacing = 10
+    spacingDecade = 1
+    stepDecade = 10
+    numBlocks = int(10**(maxPower-freqPower))
+    for power in range(maxPower):
+        for spacing in range(1,decadeSpacing):
+            stepRange = np.arange(0,stepDecade,spacing*spacingDecade,dtype=int)
+            #print(stepRange, spacing*spacingDecade)
+            stepShapeCorr = []
+            numPairs = 0
+            for multiple in range(startBlock, numBlocks):
+                for i in range(stepRange.shape[0]-1):
+                    if(checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
+                        #print(multiple, i, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        shape1, shape2 = shapeDescriptors.readShapePair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])#, boxSize, nv)
+                        stepShapeCorr.append(computeShapeCorrFunction(shape1, shape2))
+                        numPairs += 1
+            if(numPairs > 0):
+                stepList.append(spacing*spacingDecade)
+                shapeCorr.append(np.mean(stepShapeCorr))
+        print(power, stepList[-1])
+        stepDecade *= 10
+        spacingDecade *= 10
+    stepList = np.array(stepList)
+    shapeCorr = np.array(shapeCorr)
+    shapeCorr = shapeCorr[np.argsort(stepList)]
+    np.savetxt(dirName + os.sep + "corr-shape.dat", np.column_stack((stepList, shapeCorr)))
+    plotCorrelation(stepList, shapeCorr, "$shape$ $correlation$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
 
 if __name__ == '__main__':
     dirName = sys.argv[1]

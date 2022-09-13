@@ -10,7 +10,7 @@ from matplotlib import cm
 import itertools
 import sys
 import os
-import computeCorrelation
+import spCorrelation
 import shapeDescriptors
 import shapeGraphics
 
@@ -75,25 +75,47 @@ def plotSoftParticles(ax, pos, rad, alpha = 0.6, colorMap = True, lw = 0.5):
     for particleId in np.argsort(rad):
         colorId[particleId] = colorList(count/rad.shape[0])
         count += 1
-    for particleId in range(rad.shape[0]):
+    for particleId in range(pos.shape[0]):
         x = pos[particleId,0]
         y = pos[particleId,1]
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth = lw))
 
-def makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames):
+def plotSoftParticlesSubSet(ax, pos, rad, firstIndex, alpha = 0.6, colorMap = True, lw = 0.5):
+    colorId = np.zeros((rad.shape[0], 4))
+    if(colorMap == True):
+        colorList = cm.get_cmap('viridis', rad.shape[0])
+    else:
+        colorList = cm.get_cmap('Reds', rad.shape[0])
+    count = 0
+    for particleId in np.argsort(rad):
+        colorId[particleId] = colorList(count/rad.shape[0])
+        count += 1
+    colorId[:firstIndex] = [0,0,0,1]
+    alphaId = np.ones(colorId.shape[0])
+    alphaId[firstIndex:] = alpha
+    for particleId in range(pos.shape[0]):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alphaId[particleId], linewidth = lw))
+
+def makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 0):
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     gcfFrame = plt.gcf()
     gcfFrame.clear()
     axFrame = figFrame.gca()
     setDPMAxes(boxSize, axFrame)
-    plotSoftParticles(axFrame, pos, rad)
+    if(subSet == "subset"):
+        plotSoftParticlesSubSet(axFrame, pos, rad, firstIndex)
+    else:
+        plotSoftParticles(axFrame, pos, rad)
     plt.tight_layout()
     axFrame.remove()
     frames.append(axFrame)
 
-def makeSoftParticlePackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False):
+def makeSoftParticlePackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False, subSet = False, firstIndex = 0, npt = False):
     def animate(i):
         frames[i].figure=fig
         fig.axes.append(frames[i])
@@ -125,10 +147,12 @@ def makeSoftParticlePackingVideo(dirName, figureName, numFrames = 20, firstStep 
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     # the first configuration gets two frames for better visualization
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames)
+    makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames, subSet, firstIndex)
     for i in stepList:
         pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(i) + "/particlePos.dat"))
-        makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames)
+        if(npt == "npt"):
+            boxSize = np.loadtxt(dirName + os.sep + "t" + str(i) + "/boxSize.dat")
+        makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames, subSet, firstIndex)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
     anim.save("/home/francesco/Pictures/soft/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
@@ -306,7 +330,7 @@ def compareDPMPackingsVideo(dirName, fileName, figureName):
     anim.save("/home/francesco/Pictures/dpm/packings/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def plotDPMcolorHOP(dirName, figureName, colorMap = True, alpha = 0.5, save = False):
-    psi6 = computeCorrelation.computeHexaticOrder(dirName)
+    psi6 = spCorrelation.computeHexaticOrder(dirName)
     colorList = [[1-np.abs(x), 1-np.abs(x), 1] for x in psi6]
     plotDPMPacking(dirName, figureName, colorList, colorMap = colorMap, alpha = alpha, save = save)
 
@@ -434,6 +458,19 @@ if __name__ == '__main__':
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
         makeSoftParticlePackingVideo(dirName, figureName, numFrames, firstStep, stepFreq)
+
+    elif(whichPlot == "ssvideosubset"):
+        numFrames = int(sys.argv[4])
+        firstStep = float(sys.argv[5])
+        stepFreq = float(sys.argv[6])
+        firstIndex = int(sys.argv[7])
+        makeSoftParticlePackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, subSet = "subset", firstIndex = firstIndex)
+
+    elif(whichPlot == "ssvideonpt"):
+        numFrames = int(sys.argv[4])
+        firstStep = float(sys.argv[5])
+        stepFreq = float(sys.argv[6])
+        makeSoftParticlePackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, npt = "npt")
 
     elif(whichPlot == "dpm"):
         plotDPMPacking(dirName, figureName, colorMap = True)
