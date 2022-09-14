@@ -45,31 +45,6 @@ def getStepList(numFrames, firstStep, stepFreq):
         stepList = stepList[-numFrames:]
     return stepList
 
-def computeTau(data, threshold=np.exp(-1)):
-    relStep = np.argwhere(data[:,2]>threshold)[-1,0]
-    if(relStep + 1 < data.shape[0]):
-        t1 = data[relStep,0]
-        t2 = data[relStep+1,0]
-        ISF1 = data[relStep,2]
-        ISF2 = data[relStep+1,2]
-        slope = (ISF2 - ISF1)/(t2 - t1)
-        intercept = ISF2 - slope * t2
-        return (np.exp(-1) - intercept)/slope
-    else:
-        return data[relStep,0]
-
-def computeDeltaChi(data):
-    maxStep = np.argmax(data[:,3])
-    maxChi = np.max(data[:,3])
-    if(maxStep + 1 < data.shape[0]):
-        # find values of chi above the max/2
-        domeSteps = np.argwhere(data[:,3]>maxChi*0.5)
-        t1 = domeSteps[0]
-        t2 = domeSteps[-1]
-        return t2 - t1
-    else:
-        return 0
-
 
 if __name__ == '__main__':
     print("library for plotting utilities")

@@ -5,6 +5,7 @@ Created by Francesco
 #functions and script to compute correlations in space and time
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib import cm
 import utilsCorr as ucorr
 import utilsPlot as uplot
 import sys
@@ -474,9 +475,28 @@ def computeSingleParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, q
             slope = (ISF2 - ISF1)/(t2 - t1)
             intercept = ISF2 - slope * t2
             tau.append(timeStep*(np.exp(-1) - intercept)/slope)
-        #    print("relaxation time: ", tau[i])
     print("mean relaxation time: ", np.mean(tau), ", std: ", np.std(tau))
     np.savetxt(dirName + "tauSingles.dat", np.array([[timeStep, pWaveVector, phi, T, np.mean(tau), np.var(tau), np.std(tau)]]))
+
+def collectRelaxationData(dirName, dynName="langevin"):
+    T = []
+    diff = []
+    tau = []
+    deltaChi = []
+    phiList = np.array(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"])
+    for i in range(phiList.shape[0]):
+        dirSample = dirName + phiList[i] + os.sep + dynName + os.sep
+        if(os.path.exists(dirSample)):
+            dir = os.listdir(dirSample)
+            if(os.path.exists(dirSample + dir + "/dynamics/corr-log-q1.dat")):
+                timeStep = readFromParams(dirSample + dir + "/dynamics/", "dt")
+                energy = np.loadtxt(dirName + dir + "/dynamics/energy.dat")
+                T.append(np.mean(energy[:,4]))
+                data = np.loadtxt(dirSample + dir + "/dynamics/corr-log-q1.dat")
+                diff.append(data[-1,1]/(4 * data[-1,0] * timeStep))
+                tau.append(timeStep*uplot.computeTau(data))
+                deltaChi.append(timeStep*uplot.computeDeltaChi(data))
+        np.savetxt(dirName + phiList[i] + "/relaxationData.dat", np.column_stack((T, diff, tau, deltaChi)))
 
 ############################ Local Packing Fraction ############################
 def computeLocalDensity(dirName, numBins, plot = False):
@@ -725,6 +745,10 @@ if __name__ == '__main__':
         freqPower = int(sys.argv[5])
         qFrac = sys.argv[6]
         computeSingleParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac)
+
+    elif(whichCorr == "collect"):
+        dynName = sys.argv[3]
+        collectRelaxationData(dirName, dynName)
 
     elif(whichCorr == "density"):
         numBins = int(sys.argv[3])

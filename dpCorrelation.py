@@ -4,6 +4,8 @@ Created by Francesco
 '''
 #functions and script to compute correlations in space and time
 import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import cm
 import utilsCorr as ucorr
 import utilsPlot as uplot
 import shapeDescriptors
