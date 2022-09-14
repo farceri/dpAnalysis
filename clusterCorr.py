@@ -347,8 +347,8 @@ def collectRelaxationData(dirName, dynName="langevin"):
                     tempTau = timeStep*ucorr.computeTau(data)
                     if not(tempTau == timeStep * data[-1,0] and tempTau != 0):
                         tau.append(tempTau)
-                        energy = np.loadtxt(dirSample + dir + "/dynamics/energy.dat")
-                        T.append(np.mean(energy[:,4]))
+                        #energy = np.loadtxt(dirSample + dir + "/dynamics/energy.dat")
+                        T.append(ucorr.readFromParams(dirSample + dir + "/dynamics/", "temperature"))
                         diff.append(data[-1,1]/(4 * data[-1,0] * timeStep))
                         deltaChi.append(timeStep*ucorr.computeDeltaChi(data))
             T = np.array(T)
