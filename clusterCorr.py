@@ -385,8 +385,8 @@ def computeParticleVelPDFSubSet(dirName, firstIndex=10, mass=1e06):
     velPDF, edges = np.histogram(vel, bins=velBins, density=True)
     velSubSetPDF, edges = np.histogram(velSubSet, bins=velBins, density=True)
     edges = 0.5 * (edges[:-1] + edges[1:])
-    np.savetxt(dirName + os.sep + "velocityPDF.dat", velBins, velPDF, velSubSetPDF)
-    np.savetxt(dirName + os.sep + "tracerTemp.dat", np.var(vel), np.var(velSubSet))
+    np.savetxt(dirName + os.sep + "velocityPDF.dat", np.column_stack((velBins, velPDF, velSubSetPDF)))
+    np.savetxt(dirName + os.sep + "tracerTemp.dat", np.column_stack((np.var(vel), np.var(velSubSet))))
     print("Variance of the velocity pdf:", np.var(vel), " variance of the subset velocity pdf: ", np.var(velSubSet))
 
 
