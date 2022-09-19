@@ -379,10 +379,6 @@ def computeParticleVelPDFSubSet(dirName, firstIndex=10, mass=1e06):
             step.append(float(dir[1:]))
     vel = np.array(vel).flatten()
     velSubSet = np.array(velSubSet).flatten()
-    var = np.array(var)
-    varSubSet = np.array(varSubSet)
-    var = var[np.argsort(step)]
-    varSubSet = varSubSet[np.argsort(step)]
     step = np.sort(step)
     #velSubSet /= np.sqrt(2*np.var(velSubSet))
     velBins = np.linspace(np.min(velSubset), np.max(velSubset), 50)
