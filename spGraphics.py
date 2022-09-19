@@ -30,40 +30,40 @@ def plotSPCompression(dirName, figureName, compute = "compute"):
     if(compute=="compute"):
         phi = []
         pressure = []
-        hop = []
-        zeta = []
+        #hop = []
+        #zeta = []
         for dir in os.listdir(dirName):
             if(os.path.isdir(dirName + os.sep + dir)):
                 phi.append(ucorr.readFromParams(dirName + os.sep + dir, "phi"))
                 pressure.append(ucorr.readFromParams(dirName + os.sep + dir, "pressure"))
                 boxSize = np.loadtxt(dirName + os.sep + dir + "/boxSize.dat")
-                psi6 = spCorr.computeHexaticOrder(dirName + os.sep + dir, boxSize)
-                hop.append(np.mean(psi6))
-                contacts = np.array(np.loadtxt(dirName + os.sep + dir + os.sep + "contacts.dat"))
-                z = 0
-                if(contacts.shape[0] != 0):
-                    for p in range(contacts.shape[0]):
-                        z += np.sum(contacts[p]>-1)
-                    zeta.append(z/contacts.shape[0])
-                else:
-                    zeta.append(0)
+                #psi6 = spCorr.computeHexaticOrder(dirName + os.sep + dir, boxSize)
+                #hop.append(np.mean(psi6))
+                #contacts = np.array(np.loadtxt(dirName + os.sep + dir + os.sep + "contacts.dat"))
+                #z = 0
+                #if(contacts.shape[0] != 0):
+                #    for p in range(contacts.shape[0]):
+                #        z += np.sum(contacts[p]>-1)
+                #    zeta.append(z/contacts.shape[0])
+                #else:
+                #    zeta.append(0)
         pressure = np.array(pressure)
-        hop = np.array(hop)
-        zeta = np.array(zeta)
+        #hop = np.array(hop)
+        #zeta = np.array(zeta)
         phi = np.array(phi)
         pressure = pressure[np.argsort(phi)]
-        hop = hop[np.argsort(phi)]
-        zeta = zeta[np.argsort(phi)]
+        #hop = hop[np.argsort(phi)]
+        #zeta = zeta[np.argsort(phi)]
         phi = np.sort(phi)
-        np.savetxt(dirName + os.sep + "compression.dat", np.column_stack((phi, pressure, hop, zeta)))
+        np.savetxt(dirName + os.sep + "compression.dat", np.column_stack((phi, pressure)))
     else:
         data = np.loadtxt(dirName + os.sep + "compression.dat")
         phi = data[:,0]
         pressure = data[:,1]
-        hop = data[:,2]
-        zeta = data[:,3]
+        #hop = data[:,2]
+        #zeta = data[:,3]
     ax[0].semilogy(phi, pressure, color='k', linewidth=1.5)
-    ax[1].plot(phi, zeta, color='k', linewidth=1.5)
+    #ax[1].plot(phi, zeta, color='k', linewidth=1.5)
     ax[0].tick_params(axis='both', labelsize=14)
     ax[1].tick_params(axis='both', labelsize=14)
     ax[1].set_xlabel("$packing$ $fraction,$ $\\varphi$", fontsize=17)
@@ -72,7 +72,27 @@ def plotSPCompression(dirName, figureName, compute = "compute"):
     ax[1].set_ylabel("$coordination$ $number,$ $z$", fontsize=17)
     plt.tight_layout()
     plt.subplots_adjust(hspace=0)
-    plt.savefig("/home/francesco/Pictures/soft/comp-control-" + figureName + ".png", transparent=False, format = "png")
+    #plt.savefig("/home/francesco/Pictures/soft/comp-control-" + figureName + ".png", transparent=False, format = "png")
+    plt.pause(0.5)
+
+def plotSPJamming(dirName, figureName):
+    fig, ax = plt.subplots(2, 1, figsize = (6, 7), sharex = True, dpi = 120)
+    phiJ = []
+    for dir in os.listdir(dirName):
+        if(os.path.isdir(dirName + os.sep + dir)):
+            comp = np.loadtxt(dirName + os.sep + dir + os.sep + "compression.dat")
+            phiJ.append(comp[np.argwhere(comp[:,1]>1e-08)[0,0],0])
+    pdf, edges = np.histogram(phiJ, bins=10, density=True)
+    edges = (edges[:-1] + edges[1:])*0.5
+    ax[0].plot(edges, pdf, color='k', linewidth=1.5)
+    #ax[1].plot(phi, zeta, color='k', linewidth=1.5)
+    ax[0].tick_params(axis='both', labelsize=14)
+    ax[1].tick_params(axis='both', labelsize=14)
+    ax[0].set_xlabel("$packing$ $fraction,$ $\\varphi$", fontsize=17)
+    ax[0].set_xlabel("$PDF(\\varphi)$", fontsize=17)
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0)
+    plt.savefig("/home/francesco/Pictures/soft/jamming-" + figureName + ".png", transparent=False, format = "png")
     plt.show()
 
 def plotSPPSI6P2Compression(dirName, figureName):
@@ -317,19 +337,19 @@ def plotSPDynamicsVSActivity(dirName, figureName):
     #fig2.savefig("/home/francesco/Pictures/soft/ptau-Drf0-" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPDynamicsVSTemp(dirName, figureName):
+def plotSPDynamicsVSTemp(dirName, figureName, q="1"):
     T = []
     diff = []
     tau = []
     deltaChi = []
-    dataSetList = np.array(["0.04", "0.05", "0.06", "0.07", "0.08", "0.09", #1e09
+    dataSetList = np.array(["0.06", "0.07", "0.08", "0.09", #1e09
                             "0.1", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", #1e08
                             "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]) #1e07
     colorList = cm.get_cmap('plasma', dataSetList.shape[0])
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
     for i in range(dataSetList.shape[0]):
-        if(os.path.exists(dirName + "/T" + dataSetList[i] + "/dynamics/corr-log-q1.dat")):
-            data = np.loadtxt(dirName + "/T" + dataSetList[i] + "/dynamics/corr-log-q1.dat")
+        if(os.path.exists(dirName + "/T" + dataSetList[i] + "/dynamics/corr-log-q" + q + ".dat")):
+            data = np.loadtxt(dirName + "/T" + dataSetList[i] + "/dynamics/corr-log-q" + q + ".dat")
             timeStep = ucorr.readFromParams(dirName + "/T" + dataSetList[i] + "/dynamics/", "dt")
             #T.append(ucorr.readFromParams(dirName + "/T" + dataSetList[i] + "/dynamics/", "temperature"))
             energy = np.loadtxt(dirName + "/T" + dataSetList[i] + "/energy.dat")
@@ -344,26 +364,26 @@ def plotSPDynamicsVSTemp(dirName, figureName):
             #plotSPCorr(ax, data[1:,0]*timeStep, data[1:,3], "$\\chi(\\Delta t)$", color = colorList(i/dataSetList.shape[0]))
     #ax.plot(np.linspace(1e-03,1e10,50), np.exp(-1)*np.ones(50), linestyle='--', linewidth=1.5, color='k')
     ax.set_xlabel("$Time$ $interval,$ $\\Delta t$", fontsize=18)
-    #ax.set_xlim(4e-04, 4e07)
     plt.tight_layout()
-    plt.savefig("/home/francesco/Pictures/soft/pisf-T-" + figureName + ".png", transparent=True, format = "png")
+    plt.savefig("/home/francesco/Pictures/soft/pisf-T-" + figureName + "-q" + q + ".png", transparent=True, format = "png")
     T = np.array(T)
     diff = np.array(diff)
     tau = np.array(tau)
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
-    #ax.loglog(T, diff, linewidth=1.5, color='k', marker='o')
-    ax.loglog(1/T, tau, linewidth=1.5, color='k', marker='o')
-    #ax.semilogx(T[2:], diff[2:]*tau[2:], linewidth=1.5, color='k', marker='o')
-    #ax.semilogx(1/T, deltaChi, linewidth=1.5, color='k', marker='o')
+    #ax.loglog(1/T, diff, linewidth=1.5, color='k', marker='o')
+    #ax.loglog(1/T, tau, linewidth=1.5, color='k', marker='o')
+    ax.semilogx(T, diff*tau, linewidth=1.5, color='k', marker='o')
+    #ax.semilogx(1/T[2:], deltaChi[2:], linewidth=1.5, color='k', marker='o')
+    ax.set_ylim(0.12, 1.34)
     ax.tick_params(axis='both', labelsize=14)
     ax.set_xlabel("$Temperature,$ $T$", fontsize=17)
     #ax.set_ylabel("$Diffusivity,$ $D$", fontsize=17)
-    ax.set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=17)
-    #ax.set_ylabel("$D$ $\\tau$", fontsize=17)
+    #ax.set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=17)
+    ax.set_ylabel("$D$ $\\tau$", fontsize=17)
     #ax.set_ylabel("$Susceptibility$ $width,$ $\\Delta \\chi$", fontsize=17)
     plt.tight_layout()
     np.savetxt(dirName + "../diff-tau-vs-temp.dat", np.column_stack((T, diff, tau, deltaChi)))
-    plt.savefig("/home/francesco/Pictures/soft/ptau-T-" + figureName + ".png", transparent=True, format = "png")
+    plt.savefig("/home/francesco/Pictures/soft/pfdt-T-" + figureName + "-q" + q + ".png", transparent=True, format = "png")
     plt.show()
 
 def plotSPDynamicsVSPhi(dirName, sampleName, figureName):
@@ -413,7 +433,7 @@ def plotSPTauVSActivity(dirName, figureName):
 
 def plotSPTauVSTemp(dirName, figureName):
     phi0 = 0.8277#0.83867
-    mu = 1.15#1.1
+    mu = 1.1#1.1
     delta = 1.05#1.2
     dataSetList = np.array(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"])
     colorList = cm.get_cmap('viridis', dataSetList.shape[0]+10)
@@ -454,19 +474,65 @@ def plotSPTauVSPhi(dirName, sampleName, figureName):
     plt.show()
 
 def plotSPDynamicsVSQ(dirName, figureName):
-    dataSetList = np.array(["1", "2", "3", "5", "10", "20", "30", "50", "100"])
+    qList = np.array(["0.6", "0.8", "1", "1.2", "1.4", "1.6", "1.8", "2", "3", "4", "5", "10", "20", "30", "40"])
+    q = qList.astype(float)
+    colorList = cm.get_cmap('viridis', qList.shape[0])
+    fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
+    tau = []
+    for i in range(qList.shape[0]):
+        if(os.path.exists(dirName + "/corr-log-q" + qList[i] + ".dat")):
+            data = np.loadtxt(dirName + "/corr-log-q" + qList[i] + ".dat")
+            timeStep = ucorr.readFromParams(dirName, "dt")
+            legendlabel = "$q=2\\pi/($" + qList[i] + "$\\times d)$"
+            plotSPCorr(ax, data[1:,0]*timeStep, data[1:,2], "$ISF(\\Delta t)$", color = colorList((qList.shape[0]-i)/qList.shape[0]), legendLabel = legendlabel)
+            tau.append(timeStep*ucorr.computeTau(data))
+    ax.set_xlabel("$Time$ $interval,$ $\\Delta t$", fontsize=18)
+    #ax.legend(loc = "lower left", fontsize = 12)
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/soft/pisf-vsq-" + figureName + ".png", transparent=True, format = "png")
+    fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
+    ax.loglog(q, tau, linewidth=1.5, color='b', marker='*')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$Wave$ $vector$ $magnitude,$ $|\\vec{q}|$", fontsize=17)
+    ax.set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=17)
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/soft/ptau-vsq-" + figureName + "png", transparent=True, format = "png")
+    plt.show()
+
+def compareSPDynamicsVSTemp(dirName1, dirName2, figureName, q="1"):
+    dataSetList = np.array(["0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1"]) #1e07
     colorList = cm.get_cmap('plasma', dataSetList.shape[0])
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
-    for i in range(dataSetList.shape[0]):
-        if(os.path.exists(dirName + "/corr-log-q" + dataSetList[i] + ".dat")):
-            data = np.loadtxt(dirName + "/corr-log-q" + dataSetList[i] + ".dat")
-            timeStep = ucorr.readFromParams(dirName, "dt")
-            legendlabel = "$q=2\\pi/($" + dataSetList[i] + "$\\times d)$"
-            plotSPCorr(ax, data[1:,0]*timeStep, data[1:,2], "$ISF(\\Delta t)$", color = colorList(i/dataSetList.shape[0]), legendLabel = legendlabel)
-    ax.set_xlabel("$Time$ $interval,$ $\\Delta t$", fontsize=18)
-    ax.legend(loc = "lower left", fontsize = 12)
+    for dirName in [dirName1, dirName2]:
+        T = []
+        diff = []
+        tau = []
+        deltaChi = []
+        for i in range(dataSetList.shape[0]):
+            if(os.path.exists(dirName + "/T" + dataSetList[i] + "/dynamics/corr-log-q" + q + ".dat")):
+                data = np.loadtxt(dirName + "/T" + dataSetList[i] + "/dynamics/corr-log-q" + q + ".dat")
+                timeStep = ucorr.readFromParams(dirName + "/T" + dataSetList[i] + "/dynamics/", "dt")
+                energy = np.loadtxt(dirName + "/T" + dataSetList[i] + "/energy.dat")
+                T.append(np.mean(energy[:,4]))
+                diff.append(data[-1,1]/(4 * data[-1,0] * timeStep))
+                tau.append(timeStep*ucorr.computeTau(data))
+                deltaChi.append(timeStep*ucorr.computeDeltaChi(data))
+        T = np.array(T)
+        diff = np.array(diff)
+        tau = np.array(tau)
+        fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
+        #ax.loglog(1/T, diff, linewidth=1.5, color='k', marker='o')
+        #ax.loglog(1/T, tau, linewidth=1.5, color='k', marker='o')
+        ax.semilogx(T, diff*tau, linewidth=1.5, color='k', marker='o')
+        #ax.semilogx(1/T, deltaChi, linewidth=1.5, color='k', marker='o')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$Temperature,$ $T$", fontsize=17)
+    #ax.set_ylabel("$Diffusivity,$ $D$", fontsize=17)
+    #ax.set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=17)
+    ax.set_ylabel("$D$ $\\tau$", fontsize=17)
+    #ax.set_ylabel("$Susceptibility$ $width,$ $\\Delta \\chi$", fontsize=17)
     plt.tight_layout()
-    plt.savefig("/home/francesco/Pictures/soft/pcorr-q-" + figureName + ".png", transparent=True, format = "png")
+    plt.savefig("/home/francesco/Pictures/soft/comparefdt-T-" + figureName + "-q" + q + ".png", transparent=True, format = "png")
     plt.show()
 
 
@@ -774,7 +840,7 @@ def plotSPFDTdata(dirName, firstIndex, mass, figureName):
     fig1.tight_layout()
     fig2.tight_layout()
     fig1.savefig("/home/francesco/Pictures/soft/pPeTfdt-Drf0-" + figureName + ".png", transparent=True, format = "png")
-    fig2.savefig("/home/francesco/Pictures/soft/pdifftauTfdt-Drf0-" + figureName + ".png", transparent=True, format = "png")
+    fig2.savefig("/home/francesco/Pictures/soft/pfdt-Drf0-" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
 
@@ -785,7 +851,12 @@ if __name__ == '__main__':
 ########################### check and plot compression #########################
     if(whichPlot == "comp"):
         figureName = sys.argv[3]
-        plotSPCompression(dirName, figureName)
+        compute = sys.argv[4]
+        plotSPCompression(dirName, figureName, compute)
+
+    elif(whichPlot == "jam"):
+        figureName = sys.argv[3]
+        plotSPJamming(dirName, figureName)
 
     elif(whichPlot == "hexcomp"):
         figureName = sys.argv[3]
@@ -829,7 +900,8 @@ if __name__ == '__main__':
 
     elif(whichPlot == "pdyntemp"):
         figureName = sys.argv[3]
-        plotSPDynamicsVSTemp(dirName, figureName)
+        q = sys.argv[4]
+        plotSPDynamicsVSTemp(dirName, figureName, q)
 
     elif(whichPlot == "pdynphi"):
         sampleName = sys.argv[3]
@@ -851,7 +923,14 @@ if __name__ == '__main__':
 
     elif(whichPlot == "pdynq"):
         figureName = sys.argv[3]
-        plotParticleDynamicsVSQ(dirName, figureName)
+        plotSPDynamicsVSQ(dirName, figureName)
+
+    elif(whichPlot == "pdyntemp"):
+        dirName1 = dirName + sys.argv[3]
+        dirName2 = dirName + sys.argv[4]
+        figureName = sys.argv[5]
+        q = sys.argv[6]
+        compareSPDynamicsVSTemp(dirName1, dirName2, figureName, q="1")
 
 ############################## plot dynamics FDT ###############################
     elif(whichPlot == "pscale"):

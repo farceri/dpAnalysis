@@ -12,24 +12,22 @@ import sys
 import os
 
 ########################### Pair Correlation Function ##########################
-def computePairCorr(dirName, plot=True):
+def computePairCorr(dirName, plot="plot"):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     phi = ucorr.readFromParams(dirName, "phi")
     rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
     meanRad = np.mean(rad)
-    pos = np.loadtxt(dirName + os.sep + "particlePos.dat")
-    pos = np.array(pos)
+    bins = np.linspace(0.1*meanRad, 10*meanRad, 50)
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     distance = ucorr.computeDistances(pos[rad>np.mean(rad)], boxSize).flatten()
-    distance = distance[distance>0]
-    bins = np.linspace(np.min(distance), np.max(distance), 50)
     pairCorr, edges = np.histogram(distance, bins=bins, density=True)
     binCenter = 0.5 * (edges[:-1] + edges[1:])
     pairCorr /= (phi * 2 * np.pi * binCenter)
     firstPeak = binCenter[np.argmax(pairCorr)]
     print("First peak of pair corr is at distance:", firstPeak, "equal to", firstPeak/meanRad, "times the mean radius:", meanRad)
-    if(plot == True):
+    if(plot == "plot"):
         uplot.plotCorrelation(binCenter, pairCorr, "$Pair$ $correlation$ $function,$ $g(r)$")
     else:
         return firstPeak
@@ -83,21 +81,13 @@ def computeParticleVelPDFSubSet(dirName, firstIndex=10, mass=1e06, plot="plot"):
     varSubSet = varSubSet[np.argsort(step)]
     step = np.sort(step)
     #velSubSet /= np.sqrt(2*np.var(velSubSet))
-    velPDF, edges = np.histogram(velSubSet, bins=np.linspace(np.min(velSubSet), np.max(velSubSet), 100), density=True)
+    velBins = np.linspace(np.min(velSubset), np.max(velSubset), 50)
+    velPDF, edges = np.histogram(vel, bins=velBins, density=True)
+    velSubSetPDF, edges = np.histogram(velSubSet, bins=velBins, density=True)
     edges = 0.5 * (edges[:-1] + edges[1:])
+    np.savetxt(dirName + os.sep + "velocityPDF.dat", velBins, velPDF, velSubSetPDF)
+    print("Variance of the velocity pdf:", np.var(vel), " variance of the subset velocity pdf: ", np.var(velSubSet))
     if(plot=="plot"):
-        fig = plt.figure(1, dpi = 120)
-        ax = fig.gca()
-        ax.plot(step, temp, linewidth=1, color='k', marker='.')
-        ax.plot(step, tempSubSet, linewidth=1.2, color='b', marker='.')
-        ax.plot(step, var, linewidth=1, color='k', marker='.', ls='--')
-        ax.plot(step, varSubSet, linewidth=1.2, color='b', marker='.', ls='--')
-        #ax.set_xscale('log')
-        ax.tick_params(axis='both', labelsize=14)
-        ax.set_xlabel("$Simulation$ $step$", fontsize=17)
-        ax.set_ylabel("$T$", fontsize=17)
-        plt.tight_layout()
-        print("Variance of the velocity pdf:", np.var(vel), " variance of the subset velocity pdf: ", np.var(velSubSet))
         uplot.plotCorrelation(edges, velPDF / np.sqrt(mass), "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", logy = True)
     return np.var(vel), np.var(velSubSet)
 
@@ -366,8 +356,10 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
     timeStep = ucorr.readFromParams(dirName, "dt")
     T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
     #pWaveVector = 2 * np.pi / (2 * np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
-    #pWaveVector = 2 * np.pi / computePairCorr(dirName, plot=False)
-    pWaveVector = 2 * np.pi / (float(qFrac) * 2 * pRad)
+    if(qFrac == 0):
+        pWaveVector = 2 * np.pi / computePairCorr(dirName, plot=False)
+    else:
+        pWaveVector = 2 * np.pi / (float(qFrac) * 2 * pRad)
     print("wave vector: ", pWaveVector)
     particleCorr = []
     stepList = []
@@ -570,7 +562,7 @@ def localDensityVSTime(dirName, numBins, plot = False, figureName = None):
         plt.show()
 
 ############################ Local Packing Fraction ############################
-def computeLocalDensityPDF(dirName, numBins, plot = False):
+def computeLocalDensityPDF(dirName, numBins, plot = False, figureName = "active-Dr1e-02-f080"):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     xbin = np.linspace(0, boxSize[0], numBins+1)
@@ -590,21 +582,22 @@ def computeLocalDensityPDF(dirName, numBins, plot = False):
             sampleDensity.append(localDensity.flatten())
     sampleDensity = np.sort(sampleDensity)
     cdf = np.arange(len(sampleDensity))/len(sampleDensity)
-    pdf, edges = np.histogram(sampleDensity, bins=np.linspace(np.min(sampleDensity), np.max(sampleDensity), 30), density=True)
+    pdf, edges = np.histogram(sampleDensity, bins=np.linspace(np.min(sampleDensity), np.max(sampleDensity), 50), density=True)
     edges = (edges[:-1] + edges[1:])/2
     np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-test.dat", np.column_stack((edges, pdf)))
     if(plot=="plot"):
         print("data stats: ", np.min(sampleDensity), np.max(sampleDensity), np.mean(sampleDensity), np.std(sampleDensity))
         fig = plt.figure(dpi=120)
         ax = plt.gca()
-        ax.semilogy(edges[1:], pdf[1:], linewidth=1.2, color='k')
+        ax.semilogx(edges[1:], pdf[1:], linewidth=1.2, color='k')
         #ax.plot(sampleDensity, cdf, linewidth=1.2, color='k')
         ax.tick_params(axis='both', labelsize=15)
         ax.set_ylabel('$P(\\varphi)$', fontsize=18)
         ax.set_xlabel('$\\varphi$', fontsize=18)
         #ax.set_xlim(-0.02, 1.02)
         plt.tight_layout()
-        plt.pause(0.5)
+        plt.savefig("/home/francesco/Pictures/soft/plocalDensityPDF-.png", transparent=True, format = "png")
+        plt.show()
     return np.var(sampleDensity)
 
 ########################### Hexitic Order Parameter ############################
@@ -689,7 +682,8 @@ if __name__ == '__main__':
     whichCorr = sys.argv[2]
 
     if(whichCorr == "paircorr"):
-        computePairCorr(dirName)
+        plot = sys.argv[3]
+        computePairCorr(dirName, plot)
 
     elif(whichCorr == "pvelpdf"):
         computeParticleVelPDF(dirName)

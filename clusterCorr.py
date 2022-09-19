@@ -331,6 +331,7 @@ def computeSingleParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, q
     np.savetxt(dirName + "tauSingles.dat", np.array([[timeStep, pWaveVector, phi, T, np.mean(tau), np.var(tau), np.std(tau)]]))
 
 def collectRelaxationData(dirName, dynName="langevin"):
+    timeStep = 2e-03
     phiList = np.array(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"])
     for i in phiList:
         dirSample = dirName + i + os.sep + dynName + os.sep
@@ -341,14 +342,17 @@ def collectRelaxationData(dirName, dynName="langevin"):
             tau = []
             deltaChi = []
             for dir in dirList:
-                if(os.path.exists(dirSample + dir + "/dynamics/corr-log-q1.dat")):
-                    timeStep = ucorr.readFromParams(dirSample + dir + "/dynamics/", "dt")
-                    data = np.loadtxt(dirSample + dir + "/dynamics/corr-log-q1.dat")
+                if(os.path.exists(dirSample + dir + "/corr-log-q1.dat") and dir != "T1e-01"):
+                    data = np.loadtxt(dirSample + dir + "/corr-log-q1.dat")
                     tempTau = timeStep*ucorr.computeTau(data)
                     if not(tempTau == timeStep * data[-1,0] and tempTau != 0):
                         tau.append(tempTau)
-                        #energy = np.loadtxt(dirSample + dir + "/dynamics/energy.dat")
-                        T.append(ucorr.readFromParams(dirSample + dir + "/dynamics/", "temperature"))
+                        energy = np.loadtxt(dirSample + dir + "/energy.dat")
+                        if(energy[0,3]<energy[0,4]): # I unintentioanlly swapped temperature in the energy file
+                            T.append(np.mean(energy[-10:,3]))
+                        else:
+                            T.append(np.mean(energy[-10:,4]))
+                        #T.append(ucorr.readFromParams(dirSample + dir, "temperature"))
                         diff.append(data[-1,1]/(4 * data[-1,0] * timeStep))
                         deltaChi.append(timeStep*ucorr.computeDeltaChi(data))
             T = np.array(T)
@@ -360,6 +364,34 @@ def collectRelaxationData(dirName, dynName="langevin"):
             deltaChi = deltaChi[np.argsort(T)]
             T = np.sort(T)
         np.savetxt(dirName + i + "/relaxationData.dat", np.column_stack((T, diff, tau, deltaChi)))
+
+def computeParticleVelPDFSubSet(dirName, firstIndex=10, mass=1e06):
+    vel = []
+    velSubSet = []
+    step = []
+    numParticles = ucorr.readFromParams(dirName + os.sep + "t0", "numParticles")
+    for dir in os.listdir(dirName):
+        if(os.path.isdir(dirName + os.sep + dir)):
+            pVel = np.loadtxt(dirName + os.sep + dir + os.sep + "particleVel.dat")
+            vel.append(pVel[firstIndex:,:])
+            subset = pVel[:firstIndex,:] * np.sqrt(mass)
+            velSubSet.append(subset)
+            step.append(float(dir[1:]))
+    vel = np.array(vel).flatten()
+    velSubSet = np.array(velSubSet).flatten()
+    var = np.array(var)
+    varSubSet = np.array(varSubSet)
+    var = var[np.argsort(step)]
+    varSubSet = varSubSet[np.argsort(step)]
+    step = np.sort(step)
+    #velSubSet /= np.sqrt(2*np.var(velSubSet))
+    velBins = np.linspace(np.min(velSubset), np.max(velSubset), 50)
+    velPDF, edges = np.histogram(vel, bins=velBins, density=True)
+    velSubSetPDF, edges = np.histogram(velSubSet, bins=velBins, density=True)
+    edges = 0.5 * (edges[:-1] + edges[1:])
+    np.savetxt(dirName + os.sep + "velocityPDF.dat", velBins, velPDF, velSubSetPDF)
+    np.savetxt(dirName + os.sep + "tracerTemp.dat", np.var(vel), np.var(velSubSet))
+    print("Variance of the velocity pdf:", np.var(vel), " variance of the subset velocity pdf: ", np.var(velSubSet))
 
 
 if __name__ == '__main__':
@@ -412,6 +444,11 @@ if __name__ == '__main__':
     elif(whichCorr == "collect"):
         dynName = sys.argv[3]
         collectRelaxationData(dirName, dynName)
+
+    elif(whichCorr == "pvelsubset"):
+        firstIndex = int(sys.argv[3])
+        mass = float(sys.argv[4])
+        computeParticleVelPDFSubSet(dirName, firstIndex, mass)
 
     else:
         print("Please specify the correlation you want to compute")

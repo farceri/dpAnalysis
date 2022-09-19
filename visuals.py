@@ -36,7 +36,7 @@ def setBigBoxAxes(boxSize, ax):
     ax.set_aspect('equal', adjustable='box')
     setAxis2D(ax)
 
-def plotSoftParticlePacking(dirName, figureName, alpha = 0.6):
+def plotSPPacking(dirName, figureName, alpha = 0.6):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
@@ -115,7 +115,7 @@ def makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames, subSet = False, f
     axFrame.remove()
     frames.append(axFrame)
 
-def makeSoftParticlePackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False, subSet = False, firstIndex = 0, npt = False):
+def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False, subSet = False, firstIndex = 0, npt = False):
     def animate(i):
         frames[i].figure=fig
         fig.axes.append(frames[i])
@@ -451,26 +451,26 @@ if __name__ == '__main__':
     figureName = sys.argv[3]
 
     if(whichPlot == "ss"):
-        plotSoftParticlePacking(dirName, figureName)
+        plotSPPacking(dirName, figureName)
 
     elif(whichPlot == "ssvideo"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
-        makeSoftParticlePackingVideo(dirName, figureName, numFrames, firstStep, stepFreq)
+        makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq)
 
     elif(whichPlot == "ssvideosubset"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
         firstIndex = int(sys.argv[7])
-        makeSoftParticlePackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, subSet = "subset", firstIndex = firstIndex)
+        makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, subSet = "subset", firstIndex = firstIndex)
 
     elif(whichPlot == "ssvideonpt"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
-        makeSoftParticlePackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, npt = "npt")
+        makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, npt = "npt")
 
     elif(whichPlot == "dpm"):
         plotDPMPacking(dirName, figureName, colorMap = True)

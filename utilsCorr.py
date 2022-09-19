@@ -17,7 +17,7 @@ def pbcDistance(r1, r2, boxSize):
 def computeDistances(pos, boxSize):
     distances = np.zeros((pos.shape[0], pos.shape[0]))
     for i in range(pos.shape[0]):
-        for j in range(pos.shape[0]):
+        for j in range(i):
             delta = pbcDistance(pos[i], pos[j], boxSize)
             distances[i,j] = np.linalg.norm(delta)
     return distances
