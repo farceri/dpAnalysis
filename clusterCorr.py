@@ -381,7 +381,7 @@ def computeParticleVelPDFSubSet(dirName, firstIndex=10, mass=1e06):
     velSubSet = np.array(velSubSet).flatten()
     step = np.sort(step)
     #velSubSet /= np.sqrt(2*np.var(velSubSet))
-    velBins = np.linspace(np.min(velSubset), np.max(velSubset), 50)
+    velBins = np.linspace(np.min(velSubSet), np.max(velSubSet), 50)
     velPDF, edges = np.histogram(vel, bins=velBins, density=True)
     velSubSetPDF, edges = np.histogram(velSubSet, bins=velBins, density=True)
     edges = 0.5 * (edges[:-1] + edges[1:])
