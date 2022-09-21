@@ -280,13 +280,23 @@ def computeParticleSelfCorr(dirName, maxPower):
     stepRange = stepRange[stepRange<int(10**maxPower)]
     for i in range(1,stepRange.shape[0]):
         pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particlePos.dat"))
-        particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
-    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
+        #particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
+        particleCorr.append(ucorr.computeScatteringFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
+    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,5))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin.dat", np.column_stack((stepRange*timeStep, particleCorr)))
-    print("diffusivity: ", np.mean(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)))
+    #print("diffusivity: ", np.mean(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)))
     #uplot.plotCorrelation(stepRange * timeStep, particleCorr[:,0]/(stepRange * timeStep), "$MSD/t$", "$Simulation$ $time,$ $t$", logx = True, logy = True, color='k')
-    uplot.plotCorrelation(stepRange * timeStep, particleCorr[:,2], "$\\ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color='k')
+    #uplot.plotCorrelation(stepRange * timeStep, particleCorr[:,2], "$\\ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color='k')
+    fig = plt.figure(0, dpi = 120)
+    ax = fig.gca()
+    ax.semilogx(stepRange*timeStep, particleCorr[:,1], linewidth=1.5, color='k', marker='.')
+    ax.semilogx(stepRange*timeStep, particleCorr[:,3], linewidth=1.5, color='r', marker='.')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$\\Delta t$", fontsize=17)
+    ax.set_ylabel("$ISF(\\Delta t)$", fontsize=17)
+    plt.tight_layout()
+    plt.show()
 
 ########## Check Self Correlations by logarithmically spaced blocks ############
 def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau="tau"):
@@ -387,12 +397,13 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
-    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],5))
     particleCorr = particleCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log-q" + str(qFrac) + ".dat", np.column_stack((stepList, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-20:,0]/(4*stepList[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(4*stepList[-20:]*timeStep)))
     #uplot.plotCorrelation(stepList * timeStep, particleCorr[:,0]/(stepList*timeStep), "$MSD(\\Delta t)/\\Delta t$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
-    uplot.plotCorrelation(stepList * timeStep, particleCorr[:,1], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
+    uplot.plotCorrelation(stepList * timeStep, particleCorr[:,1], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'k')
+    uplot.plotCorrelation(stepList * timeStep, particleCorr[:,3], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
     if(computeTau=="tau"):
         diff = np.mean(particleCorr[-1:,0]/(2 * stepRange[-1:] * timeStep))
         ISF = particleCorr[:,1]

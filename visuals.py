@@ -497,7 +497,7 @@ if __name__ == '__main__':
         numFrames = int(sys.argv[4])
         makeCompressionVideo(dirName, figureName, numFrames)
 
-    elif(whichPlot == "rearrangevideo"):
+    elif(whichPlot == "dpmrearrange"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])

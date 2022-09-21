@@ -371,19 +371,59 @@ def plotSPDynamicsVSTemp(dirName, figureName, q="1"):
     tau = np.array(tau)
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
     #ax.loglog(1/T, diff, linewidth=1.5, color='k', marker='o')
-    #ax.loglog(1/T, tau, linewidth=1.5, color='k', marker='o')
-    ax.semilogx(T, diff*tau, linewidth=1.5, color='k', marker='o')
+    ax.loglog(1/T, tau, linewidth=1.5, color='k', marker='o')
+    #ax.semilogx(T, diff*tau, linewidth=1.5, color='k', marker='o')
     #ax.semilogx(1/T[2:], deltaChi[2:], linewidth=1.5, color='k', marker='o')
-    ax.set_ylim(0.12, 1.34)
+    #ax.set_ylim(0.12, 1.34)
     ax.tick_params(axis='both', labelsize=14)
     ax.set_xlabel("$Temperature,$ $T$", fontsize=17)
     #ax.set_ylabel("$Diffusivity,$ $D$", fontsize=17)
-    #ax.set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=17)
-    ax.set_ylabel("$D$ $\\tau$", fontsize=17)
+    ax.set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=17)
+    #ax.set_ylabel("$D$ $\\tau$", fontsize=17)
     #ax.set_ylabel("$Susceptibility$ $width,$ $\\Delta \\chi$", fontsize=17)
     plt.tight_layout()
-    np.savetxt(dirName + "../diff-tau-vs-temp.dat", np.column_stack((T, diff, tau, deltaChi)))
+    np.savetxt(dirName + "relaxationData.dat", np.column_stack((T, diff, tau, deltaChi)))
     plt.savefig("/home/francesco/Pictures/soft/pfdt-T-" + figureName + "-q" + q + ".png", transparent=True, format = "png")
+    plt.show()
+
+def plotSPDynamicsVSAttraction(dirName, figureName, q="1"):
+    u = []
+    diff = []
+    tau = []
+    deltaChi = []
+    dataSetList = np.array(["1e-03", "1e-02", "1e-01", "2e-01", "3e-01", "1", "2", "3"]) #1e07
+    colorList = cm.get_cmap('plasma', dataSetList.shape[0])
+    fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
+    for i in range(dataSetList.shape[0]):
+        if(os.path.exists(dirName + "/T10-u" + dataSetList[i] + "/dynamics/corr-log-q" + q + ".dat")):
+            data = np.loadtxt(dirName + "/T10-u" + dataSetList[i] + "/dynamics/corr-log-q" + q + ".dat")
+            timeStep = ucorr.readFromParams(dirName + "/T10-u" + dataSetList[i] + "/dynamics/", "dt")
+            diff.append(data[-1,1]/(4 * data[-1,0] * timeStep))
+            tau.append(timeStep*ucorr.computeTau(data))
+            deltaChi.append(timeStep*ucorr.computeDeltaChi(data))
+            #plotSPCorr(ax, data[:,0]*timeStep, data[:,1], "$MSD(\\Delta t)$", color = colorList(i/dataSetList.shape[0]), logy = True)
+            #plotSPCorr(ax, data[:,0]*timeStep, data[:,1]/data[:,0]*timeStep, "$\\frac{MSD(\\Delta t)}{\\Delta t}$", color = colorList(i/dataSetList.shape[0]), logy = True)
+            plotSPCorr(ax, data[1:,0]*timeStep, data[1:,4], "$ISF(\\Delta t)$", color = colorList(i/dataSetList.shape[0]))
+            #plotSPCorr(ax, data[1:,0]*timeStep, data[1:,3], "$\\chi(\\Delta t)$", color = colorList(i/dataSetList.shape[0]))
+    #ax.plot(np.linspace(1e-03,1e10,50), np.exp(-1)*np.ones(50), linestyle='--', linewidth=1.5, color='k')
+    ax.set_xlabel("$Time$ $interval,$ $\\Delta t$", fontsize=18)
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/soft/pisf-vsu-" + figureName + "-q" + q + ".png", transparent=True, format = "png")
+    u = np.array(dataSetList).astype(float)
+    diff = np.array(diff)
+    tau = np.array(tau)
+    fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
+    #ax.semilogx(u, diff, linewidth=1.5, color='k', marker='o')
+    ax.semilogx(u, tau, linewidth=1.5, color='k', marker='o')
+    #ax.semilogx(T, diff*tau, linewidth=1.5, color='k', marker='o')
+    #ax.set_ylim(0.12, 1.34)
+    ax.tick_params(axis='both', labelsize=14)
+    #ax.set_ylabel("$Diffusivity,$ $D$", fontsize=17)
+    ax.set_xlabel("$Attraction$ $energy,$ $u$", fontsize=17)
+    ax.set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=17)
+    #ax.set_ylabel("$D$ $\\tau$", fontsize=17)
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/soft/pfdt-vsu-" + figureName + "-q" + q + ".png", transparent=True, format = "png")
     plt.show()
 
 def plotSPDynamicsVSPhi(dirName, sampleName, figureName):
@@ -843,6 +883,69 @@ def plotSPFDTdata(dirName, firstIndex, mass, figureName):
     fig2.savefig("/home/francesco/Pictures/soft/pfdt-Drf0-" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
+def plotSPFDTvsTemp(dirName, figureName):
+    damping = 1e03
+    meanRad = np.mean(np.loadtxt(dirName + "../particleRad.dat"))
+    DrList = np.array(["1", "1e-01", "1e-02"])
+    f0List = np.array(["1", "40", "80"])
+    TList = np.array([#"0.06", "0.07", "0.08", "0.09", #1e09
+                    #"0.1", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", #1e08
+                    "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]) #1e07
+    markerList = ['v', 'o', 's']
+    colorList = cm.get_cmap('viridis', f0List.shape[0])
+    fig, ax = plt.subplots(2, 1, figsize = (6, 7), dpi = 120)
+    for i in range(DrList.shape[0]):
+        Dr = DrList[i]
+        for j in range(f0List.shape[0]):
+            f0 = f0List[j]
+            Pe = [] #this times the energy scale for repulsive interactions is an energy scale for active forces
+            diff = []
+            tau = []
+            deltaChi = []
+            Temp = []
+            Tsubset = []
+            Treduced = []
+            for T in TList:
+                dirSample = dirName + "/Dr" + Dr + "-f0" + f0 + "/T" + T + "/"
+                if(os.path.exists(dirSample)):
+                    Pe.append(float(f0)/ (damping * float(Dr) * 2 * meanRad))
+                    data = np.loadtxt(dirSample + "dynamics/corr-log-q1.dat")
+                    timeStep = ucorr.readFromParams(dirSample + "dynamics", "dt")
+                    diff.append(np.mean(data[-10:,1]/(4 * data[-10:,0] * timeStep)))
+                    tau.append(timeStep*ucorr.computeTau(data))
+                    deltaChi.append(ucorr.computeDeltaChi(data))
+                    #velPDF = np.array(np.loadtxt(dirSample + "dynamics-mass1e05/velocityPDF.dat"))
+                    #varSupport = np.argwhere(velPDF[:,1]>0.5*np.max(velPDF[:,1]))
+                    #Temp.append(velPDF[varSupport[-1,0],0] - velPDF[varSupport[0,0],0])
+                    #varSupport = np.argwhere(velPDF[:,2]>0.5*np.max(velPDF[:,2]))
+                    #Tsubset.append(velPDF[varSupport[-1,0],0] - velPDF[varSupport[0,0],0])
+                    velVar = np.array(np.loadtxt(dirSample + "dynamics-mass1e05/tracerTemp.dat"))
+                    Temp.append(velVar[0])
+                    Tsubset.append(velVar[1])
+                    Treduced.append(Tsubset[-1]*Pe[-1])
+            np.savetxt(dirName + "/Dr" + Dr + "-f0" + f0 + "/FDTdata.dat", np.column_stack((Temp, Tsubset, Pe, tau, diff, deltaChi)))
+            Temp = np.array(Temp)
+            Tsubset = np.array(Tsubset)
+            tau = np.array(tau)
+            diff = np.array(diff)
+            ax[0].loglog(1/Temp, tau, linewidth=1.2, color=colorList(j/f0List.shape[0]), marker=markerList[i], markersize=6, markeredgewidth=1.5)
+            ax[1].loglog(Temp, tau*diff, linewidth=1.2, color=colorList(j/f0List.shape[0]), marker=markerList[i], markersize=6, markeredgewidth=1.5)
+    thermalData = np.loadtxt(dirName + "../langevin/relaxationData.dat")
+    ax[0].semilogx(1/thermalData[:,0], thermalData[:,2], linewidth=1.2, color='k', linestyle='--')
+    ax[1].semilogx(thermalData[:,0], thermalData[:,1]*thermalData[:,2], linewidth=1.2, color='k', linestyle='--')
+    #ax[1].legend(("$D_r = 1$", "$D_r = 0.1$", "$D_r = 0.01$", "$thermal$"), fontsize=14, loc="upper left")
+    ax[0].tick_params(axis='both', labelsize=12)
+    ax[1].tick_params(axis='both', labelsize=12)
+    ax[0].set_ylabel("$Relaxation$ $time,$ $\\tau$", fontsize=15)
+    ax[0].set_xlabel("$Inverse$ $temperature,$ $1/T_{FDT}, 1/T_K$", fontsize=15)
+    #ax[0].set_ylabel("$Diffusivity,$ $D$", fontsize=15)
+    ax[1].set_xlabel("$Temperature,$ $T_{FDT}, T_K$", fontsize=15)
+    ax[1].set_ylabel("$D$ $\\tau$", fontsize=15)
+    fig.tight_layout()
+    #plt.subplots_adjust(hspace=0)
+    fig.savefig("/home/francesco/Pictures/soft/pFDT-Drf0-vsT" + figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -902,6 +1005,11 @@ if __name__ == '__main__':
         figureName = sys.argv[3]
         q = sys.argv[4]
         plotSPDynamicsVSTemp(dirName, figureName, q)
+
+    elif(whichPlot == "pdynattract"):
+        figureName = sys.argv[3]
+        q = sys.argv[4]
+        plotSPDynamicsVSAttraction(dirName, figureName, q)
 
     elif(whichPlot == "pdynphi"):
         sampleName = sys.argv[3]
@@ -980,6 +1088,10 @@ if __name__ == '__main__':
         mass = float(sys.argv[4])
         figureName = sys.argv[5]
         plotSPFDTdata(dirName, firstIndex, mass, figureName)
+
+    elif(whichPlot == "pfdttemp"):
+        figureName = sys.argv[3]
+        plotSPFDTvsTemp(dirName, figureName)
 
     else:
         print("Please specify the type of plot you want")

@@ -22,6 +22,14 @@ def computeDistances(pos, boxSize):
             distances[i,j] = np.linalg.norm(delta)
     return distances
 
+def computeTimeDistances(pos1, pos2, boxSize):
+    distances = np.zeros((pos1.shape[0], pos1.shape[0]))
+    for i in range(pos.shape[0]):
+        for j in range(i):
+            delta = pbcDistance(pos1[i], pos2[j], boxSize)
+            distances[i,j] = np.linalg.norm(delta)
+    return distances
+
 # the formula to compute the drift-subtracted msd is
 #delta = np.linalg.norm(pos1 - pos2, axis=1)
 #drift = np.linalg.norm(np.mean(pos1 - pos2, axis=0)**2)
@@ -30,7 +38,7 @@ def computeDistances(pos, boxSize):
 #drift = np.mean(delta)**2
 # in one dimension
 #gamma2 = (1/3) * np.mean(delta**2) * np.mean(1/delta**2) - 1
-def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
+def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
     #delta = pbcDistance(pos1, pos2, boxSize)
     delta = pos1 - pos2
     drift = np.mean(pos1 - pos2, axis=0)
@@ -40,10 +48,31 @@ def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False)
     if(oneDim == True):
         delta = pos1[:,0] - pos2[:,0]
         delta -= np.mean(delta)
-    msd = np.mean(delta**2)
+    msd = np.mean(delta**2)/scale
     isf = np.mean(np.sin(waveVector * delta) / (waveVector * delta))
     chi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isf*isf
-    return msd / scale, isf, chi4
+    return msd, isf, chi4
+
+def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale):
+    #delta = pbcDistance(pos1, pos2, boxSize)
+    delta = pos1 - pos2
+    drift = np.mean(pos1 - pos2, axis=0)
+    delta[:,0] -= drift[0]
+    delta[:,1] -= drift[1]
+    Sq = []
+    qList = np.array([[1,0], [-1,0], [0,1], [0,-1],
+                    [1/np.sqrt(2),1/np.sqrt(2)], [-1/np.sqrt(2),1/np.sqrt(2)], [1/np.sqrt(2),-1/np.sqrt(2)], [-1/np.sqrt(2),-1/np.sqrt(2)],
+                    [np.sqrt(3)/2,1/2], [-np.sqrt(3)/2,1/2], [np.sqrt(3)/2,-1/2], [-np.sqrt(3)/2,-1/2]])
+    for q in qList:
+        Sq.append(np.mean(np.exp(1j*waveVector*np.sum(np.multiply(q, delta), axis=1))))
+    Sq = np.array(Sq)
+    ISF = np.real(np.mean(Sq))
+    Chi4 = np.real(np.mean(Sq**2) - np.mean(Sq)**2)
+    delta = np.linalg.norm(delta, axis=1)
+    MSD = np.mean(delta**2)/scale
+    isoISF = np.mean(np.sin(waveVector * delta) / (waveVector * delta))
+    isoChi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isoISF*isoISF
+    return MSD, ISF, Chi4, isoISF, isoChi4
 
 def computeSingleParticleISF(pos1, pos2, boxSize, waveVector, scale):
     #delta = pbcDistance(pos1, pos2, boxSize)
