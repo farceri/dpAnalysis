@@ -280,8 +280,8 @@ def computeParticleSelfCorr(dirName, maxPower):
     stepRange = stepRange[stepRange<int(10**maxPower)]
     for i in range(1,stepRange.shape[0]):
         pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particlePos.dat"))
-        #particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
-        particleCorr.append(ucorr.computeScatteringFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
+        particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
+        #particleCorr.append(ucorr.computeScatteringFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
     particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,5))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin.dat", np.column_stack((stepRange*timeStep, particleCorr)))
@@ -331,14 +331,14 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
         for i in range(1,stepBlock.shape[0]):
             pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepBlock[i]) + "/particlePos.dat"))
             particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
-        particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,3))
+        particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,5))
         stepBlock = stepBlock[1:]-(block-1)*decade#discard initial time
         if(plot=="plot"):
             #uplot.plotCorrelation(stepBlock*timeStep, particleCorr[:,0], "$MSD(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, logy = True, color=colorList(block/10), show=False)
             uplot.plotCorrelation(stepBlock*timeStep, particleCorr[:,1], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color=colorList(block/10), show=False)
             plt.pause(0.2)
         if(computeTau=="tau"):
-            diff.append(particleCorr[-10,0]/4*stepBlock[-10])
+            diff.append(particleCorr[-1,0]/4*stepBlock[-1])
             ISF = particleCorr[:,1]
             step = stepBlock
             relStep = np.argwhere(ISF>np.exp(-1))[-1,0]
@@ -354,8 +354,7 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
                 tau.append(timeStep*step[relStep])
     if(computeTau=="tau"):
         print("relaxation time: ", np.mean(tau), " +- ", np.std(tau))
-        with open(dirName + "../tauDiff.dat", "ab") as f:
-            np.savetxt(f, np.array([[timeStep, phi, T, np.mean(tau), np.std(tau), np.mean(diff), np.std(diff)]]))
+        np.savetxt(dirName + "relaxationData.dat", np.array([[timeStep, phi, T, np.mean(tau), np.std(tau), np.mean(diff), np.std(diff)]]))
 
 ########### Time-averaged Self Correlations in log-spaced time window ##########
 def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac = 1, computeTau = "tau"):

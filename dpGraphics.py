@@ -43,6 +43,7 @@ def plotEnergy(dirName):
     ax.set_xlabel("$Simulation$ $step$", fontsize=15)
     #ax.set_ylabel("$Potential$ $energy$", fontsize=15)
     ax.set_ylabel("$Energy$", fontsize=15)
+    #ax.legend(("$E_{pot}$", "$E_{tot}$"), fontsize=15, loc="lower right")
     ax.legend(("$E_{pot}$", "$E_{kin}$", "$E_{tot}$"), fontsize=15, loc="lower right")
     plt.tight_layout()
     plt.show()

@@ -111,7 +111,7 @@ def computeParticleSusceptibility(dirName, sampleName, maxPower):
         #particleChi.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, scale, oneDim = True))
         particleCorr.append(ucorr.computeCorrFunctions(pos, pos0, boxSize, pWaveVector, scale, oneDim = True))
     particleChi = np.array(particleChi)
-    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
+    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,5))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "sus-lin-xdim.dat", np.column_stack((stepRange*timeStep, particleChi)))
     np.savetxt(dirName + os.sep + "../dynamics-test/corr-lin-xdim.dat", np.column_stack((stepRange*timeStep, particleCorr)))
@@ -139,7 +139,7 @@ def computeParticleSelfCorrOneDim(dirName, maxPower):
     for i in range(1,stepRange.shape[0]):
         pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particlePos.dat"))
         particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2, oneDim = True))
-    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
+    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,5))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin-xdim.dat", np.column_stack((stepRange * timeStep, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-20:,0]/(2*stepRange[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(2*stepRange[-20:]*timeStep)))
@@ -180,7 +180,7 @@ def computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower):
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
-    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],5))
     particleCorr = particleCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log-xdim.dat", np.column_stack((stepList * timeStep, particleCorr)))
     print("diffusivity on x: ", np.mean(particleCorr[-20:,0]/(2*stepList[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(2*stepList[-20:]*timeStep)))
@@ -208,7 +208,7 @@ def computeParticleSelfCorr(dirName, maxPower):
     for i in range(1,stepRange.shape[0]):
         pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particlePos.dat"))
         particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
-    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
+    particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,5))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin.dat", np.column_stack((stepRange*timeStep, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(4*stepRange[-20:]*timeStep)))
@@ -251,7 +251,7 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
-    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],3))
+    particleCorr = np.array(particleCorr).reshape((stepList.shape[0],5))
     particleCorr = particleCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "corr-log-q" + str(qFrac) + ".dat", np.column_stack((stepList, particleCorr)))
     print("diffusivity: ", np.mean(particleCorr[-20:,0]/(4*stepList[-20:]*timeStep)), " ", np.std(particleCorr[-20:,0]/(4*stepList[-20:]*timeStep)))
