@@ -14,27 +14,47 @@ import spCorrelation
 import shapeDescriptors
 import shapeGraphics
 
-def setAxis2D(ax):
+def setAxes2D(ax):
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.set_xticks([])
     ax.set_yticks([])
 
-def setDPMAxes(boxSize, ax):
+def setPackingAxes(boxSize, ax):
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
     ax.set_xlim(xBounds[0], xBounds[1])
     ax.set_ylim(yBounds[0], yBounds[1])
     ax.set_aspect('equal', adjustable='box')
-    setAxis2D(ax)
+    setAxes2D(ax)
 
-def setBigBoxAxes(boxSize, ax):
-    xBounds = np.array([-0.1, boxSize[0]+0.1])
-    yBounds = np.array([-0.1, boxSize[1]+0.1])
+def setBigBoxAxes(boxSize, ax, delta=0.1):
+    xBounds = np.array([-delta, boxSize[0]+delta])
+    yBounds = np.array([-delta, boxSize[1]+delta])
     ax.set_xlim(xBounds[0], xBounds[1])
     ax.set_ylim(yBounds[0], yBounds[1])
     ax.set_aspect('equal', adjustable='box')
-    setAxis2D(ax)
+    setAxes2D(ax)
+
+def getRadColorList(rad):
+    colorList = cm.get_cmap('viridis', rad.shape[0])
+    colorId = np.zeros((rad.shape[0], 4))
+    count = 0
+    for particleId in np.argsort(rad):
+        colorId[particleId] = colorList(count/rad.shape[0])
+        count += 1
+    return colorId
+
+def getEkinColorList(vel):
+    colorList = cm.get_cmap('Greys', vel.shape[0])
+    colorId = np.zeros((vel.shape[0], 4))
+    count = 0
+    ekin = np.linalg.norm(vel,axis=1)**2
+    print("kinetic energy: ", np.sum(ekin)/(vel.shape[0]*2))
+    for particleId in np.argsort(ekin):
+        colorId[particleId] = colorList(count/ekin.shape[0])
+        count += 1
+    return colorId
 
 def plotSPPacking(dirName, figureName, alpha = 0.6):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
@@ -49,13 +69,10 @@ def plotSPPacking(dirName, figureName, alpha = 0.6):
     ax.set_xlim(xBounds[0], xBounds[1])
     ax.set_ylim(yBounds[0], yBounds[1])
     ax.set_aspect('equal', adjustable='box')
-    setAxis2D(ax)
-    colorList = cm.get_cmap('viridis', rad.shape[0])
-    colorId = np.zeros((rad.shape[0], 4))
-    count = 0
-    for particleId in np.argsort(rad):
-        colorId[particleId] = colorList(count/rad.shape[0])
-        count += 1
+    setBigBoxAxes(boxSize, ax, 0.05)
+    colorId = getRadColorList(rad)
+    vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
+    colorId = getEkinColorList(vel)
     for particleId in range(rad.shape[0]):
         x = pos[particleId,0]
         y = pos[particleId,1]
@@ -100,28 +117,50 @@ def plotSoftParticlesSubSet(ax, pos, rad, firstIndex, alpha = 0.6, colorMap = Tr
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alphaId[particleId], linewidth = lw))
 
-def makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 0):
+def plotSoftParticleQuiverVel(axFrame, pos, vel, rad):
+    colorId = np.zeros((rad.shape[0], 4))
+    colorList = cm.get_cmap('viridis', rad.shape[0])
+    count = 0
+    for particleId in np.argsort(rad):
+        colorId[particleId] = colorList(count/rad.shape[0])
+        count += 1
+    for particleId in range(pos.shape[0]):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        vx = vel[particleId,0]
+        vy = vel[particleId,1]
+        axFrame.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', linewidth = 0.7))
+        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)
+
+def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 0, quiver = False, npt = False):
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     gcfFrame = plt.gcf()
     gcfFrame.clear()
     axFrame = figFrame.gca()
-    setDPMAxes(boxSize, axFrame)
+    setPackingAxes(boxSize, axFrame)
     if(subSet == "subset"):
         plotSoftParticlesSubSet(axFrame, pos, rad, firstIndex)
+    elif(quiver == "quiver"):
+        vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
+        plotSoftParticleQuiverVel(axFrame, pos, vel, rad)
     else:
+        if(npt == "npt"):
+            boxSize = np.loadtxt(dirSample + "/boxSize.dat")
         plotSoftParticles(axFrame, pos, rad)
     plt.tight_layout()
     axFrame.remove()
     frames.append(axFrame)
 
-def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False, subSet = False, firstIndex = 0, npt = False):
+def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False, subSet = False, firstIndex = 0, npt = False, quiver = False):
     def animate(i):
         frames[i].figure=fig
         fig.axes.append(frames[i])
         fig.add_axes(frames[i])
         return gcf.artists
-    frameTime = 200
+    frameTime = 300
     frames = []
     if(logSpaced == False):
         stepList = shapeGraphics.getStepList(numFrames, firstStep, stepFreq)
@@ -143,18 +182,16 @@ def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, st
     gcf.clear()
     ax = fig.gca()
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    setDPMAxes(boxSize, ax)
+    setPackingAxes(boxSize, ax)
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     # the first configuration gets two frames for better visualization
-    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames, subSet, firstIndex)
+    makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet, firstIndex, quiver)
+    vel = []
     for i in stepList:
-        pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(i) + "/particlePos.dat"))
-        if(npt == "npt"):
-            boxSize = np.loadtxt(dirName + os.sep + "t" + str(i) + "/boxSize.dat")
-        makeSoftParticleFrame(pos, rad, boxSize, figFrame, frames, subSet, firstIndex)
+        dirSample = dirName + os.sep + "t" + str(i)
+        makeSoftParticleFrame(dirSample, rad, boxSize, figFrame, frames, subSet, firstIndex, quiver, npt)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
-    anim.save("/home/francesco/Pictures/soft/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
+    anim.save("/home/francesco/Pictures/soft/packings/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def plotDeformableParticles(ax, pos, rad, nv, faceColor = [0,0.5,1], edgeColor = [0.3,0.3,0.3], colorMap = False, edgeColorMap = False, alpha = 0.7, ls = '-', lw = 0.5):
     start = 0
@@ -204,7 +241,7 @@ def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,
     rad = np.array(np.loadtxt(dirName + os.sep + "radii.dat"))
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype=int)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    setDPMAxes(boxSize, ax)
+    setPackingAxes(boxSize, ax)
     #setBigBoxAxes(boxSize, ax)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
@@ -220,7 +257,7 @@ def compareDPMPackings(dirName1, dirName2, figureName):
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
     boxSize = np.loadtxt(dirName1 + os.sep + "boxSize.dat")
-    setDPMAxes(boxSize, ax) # packings need to have the same boxSize
+    setPackingAxes(boxSize, ax) # packings need to have the same boxSize
     dirNameList = np.array([dirName1, dirName2])
     colorList = ['r', 'b']
     for i in range(dirNameList.shape[0]):
@@ -239,7 +276,7 @@ def makeDeformablePackingFrame(pos, rad, nv, boxSize, figFrame, frames):
     gcfFrame = plt.gcf()
     gcfFrame.clear()
     axFrame = figFrame.gca()
-    setDPMAxes(boxSize, axFrame)
+    setPackingAxes(boxSize, axFrame)
     plotDeformableParticles(axFrame, pos, rad, nv, colorMap = True)
     plt.tight_layout()
     axFrame.remove()
@@ -273,7 +310,7 @@ def makeDPMPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, s
     gcf.clear()
     ax = fig.gca()
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    setDPMAxes(boxSize, ax)
+    setPackingAxes(boxSize, ax)
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     rad = np.array(np.loadtxt(dirName + os.sep + "radii.dat"))
     # the first configuration gets two frames for better visualization
@@ -303,7 +340,7 @@ def compareDPMPackingsVideo(dirName, fileName, figureName):
     gcf.clear()
     ax = fig.gca()
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    setDPMAxes(boxSize, ax)
+    setPackingAxes(boxSize, ax)
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     rad = np.loadtxt(dirName + os.sep + "radii.dat")
     rad = np.array(rad)
@@ -312,7 +349,7 @@ def compareDPMPackingsVideo(dirName, fileName, figureName):
         gcfFrame = plt.gcf()
         gcfFrame.clear()
         axFrame = figFrame.gca()
-        setDPMAxes(boxSize, axFrame)
+        setPackingAxes(boxSize, axFrame)
         # second packing
         pos = np.loadtxt(fileName, skiprows=(numVertices*i), max_rows = numVertices, usecols = (0,1))
         pos = np.array(pos)
@@ -353,7 +390,7 @@ def makeCompressionVideo(dirName, figureName, numFrames = 50):
     gcf.clear()
     ax = fig.gca()
     boxSize = np.loadtxt(dirName + os.sep + phiList[0] + "/boxSize.dat")
-    setDPMAxes(boxSize, ax)
+    setPackingAxes(boxSize, ax)
     nv = np.array(np.loadtxt(dirName + os.sep + phiList[0] + "/numVertexInParticleList.dat", dtype=int))
     numVertices = np.sum(nv)
     colorList = cm.get_cmap('viridis', nv.shape[0])
@@ -365,7 +402,7 @@ def makeCompressionVideo(dirName, figureName, numFrames = 50):
         gcfFrame = plt.gcf()
         gcfFrame.clear()
         axFrame = figFrame.gca()
-        setDPMAxes(boxSize, axFrame)
+        setPackingAxes(boxSize, axFrame)
         plotDeformableParticles(axFrame, pos, rad, nv, faceColor = colorList, colorMap = True)
         plt.tight_layout()
         axFrame.remove()
@@ -390,7 +427,7 @@ def makeRearrengementsVideo(dirName, figureName, numFrames = 20, firstStep = 1e0
     gcf.clear()
     ax = fig.gca()
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    setDPMAxes(boxSize, ax)
+    setPackingAxes(boxSize, ax)
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     numParticles = nv.shape[0]
     rad = np.loadtxt(dirName + os.sep + "radii.dat")
@@ -414,7 +451,7 @@ def makeRearrengementsVideo(dirName, figureName, numFrames = 20, firstStep = 1e0
         gcfFrame = plt.gcf()
         gcfFrame.clear()
         axFrame = figFrame.gca()
-        setDPMAxes(boxSize, axFrame)
+        setPackingAxes(boxSize, axFrame)
         trackDeformableParticles(axFrame, pos, rad, nv, trackList = rearrangeList, highlightList = highlightList)
         plt.tight_layout()
         axFrame.remove()
@@ -430,7 +467,7 @@ def plotSPDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype=int)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     area = np.array(np.loadtxt(dirName + os.sep + "restAreas.dat"))
-    setDPMAxes(boxSize, ax)
+    setPackingAxes(boxSize, ax)
     #pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     plotDeformableParticles(ax, pos, rad, nv, faceColor, edgeColor, colorMap, edgeColorMap, alpha)
@@ -458,6 +495,12 @@ if __name__ == '__main__':
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
         makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq)
+
+    elif(whichPlot == "velvideo"):
+        numFrames = int(sys.argv[4])
+        firstStep = float(sys.argv[5])
+        stepFreq = float(sys.argv[6])
+        makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, quiver = "quiver")
 
     elif(whichPlot == "ssvideosubset"):
         numFrames = int(sys.argv[4])

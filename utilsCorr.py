@@ -15,12 +15,26 @@ def pbcDistance(r1, r2, boxSize):
     return delta
 
 def computeDistances(pos, boxSize):
-    distances = np.zeros((pos.shape[0], pos.shape[0]))
-    for i in range(pos.shape[0]):
-        for j in range(i):
-            delta = pbcDistance(pos[i], pos[j], boxSize)
-            distances[i,j] = np.linalg.norm(delta)
+    numParticles = pos.shape[0]
+    distances = (np.repeat(pos[:, np.newaxis, :], numParticles, axis=1) - np.repeat(pos[np.newaxis, :, :], numParticles, axis=0))
+    distances += boxSize / 2
+    distances %= boxSize
+    distances -= boxSize / 2
+    distances = np.sqrt(np.sum(distances**2, axis=2))
+    #distances = np.zeros((pos.shape[0], pos.shape[0]))
+    #for i in range(pos.shape[0]):
+    #    for j in range(i):
+    #        delta = pbcDistance(pos[i], pos[j], boxSize)
+    #        distances[i,j] = np.linalg.norm(delta)
     return distances
+
+def computeDeltas(pos, boxSize):
+    numParticles = pos.shape[0]
+    deltas = (np.repeat(pos[:, np.newaxis, :], numParticles, axis=1) - np.repeat(pos[np.newaxis, :, :], numParticles, axis=0))
+    deltas += boxSize / 2
+    deltas %= boxSize
+    deltas -= boxSize / 2
+    return deltas
 
 def computeTimeDistances(pos1, pos2, boxSize):
     distances = np.zeros((pos1.shape[0], pos1.shape[0]))
@@ -30,14 +44,73 @@ def computeTimeDistances(pos1, pos2, boxSize):
             distances[i,j] = np.linalg.norm(delta)
     return distances
 
-# the formula to compute the drift-subtracted msd is
-#delta = np.linalg.norm(pos1 - pos2, axis=1)
-#drift = np.linalg.norm(np.mean(pos1 - pos2, axis=0)**2)
-#msd = np.mean(delta**2) - drift
-# equivalent to
-#drift = np.mean(delta)**2
-# in one dimension
-#gamma2 = (1/3) * np.mean(delta**2) * np.mean(1/delta**2) - 1
+def getPairCorr(pos, boxSize, bins, minRad):
+    distance = np.triu(computeDistances(pos, boxSize),1)
+    distance = distance.flatten()
+    pairCorr, edges = np.histogram(distance, bins=bins)
+    binCenter = 0.5 * (edges[:-1] + edges[1:])
+    return pairCorr / (2 * np.pi * binCenter)
+
+def getStructureFactor(pos, boxSize, q, numParticles):
+    sfList = np.zeros(q.shape[0])
+    theta = np.arange(0, 2*np.pi, np.pi/8)
+    for j in range(q.shape[0]):
+        sf = []
+        for i in range(theta.shape[0]):
+            k = q[j]*np.array([np.cos(theta[i]), np.sin(theta[i])])
+            posDotK = np.dot(pos,k)
+            sf.append(np.sum(np.exp(-1j*posDotK))*np.sum(np.exp(1j*posDotK)))
+        sfList[j] = np.real(np.mean(sf))/numParticles
+    return sfList
+
+def getVelocityStructureFactor(pos, vel, boxSize, q, numParticles):
+    velsfList = np.zeros(q.shape[0])
+    theta = np.arange(0, 2*np.pi, np.pi/8)
+    for j in range(q.shape[0]):
+        velsf = []
+        for i in range(theta.shape[0]):
+            unitk = np.array([np.cos(theta[i]), np.sin(theta[i])])
+            k = unitk*q[j]
+            posDotK = np.dot(pos,k)
+            velDotK = np.dot(vel,unitk)
+            s1 = np.sum(vel[:,0]*vel[:,0]*np.exp(-1j*posDotK))*np.sum(vel[:,0]*vel[:,0]*np.exp(1j*posDotK))
+            s2 = np.sum(vel[:,0]*vel[:,1]*np.exp(-1j*posDotK))*np.sum(vel[:,0]*vel[:,1]*np.exp(1j*posDotK))
+            s3 = np.sum(vel[:,1]*vel[:,1]*np.exp(-1j*posDotK))*np.sum(vel[:,1]*vel[:,1]*np.exp(1j*posDotK))
+            vsf = np.array([[s1, s2], [s2, s3]])
+            velsf.append(np.dot(np.dot(unitk, vsf), unitk))
+            #velsf.append(np.sum(velDotK*np.exp(-1j*posDotK))*np.sum(velDotK*np.exp(1j*posDotK)))
+        velsfList[j] = np.real(np.mean(velsf))/numParticles
+    return velsfList
+
+def computeVelCorrFunctions(pos1, pos2, vel1, vel2, dir1, dir2, waveVector, numParticles):
+    speed1 = np.linalg.norm(vel1, axis=1)
+    velNorm1 = np.mean(speed1)
+    speed2 = np.linalg.norm(vel2, axis=1)
+    velNorm2 = np.mean(speed2)
+    speedCorr = np.mean(speed1 * speed2) / (velNorm1*velNorm2)
+    velCorr = np.mean(np.sum(np.multiply(vel1, vel2), axis=1)) / (velNorm1*velNorm2)
+    dirCorr = np.mean(np.sum(np.multiply(dir1, dir2), axis=1))
+    # compute velocity weighted ISF
+    delta = pos1 - pos2
+    drift = np.mean(pos1 - pos2, axis=0)
+    delta[:,0] -= drift[0]
+    delta[:,1] -= drift[1]
+    velSq = []
+    angleList = np.arange(0, 2*np.pi, np.pi/8)
+    for angle in angleList:
+        unitk = np.array([np.cos(angle), np.sin(angle)])
+        k = unitk*waveVector
+        deltaDotK = np.dot(delta, k)
+        vel1DotK = np.dot(vel1, unitk)
+        vel2DotK = np.dot(vel2, unitk)
+        s1 = np.sum(vel1[:,0]*vel2[:,0]*np.exp(1j*deltaDotK))
+        s2 = np.sum(vel1[:,0]*vel2[:,1]*np.exp(1j*deltaDotK))
+        s3 = np.sum(vel1[:,1]*vel2[:,1]*np.exp(1j*deltaDotK))
+        vsf = np.array([[s1, s2], [s2, s3]])
+        velSq.append(np.dot(np.dot(unitk, vsf), unitk))
+    velISF = np.real(np.mean(velSq))/numParticles
+    return speedCorr, velCorr, dirCorr, velISF
+
 def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
     #delta = pbcDistance(pos1, pos2, boxSize)
     delta = pos1 - pos2
@@ -53,6 +126,15 @@ def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = Fal
     chi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isf*isf
     return msd, isf, chi4
 
+# the formula to compute the drift-subtracted msd is
+#delta = np.linalg.norm(pos1 - pos2, axis=1)
+#drift = np.linalg.norm(np.mean(pos1 - pos2, axis=0)**2)
+#msd = np.mean(delta**2) - drift
+# equivalent to
+#drift = np.mean(delta)**2
+# in one dimension
+#gamma2 = (1/3) * np.mean(delta**2) * np.mean(1/delta**2) - 1
+
 def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale):
     #delta = pbcDistance(pos1, pos2, boxSize)
     delta = pos1 - pos2
@@ -60,10 +142,9 @@ def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale):
     delta[:,0] -= drift[0]
     delta[:,1] -= drift[1]
     Sq = []
-    qList = np.array([[1,0], [-1,0], [0,1], [0,-1],
-                    [1/np.sqrt(2),1/np.sqrt(2)], [-1/np.sqrt(2),1/np.sqrt(2)], [1/np.sqrt(2),-1/np.sqrt(2)], [-1/np.sqrt(2),-1/np.sqrt(2)],
-                    [np.sqrt(3)/2,1/2], [-np.sqrt(3)/2,1/2], [np.sqrt(3)/2,-1/2], [-np.sqrt(3)/2,-1/2]])
-    for q in qList:
+    angleList = np.arange(0, 2*np.pi, np.pi/8)
+    for angle in angleList:
+        q = np.array([np.cos(angle), np.sin(angle)])
         Sq.append(np.mean(np.exp(1j*waveVector*np.sum(np.multiply(q, delta), axis=1))))
     Sq = np.array(Sq)
     ISF = np.real(np.mean(Sq))
@@ -72,7 +153,9 @@ def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale):
     MSD = np.mean(delta**2)/scale
     isoISF = np.mean(np.sin(waveVector * delta) / (waveVector * delta))
     isoChi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isoISF*isoISF
-    return MSD, ISF, Chi4, isoISF, isoChi4
+    alpha2 = np.mean(delta**4)/(3*np.mean(delta**2)**2) - 1
+    alpha2new = np.mean(delta**2)/(3*np.mean(1/delta**2)) - 1
+    return MSD, ISF, Chi4, isoISF, isoChi4, alpha2, alpha2new
 
 def computeSingleParticleISF(pos1, pos2, boxSize, waveVector, scale):
     #delta = pbcDistance(pos1, pos2, boxSize)
@@ -99,21 +182,32 @@ def computeSusceptibility(pos1, pos2, field, waveVector, scale):
     chiq = np.mean(isf**2) - np.mean(isf)**2
     return chi / scale, np.real(chiq)
 
-def computeLocalAreaGrid(pos, area, xbin, ybin, localArea):
+def computeLocalAreaGrid(pos, rad, xbin, ybin, localArea):
     for pId in range(pos.shape[0]):
         for x in range(xbin.shape[0]-1):
             if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
                 for y in range(ybin.shape[0]-1):
                     if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
-                        localArea[x, y] += area[pId]
+                        localArea[x, y] += np.pi*rad[pId]**2
 
-def computeTau(data, threshold=np.exp(-1)):
+def computeLocalTempGrid(pos, vel, xbin, ybin, localTemp): #this works only for 2d
+    counts = np.zeros((localTemp.shape[0], localTemp.shape[1]))
+    for pId in range(pos.shape[0]):
+        for x in range(xbin.shape[0]-1):
+            if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
+                for y in range(ybin.shape[0]-1):
+                    if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
+                        localTemp[x, y] += np.linalg.norm(vel[pId])**2
+                        counts[x, y] += 1
+    localTemp[localTemp>0] /= counts[localTemp>0]*2
+
+def computeTau(data, index=2, threshold=np.exp(-1)):
     relStep = np.argwhere(data[:,2]>threshold)[-1,0]
     if(relStep + 1 < data.shape[0]):
         t1 = data[relStep,0]
         t2 = data[relStep+1,0]
-        ISF1 = data[relStep,2]
-        ISF2 = data[relStep+1,2]
+        ISF1 = data[relStep,index]
+        ISF2 = data[relStep+1,index]
         slope = (ISF2 - ISF1)/(t2 - t1)
         intercept = ISF2 - slope * t2
         return (np.exp(-1) - intercept)/slope
@@ -121,11 +215,11 @@ def computeTau(data, threshold=np.exp(-1)):
         return data[relStep,0]
 
 def computeDeltaChi(data):
-    maxStep = np.argmax(data[:,3])
-    maxChi = np.max(data[:,3])
+    maxStep = np.argmax(data[:,5])
+    maxChi = np.max(data[:,5])
     if(maxStep + 1 < data.shape[0]):
         # find values of chi above the max/2
-        domeSteps = np.argwhere(data[:,3]>maxChi*0.5)
+        domeSteps = np.argwhere(data[:,5]>maxChi*0.5)
         t1 = domeSteps[0]
         t2 = domeSteps[-1]
         return t2 - t1
@@ -177,6 +271,7 @@ def readDirectorPair(dirName, index1, index2):
     pVel1 = np.array([np.cos(pAngle1), np.sin(pAngle1)]).T
     pVel2 = np.array([np.cos(pAngle2), np.sin(pAngle2)]).T
     return pVel1, pVel2
+    #return pAngle1, pAngle2
 
 def computeParticleVelocities(vel, nv):
     numParticles = nv.shape[0]
@@ -186,6 +281,12 @@ def computeParticleVelocities(vel, nv):
         pVel[pId] = [np.mean(vel[firstVertex:firstVertex+nv[pId],0]), np.mean(vel[firstVertex:firstVertex+nv[pId],1])]
         firstVertex += nv[pId]
     return pVel
+
+def getPBCPositions(fileName, boxSize):
+    pos = np.array(np.loadtxt(fileName), dtype=np.float64)
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    return pos
 
 if __name__ == '__main__':
     print("library for correlation function utilities")
