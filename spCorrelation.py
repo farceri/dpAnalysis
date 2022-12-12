@@ -31,75 +31,6 @@ def computePairCorr(dirName, plot="plot"):
     else:
         return firstPeak
 
-############################ Static Structure Factor ###########################
-def computeStructureFactor(dirName, plot="plot"):
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    phi = ucorr.readFromParams(dirName, "phi")
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
-    meanRad = np.mean(rad)
-    qList = np.arange(np.pi/2, np.pi/(15*np.min(rad)), 2*np.min(rad))
-    pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
-    sfList = ucorr.getStructureFactor(pos, boxSize, qList, numParticles)
-    if(plot == "plot"):
-        uplot.plotCorrelation(qList, sfList, "$Structure$ $factor,$ $S(q)$", "$Wave$ $vector$ $magnitude,$ $q$")
-    else:
-        return sfList
-
-########################### Average Space Correlator ###########################
-def averagePairCorr(dirName, plot="plot"):
-    numParticles = ucorr.readFromParams(dirName, "numParticles")
-    phi = ucorr.readFromParams(dirName, "phi")
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    minRad = np.mean(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    rbins = np.arange(0.1*minRad, 30*minRad, 0.1*minRad)
-    dirList = np.array(ucorr.getDirectories(dirName))
-    dirList = dirList[:-1:100]
-    pcorr = np.zeros(rbins.shape[0]-1)
-    for dir in dirList:
-        #pos = np.array(np.loadtxt(dirName + os.sep + dir + "/particlePos.dat"))
-        pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
-        pcorr += ucorr.getPairCorr(pos, boxSize, rbins, minRad)/(numParticles * phi)
-    pcorr[pcorr>0] /= dirList.shape[0]
-    binCenter = (rbins[:-1] + rbins[1:])*0.5
-    np.savetxt(dirName + os.sep + "pairCorr.dat", np.column_stack((binCenter, pcorr)))
-    uplot.plotCorrelation(binCenter/minRad, pcorr, "$g(r/\\sigma)$", "$r/\\sigma$")
-    firstPeak = binCenter[np.argmax(pcorr)]
-    print("First peak of pair corr is at distance:", firstPeak, "equal to", firstPeak/minRad, "times the min radius:", minRad)
-    np.savetxt(dirName + os.sep + "pcorrFirstPeak.dat", np.column_stack(firstPeak, np.max(pcorr)))
-
-def averageStructureFactor(dirName, plot="plot"):
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    scale = 2*np.mean(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"),dtype=np.float64)
-    qList = np.arange(3.5, np.pi/(5*scale), scale)
-    dirList = np.array(ucorr.getDirectories(dirName))
-    dirList = dirList[:-1:20]
-    sf = np.zeros(qList.shape[0])
-    for dir in dirList:
-        pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)/scale
-        sf += ucorr.getStructureFactor(pos, boxSize, qList, numParticles)
-    sf[sf>0] /= dirList.shape[0]
-    np.savetxt(dirName + os.sep + "structureFactor.dat", np.column_stack((qList, sf)))
-    uplot.plotCorrelation(qList, sf, "$Structure$ $factor,$ $S(q)$", "$Wave$ $vector$ $magnitude,$ $q$", markersize=0, linewidth=1)
-
-###################### Average Velocity Correlator #############################
-def averageVelocityStructureFactor(dirName, plot=False):
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    scale = 2*np.mean(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    qList = np.arange(1, np.pi/(2*scale), scale)
-    dirList = np.array(ucorr.getDirectories(dirName))
-    dirList = dirList[:-1:20]
-    velsf = np.zeros(qList.shape[0])
-    for dir in dirList:
-        pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)/scale
-        vel = np.array(np.loadtxt(dirName + os.sep + dir + "/particleVel.dat"), dtype=np.float64)
-        velsf += ucorr.getVelocityStructureFactor(pos, vel, boxSize, qList, numParticles)
-    velsf[velsf>0] /= dirList.shape[0]
-    np.savetxt(dirName + os.sep + "velocitySF.dat", np.column_stack((qList, velsf)))
-    uplot.plotCorrelation(qList, velsf/velsf[-1], "$Velocity$ $structure$ $factor,$ $S_{v}(q)$", "$Wave$ $vector$ $magnitude,$ $q$", markersize=0, linewidth=1)
-
 ############################ Particle Susceptibility ###########################
 def computeParticleSusceptibility(dirName, sampleName, maxPower):
     numParticles = ucorr.readFromParams(dirName, "numParticles")
@@ -239,17 +170,23 @@ def computeParticleSelfCorr(dirName, maxPower):
     uplot.plotCorrelation(stepRange * timeStep, particleCorr[:,1], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'r')
 
 ########## Check Self Correlations by logarithmically spaced blocks ############
-def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau="tau"):
+def checkParticleSelfCorr(dirName, initialBlock, numBlocks, maxPower, plot="plot", computeTau="tau"):
     colorList = cm.get_cmap('viridis', 10)
     numParticles = ucorr.readFromParams(dirName, "numParticles")
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     phi = ucorr.readFromParams(dirName, "phi")
     timeStep = ucorr.readFromParams(dirName, "dt")
-    T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
+    energy = np.loadtxt(dirName + "/energy.dat")
+    if(energy[-1,3] < energy[-1,4]):
+        T = np.mean(energy[:,3])
+    else:
+        T = np.mean(energy[:,4])
+    print(T)
     #pWaveVector = np.pi / (np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
     #pWaveVector = np.pi /computePairCorr(dirName, plot=False)
-    pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
-    pWaveVector = np.pi / pRad
+    #pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
+    firstPeak = np.loadtxt(dirName + os.sep + "pcorrFirstPeak.dat")[0]
+    pWaveVector = 2*np.pi / firstPeak
     print("wave vector: ", pWaveVector)
     tau = []
     diff = []
@@ -257,17 +194,17 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
     stepRange = ucorr.getDirectories(dirName)
     stepRange = np.array(np.char.strip(stepRange, 't'), dtype=int)
     stepRange = np.sort(stepRange)
-    start = np.argwhere(stepRange==0)[0,0]
     decade = int(10**(maxPower-1))
-    for block in np.linspace(1, numBlocks, numBlocks, dtype=int):
+    start = np.argwhere(stepRange==(initialBlock-1)*decade)[0,0]
+    for block in np.arange(initialBlock, numBlocks+1, 1, dtype=int):
         particleCorr = []
         pPos0 = np.array(np.loadtxt(dirName + os.sep + "t" + str((block-1)*decade) + "/particlePos.dat"))
         pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "t" + str((block-1)*decade) + "/particleRad.dat")))
-        end = np.argwhere(stepRange==block*decade)[0,0]
+        end = np.argwhere(stepRange==(block*decade-int(decade/10)))[0,0]
         #print((block-1)*decade, start, block*decade, end)
-        stepBlock = stepRange[start:end]
-        #print(stepBlock)
-        start = end
+        stepBlock = stepRange[start:end+1]
+        print(stepBlock[0], stepBlock[-1])
+        start = end+1
         for i in range(1,stepBlock.shape[0]):
             pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepBlock[i]) + "/particlePos.dat"))
             particleCorr.append(ucorr.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, pRad**2))
@@ -278,7 +215,7 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
             uplot.plotCorrelation(stepBlock*timeStep, particleCorr[:,1], "$ISF(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color=colorList(block/10), show=False)
             plt.pause(0.2)
         if(computeTau=="tau"):
-            diff.append(particleCorr[-1,0]/4*stepBlock[-1])
+            diff.append(np.mean(particleCorr[-20:,0]/(2*stepBlock[-20:]*timeStep)))
             ISF = particleCorr[:,1]
             step = stepBlock
             relStep = np.argwhere(ISF>np.exp(-1))[-1,0]
@@ -294,7 +231,18 @@ def checkParticleSelfCorr(dirName, numBlocks, maxPower, plot="plot", computeTau=
                 tau.append(timeStep*step[relStep])
     if(computeTau=="tau"):
         print("relaxation time: ", np.mean(tau), " +- ", np.std(tau))
+        print("diffusivity: ", np.mean(diff), " +- ", np.std(diff))
         np.savetxt(dirName + "relaxationData.dat", np.array([[timeStep, phi, T, np.mean(tau), np.std(tau), np.mean(diff), np.std(diff)]]))
+
+def collectRelaxationDataVSTemp(dirName):
+    data = []
+    TList = np.array(["0.03", "0.035", "0.037", "0.04", "0.045", "0.05", "0.055", "0.06", "0.065", "0.07", "0.08", "0.1", "0.11", "0.12", "0.13", "0.14", "0.15", "0.17", "0.18", "0.19", #1e08
+                            "0.2", "0.23", "0.26", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1", "1.3", "1.6", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+    for i in range(TList.shape[0]):
+        fileName = dirName + os.sep + "T" + TList[i] + os.sep + "dynamics/relaxationData.dat"
+        if(os.path.exists(fileName)):
+            data.append(np.loadtxt(fileName))
+    np.savetxt(dirName + os.sep + "averageRelData.dat", data)
 
 ########### Time-averaged Self Correlations in log-spaced time window ##########
 def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac = 1, computeTau = "tau"):
@@ -305,11 +253,13 @@ def computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac =
     timeStep = ucorr.readFromParams(dirName, "dt")
     T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
     #pWaveVector = 2 * np.pi / (2 * np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
-    if(qFrac == 0):
-        pWaveVector = 2 * np.pi / computePairCorr(dirName, plot=False)
+    if(os.path.exists(dirName + os.sep + "pairCorr.dat")):
+        pcorr = np.loadtxt(dirName + os.sep + "pairCorr.dat")
+        firstPeak = pcorr[np.argmax(pcorr[:,1]),0]
+        pWaveVector = 2 * np.pi / firstPeak
     else:
         pWaveVector = 2 * np.pi / (float(qFrac) * 2 * pRad)
-    print("wave vector: ", pWaveVector)
+    print("wave vector: ", pWaveVector, " meanRad: ", pRad)
     particleCorr = []
     stepList = []
     freqDecade = int(10**freqPower)
@@ -420,7 +370,7 @@ def computeSingleParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, q
     print("mean relaxation time: ", np.mean(tau), ", std: ", np.std(tau))
     np.savetxt(dirName + "tauSingles.dat", np.array([[timeStep, pWaveVector, phi, T, np.mean(tau), np.var(tau), np.std(tau)]]))
 
-def collectRelaxationData(dirName, dynName="langevin"):
+def collectRelaxationDataVSPhi(dirName, dynName="langevin"):
     T = []
     diff = []
     tau = []
@@ -439,127 +389,6 @@ def collectRelaxationData(dirName, dynName="langevin"):
                 tau.append(timeStep*uplot.computeTau(data))
                 deltaChi.append(timeStep*uplot.computeDeltaChi(data))
         np.savetxt(dirName + phiList[i] + "/relaxationData.dat", np.column_stack((T, diff, tau, deltaChi)))
-
-############################ Local Packing Fraction ############################
-def computeLocalDensity(dirName, numBins, plot = False):
-    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
-    xbin = np.linspace(0, boxSize[0], numBins+1)
-    ybin = np.linspace(0, boxSize[1], numBins+1)
-    localArea = np.zeros((numBins, numBins))
-    localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
-    ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
-    localDensity = localArea/localSquare
-    localDensity = np.sort(localDensity.flatten())
-    cdf = np.arange(len(localDensity))/len(localDensity)
-    pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 30), density=True)
-    edges = (edges[1:] + edges[:-1])/2
-    if(plot=="plot"):
-        print("subBoxSize: ", xbin[1]-xbin[0], ybin[1]-ybin[0], " lengthscale: ", np.sqrt(np.mean(area)))
-        print("data stats: ", np.min(localDensity), np.max(localDensity), np.mean(localDensity), np.std(localDensity))
-        fig = plt.figure(dpi=120)
-        ax = plt.gca()
-        ax.plot(edges[1:], pdf[1:], linewidth=1.2, color='k')
-        #ax.plot(localDensity, cdf, linewidth=1.2, color='k')
-        ax.tick_params(axis='both', labelsize=15)
-        ax.set_ylabel('$P(\\varphi)$', fontsize=18)
-        ax.set_xlabel('$\\varphi$', fontsize=18)
-        #ax.set_xlim(-0.02, 1.02)
-        plt.tight_layout()
-        plt.show()
-    else:
-        return localDensity
-
-def localDensityVSTime(dirName, numBins, plot = False, figureName = None):
-    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    xbin = np.linspace(0, boxSize[0], numBins+1)
-    ybin = np.linspace(0, boxSize[1], numBins+1)
-    sampleDensity = []
-    step = []
-    localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
-    numSamples = 0
-    for dir in os.listdir(dirName):
-        if(os.path.exists(dirName + os.sep + dir + os.sep + "particleRad.dat")):
-            if(float(dir[1:])%1e04 == 0):
-                localArea = np.zeros((numBins, numBins))
-                pRad = np.array(np.loadtxt(dirName + os.sep + dir + os.sep + "particleRad.dat"))
-                pPos = np.array(np.loadtxt(dirName + os.sep + dir + os.sep + "particlePos.dat"))
-                pPos[:,0] -= np.floor(pPos[:,0]/boxSize[0]) * boxSize[0]
-                pPos[:,1] -= np.floor(pPos[:,1]/boxSize[1]) * boxSize[1]
-                ucorr.computeLocalAreaGrid(pPos, pRad, xbin, ybin, localArea)
-                localDensity = localArea/localSquare
-                sampleDensity.append(np.std(localDensity)/np.mean(localDensity))
-                step.append(float(dir[1:]))
-    sampleDensity = np.array(sampleDensity)
-    step = np.array(step)
-    sampleDensity = sampleDensity[np.argsort(step)]
-    step = np.sort(step)
-    np.savetxt(dirName + "localDensityVSTime" + str(numBins) + ".dat", np.column_stack((step, sampleDensity)))
-    if(plot=="plot"):
-        fig = plt.figure(dpi=120)
-        ax = plt.gca()
-        ax.plot(step, sampleDensity, linewidth=0.5, color='k', marker='.')
-        ax.tick_params(axis='both', labelsize=15)
-        ax.set_ylabel('$\\Delta \\varphi / \\varphi$', fontsize=18)
-        ax.set_xlabel('$Simulation$ $step$', fontsize=18)
-        plt.tight_layout()
-        plt.savefig("/home/francesco/Pictures/soft/localDensitySTD-" + figureName + ".png", transparent=False, format = "png")
-        plt.show()
-
-############################ Local Packing Fraction ############################
-def computeLocalDensityPDF(dirName, numBins, plot = False):
-    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    xbin = np.linspace(0, boxSize[0], numBins+1)
-    ybin = np.linspace(0, boxSize[1], numBins+1)
-    sampleDensity = []
-    localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
-    numSamples = 0
-    for dir in os.listdir(dirName):
-        if(os.path.exists(dirName + os.sep + dir + os.sep + "particleRad.dat")):
-            localArea = np.zeros((numBins, numBins))
-            pRad = np.array(np.loadtxt(dirName + os.sep + dir + os.sep + "particleRad.dat"))
-            pPos = np.array(np.loadtxt(dirName + os.sep + dir + os.sep + "particlePos.dat"))
-            pPos[:,0] -= np.floor(pPos[:,0]/boxSize[0]) * boxSize[0]
-            pPos[:,1] -= np.floor(pPos[:,1]/boxSize[1]) * boxSize[1]
-            ucorr.computeLocalAreaGrid(pPos, pRad, xbin, ybin, localArea)
-            localDensity = localArea/localSquare
-            sampleDensity.append(localDensity.flatten())
-    sampleDensity = np.sort(sampleDensity)
-    cdf = np.arange(len(sampleDensity))/len(sampleDensity)
-    pdf, edges = np.histogram(sampleDensity, bins=np.linspace(np.min(sampleDensity), np.max(sampleDensity), 30), density=True)
-    edges = (edges[:-1] + edges[1:])/2
-    np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + ".dat", np.column_stack((edges, pdf)))
-    if(plot=="plot"):
-        fig = plt.figure(dpi=120)
-        ax = plt.gca()
-        ax.semilogy(edges[1:], pdf[1:], linewidth=1.2, color='k')
-        #ax.plot(sampleDensity, cdf, linewidth=1.2, color='k')
-        ax.tick_params(axis='both', labelsize=15)
-        ax.set_ylabel('$P(\\varphi_{local})$', fontsize=18)
-        ax.set_xlabel('$\\varphi_{local}$', fontsize=18)
-        #ax.set_xlim(-0.02, 1.02)
-        plt.tight_layout()
-        plt.pause(1)
-    mean = np.mean(sampleDensity)
-    var = np.var(sampleDensity)
-    print("data stats: ", np.min(sampleDensity), np.max(sampleDensity), mean, var)
-    return mean, var, np.mean((sampleDensity - np.mean(sampleDensity))**4)/(3*var**2) - 1
-
-def collectLocalDensityPDF(dirName, numBins, plot):
-    dataSetList = np.array(["0.06", "0.07", "0.08", "0.09", "0.1", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19",
-                            "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
-    data = np.zeros((dataSetList.shape[0], 3))
-    for i in range(dataSetList.shape[0]):
-        dirSample = dirName + "/T" + dataSetList[i] + "/dynamics/"
-        if(os.path.exists(dirSample + os.sep + "t0/params.dat")):
-            data[i] = computeLocalDensityPDF(dirSample, numBins, plot)
-    np.savetxt(dirName + "densityData-N" + numBins + ".dat", data)
 
 ############################## Local Temperature ###############################
 def computeLocalTemperaturePDF(dirName, numBins, plot = False):
@@ -707,34 +536,67 @@ def computeParticleVelPDFSubSet(dirName, firstIndex=10, mass=1e06, plot="plot"):
     return np.var(vel), np.var(velSubSet)
 
 ##################### Particle Self Velocity Correlations ######################
-def computeParticleVelTimeCorr(dirName, maxPower):
+def computeParticleVelTimeCorr(dirName):
     numParticles = ucorr.readFromParams(dirName, "numParticles")
     timeStep = ucorr.readFromParams(dirName, "dt")
     particleVelCorr = []
+    particleVelVar = []
     # get trajectory directories
     stepRange = ucorr.getDirectories(dirName)
     stepRange = np.array(np.char.strip(stepRange, 't'), dtype=int)
     stepRange = np.sort(stepRange)
     pVel0 = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[0]) + "/particleVel.dat"))
-    pVel0Norm = np.linalg.norm(pVel0, axis=1)**2
-    stepRange = stepRange[stepRange<int(10**maxPower)]
+    pVel0Squared = np.mean(np.linalg.norm(pVel0,axis=1)**2)/2
     for i in range(0,stepRange.shape[0]):
         pVel = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particleVel.dat"))
-        particleVelCorr.append(np.mean(np.sum(np.multiply(pVel, pVel0), axis=1)/pVel0Norm))
-    particleVelCorr = np.array(particleVelCorr)
-    #stepRange = stepRange[1:]#discard initial time
-    np.savetxt(dirName + os.sep + "vel-lincorr.dat", np.column_stack((stepRange, particleVelCorr)))
-    uplot.plotCorrelation((stepRange + 1) * timeStep, particleVelCorr, "$\\frac{\\langle \\vec{v}(t) \\cdot \\vec{v}(0) \\rangle}{\\langle | \\vec{v}(0) |^2 \\rangle}$", "$Simulation$ $time$", logx = True, color='k')
+        particleVelCorr.append(np.mean(np.multiply(pVel,pVel0)))
+        meanVel = np.mean(pVel, axis=0)
+        particleVelVar.append(np.mean((pVel - meanVel)**2))
+    particleVelCorr /= pVel0Squared
+    np.savetxt(dirName + os.sep + "velCorr.dat", np.column_stack(((stepRange+1)*timeStep, particleVelCorr, particleVelVar)))
+    uplot.plotCorrelation((stepRange + 1) * timeStep, particleVelCorr, "$C_{vv}(\\Delta t)$", "$Time$ $interval,$ $\\Delta t$", color='k')
+    uplot.plotCorrelation((stepRange + 1) * timeStep, particleVelVar, "$\\langle \\vec{v}(t) - \\langle \\vec{v}(t) \\rangle \\rangle$", "$Simulation$ $time$", color='r')
+    width = stepRange[np.argwhere(particleVelCorr/particleVelCorr[0] < np.exp(-1))[0,0]]*timeStep
+    print("Measured damping coefficient: ", 1/width)
+    plt.show()
+
+##################### Particle Self Velocity Correlations ######################
+def computeParticleBlockVelTimeCorr(dirName, numBlocks):
+    numParticles = ucorr.readFromParams(dirName, "numParticles")
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    # get trajectory directories
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    blockFreq = dirList.shape[0]//numBlocks
+    timeList = timeList[:blockFreq]
+    blockVelCorr = np.zeros((blockFreq, numBlocks))
+    blockVelVar = np.zeros((blockFreq, numBlocks))
+    for block in range(numBlocks):
+        pVel0 = np.array(np.loadtxt(dirName + os.sep + dirList[block*blockFreq] + "/particleVel.dat"))
+        pVel0Squared = np.mean(np.linalg.norm(pVel0,axis=1)**2)/2
+        for i in range(blockFreq):
+            pVel = np.array(np.loadtxt(dirName + os.sep + dirList[block*blockFreq + i] + "/particleVel.dat"))
+            blockVelCorr[i, block] = np.mean(np.multiply(pVel,pVel0))
+            meanVel = np.mean(pVel, axis=0)
+            blockVelVar[i, block] = np.mean((pVel - meanVel)**2)
+        blockVelCorr[:, block] /= pVel0Squared
+    particleVelCorr = np.column_stack((np.mean(blockVelCorr, axis=1), np.std(blockVelCorr, axis=1)))
+    particleVelVar = np.mean(blockVelVar, axis=1)
+    np.savetxt(dirName + os.sep + "blockVelCorr.dat", np.column_stack((timeList * timeStep, particleVelCorr, particleVelVar)))
+    uplot.plotCorrelation(timeList * timeStep, particleVelCorr[:,0], "$C_{vv}(\\Delta t)$", "$Time$ $interval,$ $\\Delta t$", color='k')
+    uplot.plotCorrelation(timeList * timeStep, particleVelVar, "$\\langle \\vec{v}(t) - \\langle \\vec{v}(t) \\rangle \\rangle$", "$Simulation$ $time$", color='r')
+    width = timeList[np.argwhere(particleVelCorr/particleVelCorr[0] < np.exp(-1))[0,0]]*timeStep
+    print("Measured damping coefficient: ", 1/width)
+    #plt.show()
 
 ############# Time-averaged Self Vel Corr in log-spaced time window ############
-def computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower, radMultiple, plot=False):
+def computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "/particleRad.dat")))
-    phi = ucorr.readFromParams(dirName, "phi")
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    #pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "/particleRad.dat")))
+    #phi = ucorr.readFromParams(dirName, "phi")
     #waveVector = np.pi / (2 * np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
-    pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
-    waveVector = np.pi / (float(radMultiple) * pRad)
+    #pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
+    #waveVector = np.pi / (float(radMultiple) * pRad)
     particleVelCorr = []
     stepList = []
     freqDecade = int(10**freqPower)
@@ -750,57 +612,430 @@ def computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower, radM
             for multiple in range(startBlock, numBlocks):
                 for i in range(stepRange.shape[0]-1):
                     if(ucorr.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
-                        pPos1, pPos2 = ucorr.readParticlePair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
                         pVel1, pVel2 = ucorr.readVelPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        pDir1, pDir2 = ucorr.readDirectorPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        stepParticleVelCorr.append(ucorr.computeVelCorrFunctions(pPos1, pPos2, pVel1, pVel2, pDir1, pDir2, waveVector, numParticles))
+                        #pPos1, pPos2 = ucorr.readParticlePair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        #pDir1, pDir2 = ucorr.readDirectorPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        #stepParticleVelCorr.append(ucorr.computeVelCorrFunctions(pPos1, pPos2, pVel1, pVel2, pDir1, pDir2, waveVector, numParticles))
+                        stepParticleVelCorr.append(np.mean(np.multiply(pVel1,pVel2)))
                         numPairs += 1
             if(numPairs > 0):
                 stepList.append(spacing*spacingDecade)
-                particleVelCorr.append(np.mean(stepParticleVelCorr, axis=0))
+                particleVelCorr.append([np.mean(stepParticleVelCorr, axis=0), np.std(stepParticleVelCorr, axis=0)])
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
-    particleVelCorr = np.array(particleVelCorr).reshape((stepList.shape[0],4))
+    particleVelCorr = np.array(particleVelCorr).reshape((stepList.shape[0],2))
     particleVelCorr = particleVelCorr[np.argsort(stepList)]
-    np.savetxt(dirName + os.sep + "velTimeCorr-d" + radMultiple + ".dat", np.column_stack((stepList, particleVelCorr)))
-    if(plot=="plot"):
-        uplot.plotCorrelation(stepList, particleVelCorr[:,3], "$C_{nn}(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'g')
-        #uplot.plotCorrelation(stepList, particleVelCorr[:,1], "$C_{vv}(\\Delta t)$", "$time$ $interval,$ $\\Delta t$", logx = True, color = 'k')
+    np.savetxt(dirName + os.sep + "logVelCorr.dat", np.column_stack((stepList*timeStep, particleVelCorr)))
+    uplot.plotCorrWithError(stepList*timeStep, particleVelCorr[:,0]/particleVelCorr[0,0], particleVelCorr[:,1], ylabel="$C_{vv}(\\Delta t)$", logx = True, color = 'k')
+    #plt.show()
 
 ############################# Velocity Correlation #############################
-def computeParticleVelSpaceCorr(dirName, plot=False):
+def computeParticleVelSpaceCorr(dirName):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     minRad = np.min(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    bins = np.arange(0.1*minRad, 20*minRad, 0.1*minRad)/minRad
-    dirList = np.array(ucorr.getDirectories(dirName))
-    dirList = dirList[-1:]
-    speedCorr = np.zeros((bins.shape[0]-1, dirList.shape[0]))
-    velCorr = np.zeros(bins.shape[0]-1)
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    distance = ucorr.computeDistances(pos, boxSize)
+    bins = np.arange(np.min(distance), np.sqrt(2)*boxSize[0]/2, minRad)
+    vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
+    velNorm = np.linalg.norm(vel, axis=1)
+    velNormSquared = np.mean(velNorm**2)
+    velCorr = np.zeros((bins.shape[0]-1,3))
+    counts = np.zeros(bins.shape[0]-1)
+    velCorr = np.zeros((bins.shape[0]-1,3))
+    counts = np.zeros(bins.shape[0]-1)
+    for i in range(distance.shape[0]):
+        for j in range(i):
+            for k in range(bins.shape[0]-1):
+                if(distance[i,j] > bins[k] and distance[i,j] <= bins[k+1]):
+                    # parallel
+                    delta = ucorr.pbcDistance(pos[i], pos[j], boxSize)/distance[i,j]
+                    parProj1 = np.dot(vel[i],delta)
+                    parProj2 = np.dot(vel[j],delta)
+                    # perpendicular
+                    deltaPerp = np.array([-delta[1], delta[0]])
+                    perpProj1 = np.dot(vel[i],deltaPerp)
+                    perpProj2 = np.dot(vel[j],deltaPerp)
+                    # correlations
+                    velCorr[k,0] += parProj1 * parProj2
+                    velCorr[k,1] += perpProj1 * perpProj2
+                    velCorr[k,2] += np.dot(vel[i],vel[j])
+                    counts[k] += 1
+    binCenter = (bins[1:] + bins[:-1])/2
+    velCorr[counts>0,0] /= counts[counts>0]
+    velCorr[counts>0,1] /= counts[counts>0]
+    velCorr[counts>0,2] /= counts[counts>0]
+    velCorr /= velNormSquared
+    np.savetxt(dirName + os.sep + "spaceVelCorr1.dat", np.column_stack((binCenter, velCorr, counts)))
+    uplot.plotCorrelation(binCenter, velCorr[:,0], "$C_{vv}^{\\parallel}(r)$", "$Distance,$ $r$", color = 'k')
+    uplot.plotCorrelation(binCenter, velCorr[:,1], "$C_{vv}^{\\perp}(r)$", "$Distance,$ $r$", color = 'r')
+    uplot.plotCorrelation(binCenter, velCorr[:,2], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
+    plt.show()
+
+############################# Velocity Correlation #############################
+def averageParticleVelSpaceCorr(dirName, dirSpacing=1000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    minRad = np.min(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    bins = np.arange(2*minRad, np.sqrt(2)*boxSize[0]/2, 2*minRad)
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    dirList = dirList[:100]
+    velCorr = np.zeros((bins.shape[0]-1,3))
     counts = np.zeros(bins.shape[0]-1)
     for d in range(dirList.shape[0]):
-        pVel = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particleVel.dat"))
-        pPos = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particlePos.dat"))
-        distance = ucorr.computeDistances(pPos, boxSize)/minRad
-        pSpeed = np.linalg.norm(pVel, axis=1)
-        velNorm = np.mean(pSpeed)
-        distance = np.triu(distance)
+        pos = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particlePos.dat"))
+        distance = ucorr.computeDistances(pos, boxSize)
+        vel = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particleVel.dat"))
+        velNorm = np.linalg.norm(vel, axis=1)
+        velNormSquared = np.mean(velNorm**2)
         for i in range(distance.shape[0]):
-            for j in range(distance.shape[1]):
-                if(distance[i,j]!=0):
+            for j in range(i):
                     for k in range(bins.shape[0]-1):
                         if(distance[i,j] > bins[k] and distance[i,j] <= bins[k+1]):
-                            speedCorr[k, d] += pSpeed[i] * pSpeed[j]/velNorm**2
-                            velCorr[k] += np.dot(pVel[i],pVel[j])/velNorm**2
+                            # parallel
+                            delta = ucorr.pbcDistance(pos[i], pos[j], boxSize)/distance[i,j]
+                            parProj1 = np.dot(vel[i],delta)
+                            parProj2 = np.dot(vel[j],delta)
+                            velCorr[k,0] += parProj1 * parProj2
+                            # perpendicular
+                            deltaPerp = np.array([-delta[1], delta[0]])
+                            perpProj1 = np.dot(vel[i],deltaPerp)
+                            perpProj2 = np.dot(vel[j],deltaPerp)
+                            velCorr[k,1] += perpProj1 * perpProj2
+                            # total
+                            velCorr[k,2] += np.dot(vel[i],vel[j])
                             counts[k] += 1
-    speedCorr = np.mean(speedCorr, axis=1)
-    velCorr[counts>0] /= counts[counts>0]
+    velCorr[counts>0,0] /= counts[counts>0]
+    velCorr[counts>0,1] /= counts[counts>0]
+    velCorr[counts>0,2] /= counts[counts>0]
+    velCorr /= velNormSquared
     binCenter = (bins[1:] + bins[:-1])/2
-    np.savetxt(dirName + os.sep + "corr-vel-space.dat", np.column_stack((binCenter, speedCorr, velCorr)))
-    if(plot == "plot"):
-        uplot.plotCorrelation(binCenter, speedCorr/(2*np.pi*binCenter), "$C_{ss}(r)$", "$Distance,$ $r$", color = 'g')
-        uplot.plotCorrelation(binCenter, velCorr, "$C_{vv}(r)$", "$Distance,$ $r$", color = 'k')
+    np.savetxt(dirName + os.sep + "spaceVelCorr.dat", np.column_stack((binCenter, velCorr, counts)))
+    uplot.plotCorrelation(binCenter, velCorr[:,0], "$C_{vv}^{\\parallel}(r)$", "$Distance,$ $r$", color = 'k')
+    uplot.plotCorrelation(binCenter, velCorr[:,1], "$C_{vv}^{\\perp}(r)$", "$Distance,$ $r$", color = 'r')
+    uplot.plotCorrelation(binCenter, velCorr[:,2], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
+    #plt.show()
+
+##################### Velocity Correlation in/out Cluster ######################
+def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    minRad = np.min(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    bins = np.arange(2*minRad, np.sqrt(2)*boxSize[0]/2, 2*minRad)
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    dirList = dirList[:100]
+    if(os.path.exists(dirName + "clusterList.dat")):
+        print('ok')
+        clusterLabel = np.loadtxt(dirName + "clusterList.dat")[:,1]
+    clusterLabel = searchClusters(dirName)
+    velCorrInCluster = np.zeros((bins.shape[0]-1,3))
+    countsInCluster = np.zeros(bins.shape[0]-1)
+    velCorrOutCluster = np.zeros((bins.shape[0]-1,3))
+    countsOutCluster = np.zeros(bins.shape[0]-1)
+    for d in range(dirList.shape[0]):
+        pos = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particlePos.dat"))
+        distance = ucorr.computeDistances(pos, boxSize)
+        vel = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particleVel.dat"))
+        velNorm = np.linalg.norm(vel, axis=1)
+        velNormSquared = np.mean(velNorm**2)
+        for i in range(distance.shape[0]):
+            for j in range(i):
+                    for k in range(bins.shape[0]-1):
+                        if(distance[i,j] > bins[k] and distance[i,j] <= bins[k+1]):
+                            # parallel
+                            delta = ucorr.pbcDistance(pos[i], pos[j], boxSize)/distance[i,j]
+                            parProj1 = np.dot(vel[i],delta)
+                            parProj2 = np.dot(vel[j],delta)
+                            # perpendicular
+                            deltaPerp = np.array([-delta[1], delta[0]])
+                            perpProj1 = np.dot(vel[i],deltaPerp)
+                            perpProj2 = np.dot(vel[j],deltaPerp)
+                            # correlations
+                            if(clusterLabel[i]!=0):
+                                velCorrInCluster[k,0] += parProj1 * parProj2
+                                velCorrInCluster[k,1] += perpProj1 * perpProj2
+                                velCorrInCluster[k,2] += np.dot(vel[i],vel[j])
+                                countsInCluster[k] += 1
+                            else:
+                                velCorrOutCluster[k,0] += parProj1 * parProj2
+                                velCorrOutCluster[k,1] += perpProj1 * perpProj2
+                                velCorrOutCluster[k,2] += np.dot(vel[i],vel[j])
+                                countsOutCluster[k] += 1
+    binCenter = (bins[1:] + bins[:-1])/2
+    for i in range(velCorrInCluster.shape[1]):
+        velCorrInCluster[countsOutCluster>0,i] /= countsInCluster[countsOutCluster>0]
+        velCorrOutCluster[countsOutCluster>0,i] /= countsOutCluster[countsOutCluster>0]
+    velCorrInCluster /= velNormSquared
+    velCorrOutCluster /= velNormSquared
+    np.savetxt(dirName + os.sep + "spaceVelCorrInCluster.dat", np.column_stack((binCenter, velCorrInCluster, countsInCluster)))
+    np.savetxt(dirName + os.sep + "spaceVelCorrOutCluster.dat", np.column_stack((binCenter, velCorrOutCluster, countsOutCluster)))
+    uplot.plotCorrelation(binCenter, velCorrInCluster[:,1], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'r')
+    uplot.plotCorrelation(binCenter, velCorrOutCluster[:,1], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
+    #plt.show()
+
+########################### Average Space Correlator ###########################
+def averagePairCorr(dirName, dirSpacing=1):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    phi = ucorr.readFromParams(dirName, "phi")
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    minRad = np.mean(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    rbins = np.arange(0, np.sqrt(2)*boxSize[0]/2, 0.05*minRad)
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    print(dirList.shape[0])
+    pcorr = np.zeros(rbins.shape[0]-1)
+    for dir in dirList:
+        #pos = np.array(np.loadtxt(dirName + os.sep + dir + "/particlePos.dat"))
+        pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
+        pcorr += ucorr.getPairCorr(pos, boxSize, rbins, minRad)/(numParticles * phi)
+    pcorr[pcorr>0] /= dirList.shape[0]
+    binCenter = (rbins[:-1] + rbins[1:])*0.5
+    firstPeak = binCenter[np.argmax(pcorr)]
+    np.savetxt(dirName + os.sep + "pairCorr.dat", np.column_stack((binCenter, pcorr)))
+    print("First peak of pair corr is at distance:", firstPeak, "equal to", firstPeak/minRad, "times the min radius:", minRad)
+    np.savetxt(dirName + os.sep + "pcorrFirstPeak.dat", np.column_stack((firstPeak, np.max(pcorr))))
+    uplot.plotCorrelation(binCenter/minRad, pcorr, "$g(r/\\sigma)$", "$r/\\sigma$")
+    #plt.show()
+
+########################### Average Space Correlator ###########################
+def getCollisionIntervalPDF(dirName, check=False, numBins=40):
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    if(os.path.exists(dirName + "/collisionIntervals.dat") and check=="check"):
+        interval = np.loadtxt(dirName + os.sep + "collisionIntervals.dat")
+    else:
+        interval = np.empty(0)
+        previousTime = np.zeros(numParticles)
+        previousVel = np.array(np.loadtxt(dirName + os.sep + "t0/particleVel.dat"))
+        for i in range(1,dirList.shape[0]):
+            currentTime = timeList[i]
+            currentVel = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleVel.dat"), dtype=np.float64)
+            colIndex = np.argwhere(currentVel[:,0]!=previousVel[:,0])[:,0]
+            currentInterval = currentTime-previousTime[colIndex]
+            interval = np.append(interval, currentInterval[currentInterval>1])
+            previousTime[colIndex] = currentTime
+            previousVel = currentVel
+        interval = np.sort(interval)
+        interval = interval[interval>10]
+        interval *= timeStep
+        #np.savetxt(dirName + os.sep + "collisionIntervals.dat", interval)
+    bins = np.linspace(np.min(interval), np.max(interval), numBins)
+    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    centers = (edges[1:] + edges[:-1])/2
+    print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
+    np.savetxt(dirName + os.sep + "collision.dat", np.column_stack((centers, pdf)))
+    uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True)
+    plt.show()
+
+########################### Average Space Correlator ###########################
+def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    if(os.path.exists(dirName + "/contactCollisionIntervals.dat") and check=="check"):
+        interval = np.loadtxt(dirName + os.sep + "contactCollisionIntervals.dat")
+    else:
+        interval = np.empty(0)
+        previousTime = np.zeros(numParticles)
+        previousContacts = np.array(np.loadtxt(dirName + os.sep + "t0/particleContacts.dat"))
+        for i in range(1,dirList.shape[0]):
+            currentTime = timeList[i]
+            currentContacts = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleContacts.dat"), dtype=np.int64)
+            colIndex = np.argwhere(currentContacts[:,0]!=previousContacts[:,0])[:,0]
+            currentInterval = currentTime-previousTime[colIndex]
+            interval = np.append(interval, currentInterval[currentInterval>1])
+            previousTime[colIndex] = currentTime
+            previousContacts = currentContacts
+        interval = np.sort(interval)
+        interval = interval[interval>10]
+        interval *= timeStep
+        np.savetxt(dirName + os.sep + "contactCollisionIntervals.dat", interval)
+    bins = np.arange(np.min(interval), np.max(interval), spacing*timeStep)
+    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    centers = (edges[1:] + edges[:-1])/2
+    print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
+    np.savetxt(dirName + os.sep + "contactCollision.dat", np.column_stack((centers, pdf)))
+    centers = centers[np.argwhere(pdf>0)[:,0]]
+    pdf = pdf[pdf>0]
+    uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True)
+    plt.xlim(-500*timeStep, timeList[-1]*timeStep)
+    #cdf = np.arange(len(interval))/len(interval)
+    #indices = (np.unique(np.geomspace(1, len(interval), num=100, dtype=int)) - 1)
+    #interval = interval[indices]
+    #cdf = cdf[indices]
+    #uplot.plotCorrelation(interval, cdf, "$CDF(\\Delta_c)$", "$Collision$ $time,$ $\\Delta_c$", logy=True, logx=True)
+    #plt.show()
+
+def computeActivePressure(dirName, plot=False):
+    driving = float(ucorr.readFromDynParams(dirName, "f0"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    energy = np.loadtxt(dirName + os.sep + "energy.dat")
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    activePressure = np.zeros(dirList.shape[0])
+    for i in range(dirList.shape[0]):
+        pos = np.loadtxt(dirName + os.sep + dirList[i] + "/particlePos.dat")
+        force = np.loadtxt(dirName + os.sep + dirList[i] + "/particleForces.dat")
+        angle = np.loadtxt(dirName + os.sep + dirList[i] + "/particleAngles.dat")
+        dir = driving*np.array([np.cos(angle), np.sin(angle)]).T
+        activePressure[i] = np.sum(np.sum(dir*pos,axis=1))
+    if(plot=='plot'):
+        uplot.plotCorrelation(energy[:,0], energy[:,6], "$Pressure$", "$Time,$ $t$")
+        uplot.plotCorrelation(timeList*timeStep, activePressure, "$Active$ $pressure$", "$Time,$ $t$")
+        plt.show()
+    return activePressure
+
+############################ Local Packing Fraction ############################
+def computeLocalDensity(dirName, numBins, plot = False):
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    xbin = np.linspace(0, boxSize[0], numBins+1)
+    ybin = np.linspace(0, boxSize[1], numBins+1)
+    localArea = np.zeros((numBins, numBins))
+    localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
+    ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
+    localDensity = localArea/localSquare
+    localDensity = np.sort(localDensity.flatten())
+    cdf = np.arange(len(localDensity))/len(localDensity)
+    pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 30), density=True)
+    edges = (edges[1:] + edges[:-1])/2
+    if(plot=="plot"):
+        print("subBoxSize: ", xbin[1]-xbin[0], ybin[1]-ybin[0], " lengthscale: ", np.sqrt(np.mean(area)))
+        print("data stats: ", np.min(localDensity), np.max(localDensity), np.mean(localDensity), np.std(localDensity))
+        fig = plt.figure(dpi=120)
+        ax = plt.gca()
+        ax.plot(edges[1:], pdf[1:], linewidth=1.2, color='k')
+        #ax.plot(localDensity, cdf, linewidth=1.2, color='k')
+        ax.tick_params(axis='both', labelsize=15)
+        ax.set_ylabel('$P(\\varphi)$', fontsize=18)
+        ax.set_xlabel('$\\varphi$', fontsize=18)
+        #ax.set_xlim(-0.02, 1.02)
+        plt.tight_layout()
+        plt.show()
+    else:
+        return localDensity
+
+def averageLocalDensity(dirName, numBins=12):
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    xbin = np.linspace(0, boxSize[0], numBins+1)
+    ybin = np.linspace(0, boxSize[1], numBins+1)
+    localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
+    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    localDensity = []
+    for dir in dirList:
+        localArea = np.zeros((numBins, numBins))
+        pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
+        ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
+        localDensity.append(localArea/localSquare)
+    localDensity = np.array(localDensity).flatten()
+    pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 50), density=True)
+    edges = (edges[:-1] + edges[1:])/2
+    np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + ".dat", np.column_stack((edges, pdf)))
+    #mean = np.mean(sampleDensity)
+    #var = np.var(sampleDensity)
+    #skewness = np.mean((sampleDensity - np.mean(sampleDensity))**4)/(3*var**2) - 1
+    uplot.plotCorrelation(edges, pdf, "$Local$ $density$", "$Time,$ $t$")
+    #plt.show()
+
+def localDensityVarianceVSTime(dirName, numBins=12):
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    xbin = np.linspace(0, boxSize[0], numBins+1)
+    ybin = np.linspace(0, boxSize[1], numBins+1)
+    localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
+    rad = np.array(np.loadtxt(dirName + os.sep + "t0/particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    localDensityVar = []
+    for dir in dirList:
+        localArea = np.zeros((numBins, numBins))
+        pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
+        ucorr.computeLocalAreaGrid(pos, pRad, xbin, ybin, localArea)
+        localDensity = localArea/localSquare
+        localDensityVar.append(np.std(localDensity)/np.mean(localDensity))
+    np.savetxt(dirName + "localDensityVarVSTime" + str(numBins) + ".dat", np.column_stack((timeList*timeStep, localDensityVar)))
+    uplot.plotCorrelation(timeList*timeStep, localDensityVar, "$Variance$ $of$ $local$ $density$", "$Time,$ $t$")
+    plt.show()
+
+######################### Cluster Velocity Correlation #########################
+def searchClusters(dirName, plot=False):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat"), dtype=int)
+    particleLabel = np.zeros(numParticles)
+    connectLabel = np.zeros(numParticles)
+    clusterLabel = 0
+    for i in range(1,numParticles):
+        if(np.sum(contacts[i]!=-1)>2):
+            if(particleLabel[i] == 0): # this means it hasn't been checked yet
+                # check that it is not a contact of contacts of previously checked particles
+                newCluster = False
+                for j in range(i):
+                    for c in contacts[j, np.argwhere(contacts[j]!=-1)[:,0]]:
+                        if(i==c):
+                            # a contact of this particle already belongs to a cluster
+                            particleLabel[i] = particleLabel[j]
+                            newCluster = True
+                            break
+                if(newCluster == False):
+                    clusterLabel += 1
+                    particleLabel[i] = clusterLabel
+            particleLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = particleLabel[i]
+            connectLabel[i] = 1
+            connectLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = 1
+        else:
+            particleLabel[i] = 0
+    if(plot=="plot"):
+        print("Number of clusters: ", clusterLabel)
+        print("Cluster label list: ", particleLabel)
+        # plot packing
+        boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+        pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+        rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+        xBounds = np.array([0, boxSize[0]])
+        yBounds = np.array([0, boxSize[1]])
+        pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+        pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+        fig = plt.figure(0, dpi = 150)
+        ax = fig.gca()
+        ax.set_xlim(xBounds[0], xBounds[1])
+        ax.set_ylim(yBounds[0], yBounds[1])
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        colorList = cm.get_cmap('prism', clusterLabel)
+        colorId = np.zeros((pos.shape[0], 4))
+        for i in range(numParticles):
+            if(particleLabel[i]==0):
+                colorId[i] = [1,1,1,1]
+            else:
+                colorId[i] = colorList(particleLabel[i]/clusterLabel)
+        for particleId in range(numParticles):
+            x = pos[particleId,0]
+            y = pos[particleId,1]
+            r = rad[particleId]
+            ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=0.6, linewidth=0.5))
+            if(connectLabel[particleId] == 1):
+                ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
+        plt.show()
+    np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel)))
+    return connectLabel
 
 
 if __name__ == '__main__':
@@ -811,49 +1046,37 @@ if __name__ == '__main__':
         plot = sys.argv[3]
         computePairCorr(dirName, plot)
 
-    elif(whichCorr == "averagepc"):
-        plot = sys.argv[3]
-        averagePairCorr(dirName, plot)
-
-    elif(whichCorr == "psf"):
-        plot = sys.argv[3]
-        computeStructureFactor(dirName, plot)
-
-    elif(whichCorr == "averagesf"):
-        plot = sys.argv[3]
-        averageStructureFactor(dirName, plot)
-
-    elif(whichCorr == "averagevsf"):
-        plot = sys.argv[3]
-        averageVelocityStructureFactor(dirName, plot)
-
-    elif(whichCorr == "psus"):
+    elif(whichCorr == "sus"):
         sampleName = sys.argv[3]
         maxPower = int(sys.argv[4])
         computeParticleSusceptibility(dirName, sampleName, maxPower)
 
-    elif(whichCorr == "plincorrx"):
+    elif(whichCorr == "lincorrx"):
         maxPower = int(sys.argv[3])
         computeParticleSelfCorrOneDim(dirName, maxPower)
 
-    elif(whichCorr == "plogcorrx"):
+    elif(whichCorr == "logcorrx"):
         startBlock = int(sys.argv[3])
         maxPower = int(sys.argv[4])
         freqPower = int(sys.argv[5])
         computeParticleLogSelfCorrOneDim(dirName, startBlock, maxPower, freqPower)
 
-    elif(whichCorr == "pcorr"):
+    elif(whichCorr == "lincorr"):
         maxPower = int(sys.argv[3])
         computeParticleSelfCorr(dirName, maxPower)
 
-    elif(whichCorr == "pcheckcorr"):
-        numBlocks = int(sys.argv[3])
-        maxPower = int(sys.argv[4])
-        plot = sys.argv[5]
-        computeTau = sys.argv[6]
-        checkParticleSelfCorr(dirName, numBlocks, maxPower, plot=plot, computeTau=computeTau)
+    elif(whichCorr == "checkcorr"):
+        initialBlock = int(sys.argv[3])
+        numBlocks = int(sys.argv[4])
+        maxPower = int(sys.argv[5])
+        plot = sys.argv[6]
+        computeTau = sys.argv[7]
+        checkParticleSelfCorr(dirName, initialBlock, numBlocks, maxPower, plot=plot, computeTau=computeTau)
 
-    elif(whichCorr == "plogcorr"):
+    elif(whichCorr == "collecttemp"):
+        collectRelaxationDataVSTemp(dirName)
+
+    elif(whichCorr == "logcorr"):
         startBlock = int(sys.argv[3])
         maxPower = int(sys.argv[4])
         freqPower = int(sys.argv[5])
@@ -861,36 +1084,16 @@ if __name__ == '__main__':
         computeTau = sys.argv[7]
         computeParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac, computeTau=computeTau)
 
-    elif(whichCorr == "pcorrsingle"):
+    elif(whichCorr == "corrsingle"):
         startBlock = int(sys.argv[3])
         maxPower = int(sys.argv[4])
         freqPower = int(sys.argv[5])
         qFrac = sys.argv[6]
         computeSingleParticleLogSelfCorr(dirName, startBlock, maxPower, freqPower, qFrac)
 
-    elif(whichCorr == "collect"):
+    elif(whichCorr == "collectphi"):
         dynName = sys.argv[3]
-        collectRelaxationData(dirName, dynName)
-
-    elif(whichCorr == "density"):
-        numBins = int(sys.argv[3])
-        plot = sys.argv[4]
-        computeLocalDensity(dirName, numBins, plot)
-
-    elif(whichCorr == "densitytime"):
-        numBins = int(sys.argv[3])
-        plot = sys.argv[4]
-        localDensityVSTime(dirName, numBins, plot)
-
-    elif(whichCorr == "phipdf"):
-        numBins = int(sys.argv[3])
-        plot = sys.argv[4]
-        computeLocalDensityPDF(dirName, numBins, plot)
-
-    elif(whichCorr == "collectphipdf"):
-        numBins = int(sys.argv[3])
-        plot = sys.argv[4]
-        collectLocalDensityPDF(dirName, numBins, plot)
+        collectRelaxationDataVSPhi(dirName, dynName)
 
     elif(whichCorr == "temppdf"):
         numBins = int(sys.argv[3])
@@ -902,25 +1105,70 @@ if __name__ == '__main__':
         plot = sys.argv[4]
         collectLocalTemperaturePDF(dirName, numBins, plot)
 
-    elif(whichCorr == "pvelpdf"):
+    elif(whichCorr == "velpdf"):
         computeParticleVelPDF(dirName)
 
-    elif(whichCorr == "pvelsubset"):
+    elif(whichCorr == "velsubset"):
         firstIndex = int(sys.argv[3])
         mass = float(sys.argv[4])
         computeParticleVelPDFSubSet(dirName, firstIndex, mass)
 
-    elif(whichCorr == "pveltimecorr"):
+    elif(whichCorr == "velcorr"):
+        computeParticleVelTimeCorr(dirName)
+
+    elif(whichCorr == "blockvelcorr"):
+        numBlocks = int(sys.argv[3])
+        computeParticleBlockVelTimeCorr(dirName, numBlocks)
+
+    elif(whichCorr == "logvelcorr"):
         startBlock = int(sys.argv[3])
         maxPower = int(sys.argv[4])
         freqPower = int(sys.argv[5])
-        radMultiple = sys.argv[6]
-        plot = sys.argv[7]
-        computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower, radMultiple, plot)
+        computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower)
 
-    elif(whichCorr == "pvelspacecorr"):
+    elif(whichCorr == "velspacecorr"):
+        computeParticleVelSpaceCorr(dirName)
+
+    elif(whichCorr == "averagevc"):
+        averageParticleVelSpaceCorr(dirName)
+
+    elif(whichCorr == "averagevccluster"):
+        averageParticleVelSpaceCorrCluster(dirName)
+
+    elif(whichCorr == "averagepc"):
+        dirSpacing = int(sys.argv[3])
+        averagePairCorr(dirName, dirSpacing)
+
+    elif(whichCorr == "collision"):
+        check = sys.argv[3]
+        numBins = int(sys.argv[4])
+        getCollisionIntervalPDF(dirName, check, numBins)
+
+    elif(whichCorr == "contact"):
+        check = sys.argv[3]
+        spacing = int(sys.argv[4])
+        getContactCollisionIntervalPDF(dirName, check, spacing)
+
+    elif(whichCorr == "activep"):
+        computeActivePressure(dirName)
+
+    elif(whichCorr == "density"):
+        numBins = int(sys.argv[3])
+        plot = sys.argv[4]
+        computeLocalDensity(dirName, numBins, plot)
+
+    elif(whichCorr == "densitytime"):
+        numBins = int(sys.argv[3])
+        plot = sys.argv[4]
+        localDensityVSTime(dirName, numBins, plot)
+
+    elif(whichCorr == "averageld"):
+        numBins = int(sys.argv[3])
+        averageLocalDensity(dirName, numBins)
+
+    elif(whichCorr == "cluster"):
         plot = sys.argv[3]
-        computeParticleVelSpaceCorr(dirName, plot)
+        searchClusters(dirName, plot=plot)
 
     else:
         print("Please specify the correlation you want to compute")

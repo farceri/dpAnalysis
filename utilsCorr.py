@@ -4,6 +4,7 @@ Created by Francesco
 '''
 #functions and script to compute correlations in space and time
 import numpy as np
+from scipy.fft import fft, fftfreq, fft2
 import os
 
 ############################## general utilities ###############################
@@ -21,11 +22,6 @@ def computeDistances(pos, boxSize):
     distances %= boxSize
     distances -= boxSize / 2
     distances = np.sqrt(np.sum(distances**2, axis=2))
-    #distances = np.zeros((pos.shape[0], pos.shape[0]))
-    #for i in range(pos.shape[0]):
-    #    for j in range(i):
-    #        delta = pbcDistance(pos[i], pos[j], boxSize)
-    #        distances[i,j] = np.linalg.norm(delta)
     return distances
 
 def computeDeltas(pos, boxSize):
@@ -45,72 +41,16 @@ def computeTimeDistances(pos1, pos2, boxSize):
     return distances
 
 def getPairCorr(pos, boxSize, bins, minRad):
-    distance = np.triu(computeDistances(pos, boxSize),1)
+    #distance = np.triu(computeDistances(pos, boxSize),1)
+    distance = computeDistances(pos, boxSize)
     distance = distance.flatten()
+    distance = distance[distance>0]
     pairCorr, edges = np.histogram(distance, bins=bins)
     binCenter = 0.5 * (edges[:-1] + edges[1:])
     return pairCorr / (2 * np.pi * binCenter)
 
-def getStructureFactor(pos, boxSize, q, numParticles):
-    sfList = np.zeros(q.shape[0])
-    theta = np.arange(0, 2*np.pi, np.pi/8)
-    for j in range(q.shape[0]):
-        sf = []
-        for i in range(theta.shape[0]):
-            k = q[j]*np.array([np.cos(theta[i]), np.sin(theta[i])])
-            posDotK = np.dot(pos,k)
-            sf.append(np.sum(np.exp(-1j*posDotK))*np.sum(np.exp(1j*posDotK)))
-        sfList[j] = np.real(np.mean(sf))/numParticles
-    return sfList
 
-def getVelocityStructureFactor(pos, vel, boxSize, q, numParticles):
-    velsfList = np.zeros(q.shape[0])
-    theta = np.arange(0, 2*np.pi, np.pi/8)
-    for j in range(q.shape[0]):
-        velsf = []
-        for i in range(theta.shape[0]):
-            unitk = np.array([np.cos(theta[i]), np.sin(theta[i])])
-            k = unitk*q[j]
-            posDotK = np.dot(pos,k)
-            velDotK = np.dot(vel,unitk)
-            s1 = np.sum(vel[:,0]*vel[:,0]*np.exp(-1j*posDotK))*np.sum(vel[:,0]*vel[:,0]*np.exp(1j*posDotK))
-            s2 = np.sum(vel[:,0]*vel[:,1]*np.exp(-1j*posDotK))*np.sum(vel[:,0]*vel[:,1]*np.exp(1j*posDotK))
-            s3 = np.sum(vel[:,1]*vel[:,1]*np.exp(-1j*posDotK))*np.sum(vel[:,1]*vel[:,1]*np.exp(1j*posDotK))
-            vsf = np.array([[s1, s2], [s2, s3]])
-            velsf.append(np.dot(np.dot(unitk, vsf), unitk))
-            #velsf.append(np.sum(velDotK*np.exp(-1j*posDotK))*np.sum(velDotK*np.exp(1j*posDotK)))
-        velsfList[j] = np.real(np.mean(velsf))/numParticles
-    return velsfList
-
-def computeVelCorrFunctions(pos1, pos2, vel1, vel2, dir1, dir2, waveVector, numParticles):
-    speed1 = np.linalg.norm(vel1, axis=1)
-    velNorm1 = np.mean(speed1)
-    speed2 = np.linalg.norm(vel2, axis=1)
-    velNorm2 = np.mean(speed2)
-    speedCorr = np.mean(speed1 * speed2) / (velNorm1*velNorm2)
-    velCorr = np.mean(np.sum(np.multiply(vel1, vel2), axis=1)) / (velNorm1*velNorm2)
-    dirCorr = np.mean(np.sum(np.multiply(dir1, dir2), axis=1))
-    # compute velocity weighted ISF
-    delta = pos1 - pos2
-    drift = np.mean(pos1 - pos2, axis=0)
-    delta[:,0] -= drift[0]
-    delta[:,1] -= drift[1]
-    velSq = []
-    angleList = np.arange(0, 2*np.pi, np.pi/8)
-    for angle in angleList:
-        unitk = np.array([np.cos(angle), np.sin(angle)])
-        k = unitk*waveVector
-        deltaDotK = np.dot(delta, k)
-        vel1DotK = np.dot(vel1, unitk)
-        vel2DotK = np.dot(vel2, unitk)
-        s1 = np.sum(vel1[:,0]*vel2[:,0]*np.exp(1j*deltaDotK))
-        s2 = np.sum(vel1[:,0]*vel2[:,1]*np.exp(1j*deltaDotK))
-        s3 = np.sum(vel1[:,1]*vel2[:,1]*np.exp(1j*deltaDotK))
-        vsf = np.array([[s1, s2], [s2, s3]])
-        velSq.append(np.dot(np.dot(unitk, vsf), unitk))
-    velISF = np.real(np.mean(velSq))/numParticles
-    return speedCorr, velCorr, dirCorr, velISF
-
+############################ correlation functions #############################
 def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
     #delta = pbcDistance(pos1, pos2, boxSize)
     delta = pos1 - pos2
@@ -125,15 +65,6 @@ def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = Fal
     isf = np.mean(np.sin(waveVector * delta) / (waveVector * delta))
     chi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isf*isf
     return msd, isf, chi4
-
-# the formula to compute the drift-subtracted msd is
-#delta = np.linalg.norm(pos1 - pos2, axis=1)
-#drift = np.linalg.norm(np.mean(pos1 - pos2, axis=0)**2)
-#msd = np.mean(delta**2) - drift
-# equivalent to
-#drift = np.mean(delta)**2
-# in one dimension
-#gamma2 = (1/3) * np.mean(delta**2) * np.mean(1/delta**2) - 1
 
 def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale):
     #delta = pbcDistance(pos1, pos2, boxSize)
@@ -153,8 +84,8 @@ def computeCorrFunctions(pos1, pos2, boxSize, waveVector, scale):
     MSD = np.mean(delta**2)/scale
     isoISF = np.mean(np.sin(waveVector * delta) / (waveVector * delta))
     isoChi4 = np.mean((np.sin(waveVector * delta) / (waveVector * delta))**2) - isoISF*isoISF
-    alpha2 = np.mean(delta**4)/(3*np.mean(delta**2)**2) - 1
-    alpha2new = np.mean(delta**2)/(3*np.mean(1/delta**2)) - 1
+    alpha2 = np.mean(delta**4)/(2*np.mean(delta**2)**2) - 1
+    alpha2new = np.mean(delta**2)/(2*np.mean(1/delta**2)) - 1
     return MSD, ISF, Chi4, isoISF, isoChi4, alpha2, alpha2new
 
 def computeSingleParticleISF(pos1, pos2, boxSize, waveVector, scale):
@@ -173,6 +104,33 @@ def computeShapeCorrFunction(shape1, shape2):
 
 def computeVelCorrFunction(vel1, vel2):
     return np.mean(np.sum(vel1 * vel2, axis=1))
+
+def computeVelCorrFunctions(pos1, pos2, vel1, vel2, dir1, dir2, waveVector, numParticles):
+    speed1 = np.linalg.norm(vel1, axis=1)
+    velNorm1 = np.mean(speed1)
+    speed2 = np.linalg.norm(vel2, axis=1)
+    velNorm2 = np.mean(speed2)
+    speedCorr = np.mean(speed1 * speed2)
+    velCorr = np.mean(np.sum(np.multiply(vel1, vel2)))
+    dirCorr = np.mean(np.sum(np.multiply(dir1, dir2)))
+    # compute velocity weighted ISF
+    delta = pos1 - pos2
+    drift = np.mean(pos1 - pos2, axis=0)
+    delta[:,0] -= drift[0]
+    delta[:,1] -= drift[1]
+    velSq = []
+    angleList = np.arange(0, 2*np.pi, np.pi/8)
+    for angle in angleList:
+        unitk = np.array([np.cos(angle), np.sin(angle)])
+        k = unitk*waveVector
+        weight = np.exp(1j*np.sum(np.multiply(k,delta), axis=1))
+        s1 = np.sum(vel1[:,0]*vel2[:,0]*weight)
+        s2 = np.sum(vel1[:,0]*vel2[:,1]*weight)
+        s3 = np.sum(vel1[:,1]*vel2[:,1]*weight)
+        vsf = np.array([[s1, s2], [s2, s3]])
+        velSq.append(np.dot(np.dot(unitk, vsf), unitk))
+    velISF = np.real(np.mean(velSq))/numParticles
+    return speedCorr, velCorr, dirCorr, velISF
 
 def computeSusceptibility(pos1, pos2, field, waveVector, scale):
     delta = pos1[:,0] - pos2[:,0]
@@ -227,6 +185,141 @@ def computeDeltaChi(data):
         return 0
 
 
+############################## Fourier Analysis ################################
+def getStructureFactor(pos, q, numParticles):
+    sfList = np.zeros(q.shape[0])
+    theta = np.arange(0, 2*np.pi, np.pi/8)
+    for j in range(q.shape[0]):
+        sf = []
+        for i in range(theta.shape[0]):
+            k = q[j]*np.array([np.cos(theta[i]), np.sin(theta[i])])
+            posDotK = np.dot(pos,k)
+            sf.append(np.sum(np.exp(-1j*posDotK))*np.sum(np.exp(1j*posDotK)))
+        sfList[j] = np.real(np.mean(sf))/numParticles
+    return sfList
+
+def getVelocityStructureFactor(pos, vel, q, numParticles):
+    velsfList = np.zeros(q.shape[0])
+    theta = np.arange(0, 2*np.pi, np.pi/8)
+    for j in range(q.shape[0]):
+        velsf = []
+        for i in range(theta.shape[0]):
+            unitk = np.array([np.cos(theta[i]), np.sin(theta[i])])
+            k = unitk*q[j]
+            posDotK = np.dot(pos,k)
+            s1 = np.sum(vel[:,0]*vel[:,0]*np.exp(-1j*posDotK))*np.sum(vel[:,0]*vel[:,0]*np.exp(1j*posDotK))
+            s2 = np.sum(vel[:,0]*vel[:,1]*np.exp(-1j*posDotK))*np.sum(vel[:,0]*vel[:,1]*np.exp(1j*posDotK))
+            s3 = np.sum(vel[:,1]*vel[:,1]*np.exp(-1j*posDotK))*np.sum(vel[:,1]*vel[:,1]*np.exp(1j*posDotK))
+            vsf = np.array([[s1, s2], [s2, s3]])
+            velsf.append(np.dot(np.dot(unitk, vsf), unitk))
+        velsfList[j] = np.real(np.mean(velsf))/numParticles
+    return velsfList
+
+def getSpaceFourierEnergy(pos, vel, epot, q, numParticles):
+    kq = np.zeros(q.shape[0])
+    uq = np.zeros(q.shape[0])
+    kcorr = np.zeros(q.shape[0])
+    theta = np.arange(0, 2*np.pi, np.pi/8)
+    for j in range(q.shape[0]):
+        ktemp = []
+        utemp = []
+        kctemp = []
+        for i in range(theta.shape[0]):
+            unitk = np.array([np.cos(theta[i]), np.sin(theta[i])])
+            k = unitk*q[j]
+            posDotK = np.dot(pos,k)
+            ekin = 0.5*np.linalg.norm(vel, axis=1)**2
+            ktemp.append(np.sum(ekin.T*np.exp(-1j*posDotK)))
+            utemp.append(np.sum(epot.T*np.exp(1j*posDotK))*np.sum(epot.T*np.exp(-1j*posDotK)))
+            # correlations
+            kctemp.append(np.sum(ekin.T*np.exp(1j*posDotK))*np.sum(ekin.T*np.exp(-1j*posDotK)))
+        kq[j] = np.abs(np.mean(ktemp))/numParticles
+        uq[j] = np.abs(np.mean(utemp))/numParticles
+        kcorr[j] = np.abs(np.mean(kctemp))/numParticles
+    return kq, uq, kcorr
+
+def getTimeFourierEnergy(dirName, dirList, dirSpacing, numParticles):
+    timeStep = readFromParams(dirName, "dt")
+    numSteps = dirList.shape[0]
+    freq = fftfreq(numSteps, dirSpacing*timeStep)
+    energy = np.zeros((numSteps,numParticles,2))
+    corre = np.zeros((numSteps,numParticles,2))
+    initialEpot = np.array(np.loadtxt(dirName + os.sep + "t0/particleEnergy.dat"), dtype=np.float64)
+    initialVel = np.array(np.loadtxt(dirName + os.sep + "t0/particleVel.dat"), dtype=np.float64)
+    initialEkin = 0.5*np.linalg.norm(initialVel, axis=1)**2
+    # collect instantaneous energy for 10 particles
+    for i in range(numSteps):
+        vel = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleVel.dat"), dtype=np.float64)
+        epot = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleEnergy.dat"), dtype=np.float64)
+        ekin = 0.5*np.linalg.norm(vel, axis=1)**2
+        energy[i,:,0] = ekin
+        energy[i,:,1] = epot
+        corre[i,:,0] = ekin*initialEkin
+        corre[i,:,1] = epot*initialEpot
+    # compute fourier transform and average over particles
+    energyf = np.zeros((numSteps, 3), dtype=complex)
+    corref = np.zeros((numSteps, 3), dtype=complex)
+    for pId in range(numParticles):
+        energyf[:,0] += fft(energy[:,pId,0])
+        energyf[:,1] += fft(energy[:,pId,1])
+        energyf[:,2] += fft(energy[:,pId,0] + energy[:,pId,1])
+        # correlations
+        corref[:,0] += fft(corre[:,pId,0])
+        corref[:,1] += fft(corre[:,pId,1])
+        corref[:,2] += fft(corre[:,pId,0] + corre[:,pId,1])
+    energyf /= numParticles
+    energyf = energyf[np.argsort(freq)]
+    corref /= numParticles
+    corref = corref[np.argsort(freq)]
+    freq = np.sort(freq)
+    return np.column_stack((freq, np.abs(energyf)*2/numSteps, np.abs(corref)*2/numSteps))
+
+def getSpaceFourierVelocity(pos, vel, q, numParticles):
+    vq = np.zeros((q.shape[0],2))
+    theta = np.arange(0, 2*np.pi, np.pi/8)
+    for j in range(q.shape[0]):
+        vqtemp = np.zeros(2)
+        for i in range(theta.shape[0]):
+            unitk = np.array([np.cos(theta[i]), np.sin(theta[i])])
+            k = unitk*q[j]
+            posDotK = np.dot(pos,k)
+            vqx = np.sum(vel[:,0].T*np.exp(-1j*posDotK))
+            vqy = np.sum(vel[:,1].T*np.exp(-1j*posDotK))
+            vqxy = np.array([vqx, vqy])
+            vqtemp[0] += np.mean(np.abs(np.dot(vqxy, unitk))**2)
+            vqtemp[1] += np.mean(np.abs(np.cross(vqxy, unitk))**2)
+        vq[j] = vqtemp/theta.shape[0]
+    return vq
+
+def getTimeFourierVel(dirName, dirList, dirSpacing, numParticles):
+    timeStep = readFromParams(dirName, "dt")
+    numSteps = dirList.shape[0]
+    freq = fftfreq(numSteps, dirSpacing*timeStep)
+    veltot = np.zeros((numSteps,numParticles,2))
+    # collect instantaneous energy for 10 particles
+    for i in range(numSteps):
+        vel = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleVel.dat"), dtype=np.float64)
+        veltot[i] = vel
+    # compute fourier transform and average over particles
+    velf = np.zeros((numSteps,2), dtype=complex)
+    for pId in range(numParticles):
+        velf[:,0] += fft(veltot[:,pId,0])
+        velf[:,1] += fft(veltot[:,pId,1])
+    velf /= numParticles
+    velf = velf[np.argsort(freq)]
+    velfSquared1 = np.mean(np.abs(velf)**2,axis=1)*2/numSteps
+    # compute fourier transform and average over particles
+    velf = np.zeros((numSteps,2))
+    for pId in range(numParticles):
+        velf[:,0] += np.abs(fft(veltot[:,pId,0]))**2
+        velf[:,1] += np.abs(fft(veltot[:,pId,1]))**2
+    velf /= numParticles
+    velf = velf[np.argsort(freq)]
+    velSquared2 = np.mean(velf,axis=1)*2/numSteps
+    freq = np.sort(freq)
+    return np.column_stack((freq, velfSquared1, velSquared2))
+
+
 ############################### read from files ################################
 def getDirectories(dirName):
     listDir = []
@@ -235,8 +328,28 @@ def getDirectories(dirName):
             listDir.append(dir)
     return listDir
 
+def getOrderedDirectories(dirName):
+    listDir = []
+    listScalar = []
+    for dir in os.listdir(dirName):
+        if(os.path.isdir(dirName + os.sep + dir) and (dir != "bab" and dir != "dynamics")):
+            listDir.append(dir)
+            listScalar.append(dir.strip('t'))
+    listScalar = np.array(listScalar, dtype=np.int64)
+    listDir = np.array(listDir)
+    listDir = listDir[np.argsort(listScalar)]
+    listScalar = np.sort(listScalar)
+    return listDir, listScalar
+
 def readFromParams(dirName, paramName):
     with open(dirName + os.sep + "params.dat") as file:
+        for line in file:
+            name, scalarString = line.strip().split("\t")
+            if(name == paramName):
+                return float(scalarString)
+
+def readFromDynParams(dirName, paramName):
+    with open(dirName + os.sep + "dynParams.dat") as file:
         for line in file:
             name, scalarString = line.strip().split("\t")
             if(name == paramName):
@@ -290,3 +403,20 @@ def getPBCPositions(fileName, boxSize):
 
 if __name__ == '__main__':
     print("library for correlation function utilities")
+
+
+# the formula to compute the drift-subtracted msd is
+#delta = np.linalg.norm(pos1 - pos2, axis=1)
+#drift = np.linalg.norm(np.mean(pos1 - pos2, axis=0)**2)
+#msd = np.mean(delta**2) - drift
+# equivalent to
+#drift = np.mean(delta)**2
+# in one dimension
+#gamma2 = (1/3) * np.mean(delta**2) * np.mean(1/delta**2) - 1
+
+
+#distances = np.zeros((pos.shape[0], pos.shape[0]))
+#for i in range(pos.shape[0]):
+#    for j in range(i):
+#        delta = pbcDistance(pos[i], pos[j], boxSize)
+#        distances[i,j] = np.linalg.norm(delta)

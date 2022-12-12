@@ -7,6 +7,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation
 from matplotlib import cm
+from sklearn.cluster import KMeans
 import itertools
 import sys
 import os
@@ -56,7 +57,15 @@ def getEkinColorList(vel):
         count += 1
     return colorId
 
-def plotSPPacking(dirName, figureName, alpha = 0.6):
+def getClusterColorList(pos, nClusters=10):
+    y_pred = KMeans(n_clusters=nClusters).fit_predict(pos)
+    colorList = cm.get_cmap('tab20', nClusters)
+    colorId = np.zeros((pos.shape[0], 4))
+    for particleId in range(pos.shape[0]):
+        colorId[particleId] = colorList(y_pred[particleId])
+    return colorId
+
+def plotSPPacking(dirName, figureName, velmap=False, cluster=False, nClusters=10, alpha = 0.6):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
@@ -70,16 +79,26 @@ def plotSPPacking(dirName, figureName, alpha = 0.6):
     ax.set_ylim(yBounds[0], yBounds[1])
     ax.set_aspect('equal', adjustable='box')
     setBigBoxAxes(boxSize, ax, 0.05)
-    colorId = getRadColorList(rad)
-    vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
-    colorId = getEkinColorList(vel)
+    if(cluster==True):
+        colorId = getClusterColorList(pos, nClusters)
+    elif(velmap==True):
+        vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
+        colorId = getEkinColorList(vel)
+    else:
+        colorId = getRadColorList(rad)
     for particleId in range(rad.shape[0]):
         x = pos[particleId,0]
         y = pos[particleId,1]
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
         #plt.pause(1)
-    plt.savefig("/home/francesco/Pictures/soft/" + figureName + ".png", transparent=False, format = "png")
+    if(cluster==True):
+        figureName = "/home/francesco/Pictures/soft/cluster" + figureName + ".png"
+    elif(velmap==True):
+        figureName = "/home/francesco/Pictures/soft/velmap-" + figureName + ".png"
+    else:
+        figureName = "/home/francesco/Pictures/soft/" + figureName + ".png"
+    plt.savefig(figureName, transparent=False, format = "png")
     plt.show()
 
 def plotSoftParticles(ax, pos, rad, alpha = 0.6, colorMap = True, lw = 0.5):
@@ -117,7 +136,7 @@ def plotSoftParticlesSubSet(ax, pos, rad, firstIndex, alpha = 0.6, colorMap = Tr
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alphaId[particleId], linewidth = lw))
 
-def plotSoftParticleQuiverVel(axFrame, pos, vel, rad):
+def plotSoftParticleQuiverVel(axFrame, pos, vel, rad, alpha = 0.6):
     colorId = np.zeros((rad.shape[0], 4))
     colorList = cm.get_cmap('viridis', rad.shape[0])
     count = 0
@@ -130,7 +149,7 @@ def plotSoftParticleQuiverVel(axFrame, pos, vel, rad):
         r = rad[particleId]
         vx = vel[particleId,0]
         vy = vel[particleId,1]
-        axFrame.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', linewidth = 0.7))
+        axFrame.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
         axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)
 
 def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 0, quiver = False, npt = False):
@@ -185,7 +204,7 @@ def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, st
     setPackingAxes(boxSize, ax)
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     # the first configuration gets two frames for better visualization
-    makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet, firstIndex, quiver)
+    makeSoftParticleFrame(dirName + os.sep + "t0", rad, boxSize, figFrame, frames, subSet, firstIndex, quiver)
     vel = []
     for i in stepList:
         dirSample = dirName + os.sep + "t" + str(i)
@@ -489,6 +508,10 @@ if __name__ == '__main__':
 
     if(whichPlot == "ss"):
         plotSPPacking(dirName, figureName)
+
+    elif(whichPlot == "sscluster"):
+        nClusters = int(sys.argv[4])
+        plotSPPacking(dirName, figureName, cluster=True, nClusters=nClusters)
 
     elif(whichPlot == "ssvideo"):
         numFrames = int(sys.argv[4])

@@ -21,6 +21,21 @@ def plotErrorBar(ax, x, y, err, xlabel, ylabel, logx = False, logy = False):
         ax.set_yscale('log')
     plt.tight_layout()
 
+def plotCorrWithError(x, y, err, ylabel, xlabel = "$Time$ $interval,$ $\\Delta t$", logx = False, logy = False, color = 'k', show = True):
+    fig = plt.figure(0, dpi = 120)
+    ax = fig.gca()
+    ax.errorbar(x, y, err, marker='o', color=color, markersize=4, markeredgecolor='k', markeredgewidth=0.7, linewidth=1.2, elinewidth=1, capsize=4)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel(xlabel, fontsize=17)
+    ax.set_ylabel(ylabel, fontsize=17)
+    if(logx == True):
+        ax.set_xscale('log')
+    if(logy == True):
+        ax.set_yscale('log')
+    plt.tight_layout()
+    if(show == True):
+        plt.pause(0.5)
+
 def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx = False, color = 'k', markersize = 6, linewidth = 1.5, show = True):
     fig = plt.figure(0, dpi = 120)
     ax = fig.gca()
@@ -33,8 +48,8 @@ def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx
     ax.set_xlabel(xlabel, fontsize=17)
     ax.set_ylabel(ylabel, fontsize=17)
     plt.tight_layout()
-    #if(show == True):
-    #    plt.pause(0.5)
+    if(show == True):
+        plt.pause(0.5)
 
 def getStepList(numFrames, firstStep, stepFreq):
     maxStep = int(firstStep + stepFreq * numFrames)
