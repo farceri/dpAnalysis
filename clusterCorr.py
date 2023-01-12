@@ -363,6 +363,7 @@ def computeParticleLogVelCorr(dirName, startBlock, maxPower, freqPower):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     timeStep = ucorr.readFromParams(dirName, "dt")
     particleVelCorr = []
+    particleDirCorr = []
     stepList = []
     freqDecade = int(10**freqPower)
     decadeSpacing = 10
@@ -378,17 +379,23 @@ def computeParticleLogVelCorr(dirName, startBlock, maxPower, freqPower):
                 for i in range(stepRange.shape[0]-1):
                     if(ucorr.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
                         pVel1, pVel2 = ucorr.readVelPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        stepParticleVelCorr.append(np.mean(np.multiply(pVel1,pVel2)))
+                        pDir1, pDir2 = ucorr.readDirectorPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        stepParticleVelCorr.append(np.mean(np.sum(np.multiply(pVel1,pVel2), axis=1)))
+                        stepParticleDirCorr.append(np.mean(np.sum(np.multiply(pDir1,pDir2), axis=1)))
                         numPairs += 1
             if(numPairs > 0):
                 stepList.append(spacing*spacingDecade)
                 particleVelCorr.append([np.mean(stepParticleVelCorr, axis=0), np.std(stepParticleVelCorr, axis=0)])
+                particleDirCorr.append([np.mean(stepParticleDirCorr, axis=0), np.std(stepParticleDirCorr, axis=0)])
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
     particleVelCorr = np.array(particleVelCorr).reshape((stepList.shape[0],2))
     particleVelCorr = particleVelCorr[np.argsort(stepList)]
+    particleDirCorr = np.array(particleDirCorr).reshape((stepList.shape[0],2))
+    particleDirCorr = particleDirCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "logVelCorr.dat", np.column_stack((stepList*timeStep, particleVelCorr)))
+    np.savetxt(dirName + os.sep + "logDirCorr.dat", np.column_stack((stepList*timeStep, particleDirCorr)))
 
 ########################## Space Velocity Correlation ##########################
 def averageParticleVelSpaceCorr(dirName, dirSpacing=1000):
