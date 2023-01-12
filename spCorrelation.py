@@ -598,6 +598,7 @@ def computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower):
     #pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
     #waveVector = np.pi / (float(radMultiple) * pRad)
     particleVelCorr = []
+    particleDirCorr = []
     stepList = []
     freqDecade = int(10**freqPower)
     decadeSpacing = 10
@@ -608,26 +609,33 @@ def computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower):
         for spacing in range(1,decadeSpacing):
             stepRange = np.arange(0,stepDecade,spacing*spacingDecade,dtype=int)
             stepParticleVelCorr = []
+            stepParticleDirCorr = []
             numPairs = 0
             for multiple in range(startBlock, numBlocks):
                 for i in range(stepRange.shape[0]-1):
                     if(ucorr.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
                         pVel1, pVel2 = ucorr.readVelPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
                         #pPos1, pPos2 = ucorr.readParticlePair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        #pDir1, pDir2 = ucorr.readDirectorPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        pDir1, pDir2 = ucorr.readDirectorPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
                         #stepParticleVelCorr.append(ucorr.computeVelCorrFunctions(pPos1, pPos2, pVel1, pVel2, pDir1, pDir2, waveVector, numParticles))
-                        stepParticleVelCorr.append(np.mean(np.multiply(pVel1,pVel2)))
+                        stepParticleVelCorr.append(np.mean(np.sum(np.multiply(pVel1,pVel2), axis=1)))
+                        stepParticleDirCorr.append(np.mean(np.sum(np.multiply(pDir1,pDir2), axis=1)))
                         numPairs += 1
             if(numPairs > 0):
                 stepList.append(spacing*spacingDecade)
                 particleVelCorr.append([np.mean(stepParticleVelCorr, axis=0), np.std(stepParticleVelCorr, axis=0)])
+                particleDirCorr.append([np.mean(stepParticleDirCorr, axis=0), np.std(stepParticleDirCorr, axis=0)])
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
     particleVelCorr = np.array(particleVelCorr).reshape((stepList.shape[0],2))
     particleVelCorr = particleVelCorr[np.argsort(stepList)]
+    particleDirCorr = np.array(particleDirCorr).reshape((stepList.shape[0],2))
+    particleDirCorr = particleDirCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "logVelCorr.dat", np.column_stack((stepList*timeStep, particleVelCorr)))
-    uplot.plotCorrWithError(stepList*timeStep, particleVelCorr[:,0]/particleVelCorr[0,0], particleVelCorr[:,1], ylabel="$C_{vv}(\\Delta t)$", logx = True, color = 'k')
+    np.savetxt(dirName + os.sep + "logDirCorr.dat", np.column_stack((stepList*timeStep, particleDirCorr)))
+    uplot.plotCorrWithError(stepList*timeStep, particleVelCorr[:,0], particleVelCorr[:,1], ylabel="$C_{vv}(\\Delta t)$", logx = True, color = 'k')
+    uplot.plotCorrWithError(stepList*timeStep, particleDirCorr[:,0], particleDirCorr[:,1], ylabel="$C_{nn}(\\Delta t)$", logx = True, color = 'r')
     #plt.show()
 
 ############################# Velocity Correlation #############################
@@ -637,13 +645,11 @@ def computeParticleVelSpaceCorr(dirName):
     minRad = np.min(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     distance = ucorr.computeDistances(pos, boxSize)
-    bins = np.arange(np.min(distance), np.sqrt(2)*boxSize[0]/2, minRad)
+    bins = np.arange(2*minRad, np.sqrt(2)*boxSize[0]/2, 2*minRad)
     vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
     velNorm = np.linalg.norm(vel, axis=1)
     velNormSquared = np.mean(velNorm**2)
-    velCorr = np.zeros((bins.shape[0]-1,3))
-    counts = np.zeros(bins.shape[0]-1)
-    velCorr = np.zeros((bins.shape[0]-1,3))
+    velCorr = np.zeros((bins.shape[0]-1,4))
     counts = np.zeros(bins.shape[0]-1)
     for i in range(distance.shape[0]):
         for j in range(i):
@@ -660,17 +666,17 @@ def computeParticleVelSpaceCorr(dirName):
                     # correlations
                     velCorr[k,0] += parProj1 * parProj2
                     velCorr[k,1] += perpProj1 * perpProj2
-                    velCorr[k,2] += np.dot(vel[i],vel[j])
+                    velCorr[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
+                    velCorr[k,3] += np.dot(vel[i],vel[j])
                     counts[k] += 1
     binCenter = (bins[1:] + bins[:-1])/2
-    velCorr[counts>0,0] /= counts[counts>0]
-    velCorr[counts>0,1] /= counts[counts>0]
-    velCorr[counts>0,2] /= counts[counts>0]
+    for i in range(velCorr.shape[1]):
+        velCorr[counts>0,i] /= counts[counts>0]
     velCorr /= velNormSquared
     np.savetxt(dirName + os.sep + "spaceVelCorr1.dat", np.column_stack((binCenter, velCorr, counts)))
-    uplot.plotCorrelation(binCenter, velCorr[:,0], "$C_{vv}^{\\parallel}(r)$", "$Distance,$ $r$", color = 'k')
-    uplot.plotCorrelation(binCenter, velCorr[:,1], "$C_{vv}^{\\perp}(r)$", "$Distance,$ $r$", color = 'r')
-    uplot.plotCorrelation(binCenter, velCorr[:,2], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
+    uplot.plotCorrelation(binCenter, velCorr[:,0], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'r')
+    uplot.plotCorrelation(binCenter, velCorr[:,1], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
+    uplot.plotCorrelation(binCenter, velCorr[:,2], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'k')
     plt.show()
 
 ############################# Velocity Correlation #############################
@@ -682,14 +688,16 @@ def averageParticleVelSpaceCorr(dirName, dirSpacing=1000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[:100]
-    velCorr = np.zeros((bins.shape[0]-1,3))
+    dirList = dirList[-50:]
+    velCorr = np.zeros((bins.shape[0]-1,4))
     counts = np.zeros(bins.shape[0]-1)
     for d in range(dirList.shape[0]):
         pos = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particlePos.dat"))
         distance = ucorr.computeDistances(pos, boxSize)
         vel = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particleVel.dat"))
         velNorm = np.linalg.norm(vel, axis=1)
+        vel[:,0] /= velNorm
+        vel[:,1] /= velNorm
         velNormSquared = np.mean(velNorm**2)
         for i in range(distance.shape[0]):
             for j in range(i):
@@ -705,78 +713,20 @@ def averageParticleVelSpaceCorr(dirName, dirSpacing=1000):
                             perpProj1 = np.dot(vel[i],deltaPerp)
                             perpProj2 = np.dot(vel[j],deltaPerp)
                             velCorr[k,1] += perpProj1 * perpProj2
+                            # off-diagonal
+                            velCorr[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
                             # total
-                            velCorr[k,2] += np.dot(vel[i],vel[j])
+                            velCorr[k,3] += np.dot(vel[i],vel[j])
                             counts[k] += 1
-    velCorr[counts>0,0] /= counts[counts>0]
-    velCorr[counts>0,1] /= counts[counts>0]
-    velCorr[counts>0,2] /= counts[counts>0]
-    velCorr /= velNormSquared
+    for i in range(velCorr.shape[1]):
+        velCorr[counts>0,i] /= counts[counts>0]
+    #velCorr /= velNormSquared
     binCenter = (bins[1:] + bins[:-1])/2
     np.savetxt(dirName + os.sep + "spaceVelCorr.dat", np.column_stack((binCenter, velCorr, counts)))
-    uplot.plotCorrelation(binCenter, velCorr[:,0], "$C_{vv}^{\\parallel}(r)$", "$Distance,$ $r$", color = 'k')
-    uplot.plotCorrelation(binCenter, velCorr[:,1], "$C_{vv}^{\\perp}(r)$", "$Distance,$ $r$", color = 'r')
-    uplot.plotCorrelation(binCenter, velCorr[:,2], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
-    #plt.show()
-
-##################### Velocity Correlation in/out Cluster ######################
-def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
-    minRad = np.min(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    bins = np.arange(2*minRad, np.sqrt(2)*boxSize[0]/2, 2*minRad)
-    dirList, timeList = ucorr.getOrderedDirectories(dirName)
-    timeList = timeList.astype(int)
-    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[:100]
-    if(os.path.exists(dirName + "clusterList.dat")):
-        print('ok')
-        clusterLabel = np.loadtxt(dirName + "clusterList.dat")[:,1]
-    clusterLabel = searchClusters(dirName)
-    velCorrInCluster = np.zeros((bins.shape[0]-1,3))
-    countsInCluster = np.zeros(bins.shape[0]-1)
-    velCorrOutCluster = np.zeros((bins.shape[0]-1,3))
-    countsOutCluster = np.zeros(bins.shape[0]-1)
-    for d in range(dirList.shape[0]):
-        pos = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particlePos.dat"))
-        distance = ucorr.computeDistances(pos, boxSize)
-        vel = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particleVel.dat"))
-        velNorm = np.linalg.norm(vel, axis=1)
-        velNormSquared = np.mean(velNorm**2)
-        for i in range(distance.shape[0]):
-            for j in range(i):
-                    for k in range(bins.shape[0]-1):
-                        if(distance[i,j] > bins[k] and distance[i,j] <= bins[k+1]):
-                            # parallel
-                            delta = ucorr.pbcDistance(pos[i], pos[j], boxSize)/distance[i,j]
-                            parProj1 = np.dot(vel[i],delta)
-                            parProj2 = np.dot(vel[j],delta)
-                            # perpendicular
-                            deltaPerp = np.array([-delta[1], delta[0]])
-                            perpProj1 = np.dot(vel[i],deltaPerp)
-                            perpProj2 = np.dot(vel[j],deltaPerp)
-                            # correlations
-                            if(clusterLabel[i]!=0):
-                                velCorrInCluster[k,0] += parProj1 * parProj2
-                                velCorrInCluster[k,1] += perpProj1 * perpProj2
-                                velCorrInCluster[k,2] += np.dot(vel[i],vel[j])
-                                countsInCluster[k] += 1
-                            else:
-                                velCorrOutCluster[k,0] += parProj1 * parProj2
-                                velCorrOutCluster[k,1] += perpProj1 * perpProj2
-                                velCorrOutCluster[k,2] += np.dot(vel[i],vel[j])
-                                countsOutCluster[k] += 1
-    binCenter = (bins[1:] + bins[:-1])/2
-    for i in range(velCorrInCluster.shape[1]):
-        velCorrInCluster[countsOutCluster>0,i] /= countsInCluster[countsOutCluster>0]
-        velCorrOutCluster[countsOutCluster>0,i] /= countsOutCluster[countsOutCluster>0]
-    velCorrInCluster /= velNormSquared
-    velCorrOutCluster /= velNormSquared
-    np.savetxt(dirName + os.sep + "spaceVelCorrInCluster.dat", np.column_stack((binCenter, velCorrInCluster, countsInCluster)))
-    np.savetxt(dirName + os.sep + "spaceVelCorrOutCluster.dat", np.column_stack((binCenter, velCorrOutCluster, countsOutCluster)))
-    uplot.plotCorrelation(binCenter, velCorrInCluster[:,1], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'r')
-    uplot.plotCorrelation(binCenter, velCorrOutCluster[:,1], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
-    #plt.show()
+    uplot.plotCorrelation(binCenter, velCorr[:,0], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'r')
+    uplot.plotCorrelation(binCenter, velCorr[:,1], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
+    uplot.plotCorrelation(binCenter, velCorr[:,2], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'k')
+    plt.show()
 
 ########################### Average Space Correlator ###########################
 def averagePairCorr(dirName, dirSpacing=1):
@@ -858,6 +808,7 @@ def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
         interval *= timeStep
         np.savetxt(dirName + os.sep + "contactCollisionIntervals.dat", interval)
     bins = np.arange(np.min(interval), np.max(interval), spacing*timeStep)
+    #bins = np.linspace(np.min(interval), np.max(interval), spacing)
     pdf, edges = np.histogram(interval, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
@@ -865,7 +816,7 @@ def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
     centers = centers[np.argwhere(pdf>0)[:,0]]
     pdf = pdf[pdf>0]
     uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True)
-    plt.xlim(-500*timeStep, timeList[-1]*timeStep)
+    #plt.xlim(-500*timeStep, timeList[-1]*timeStep)
     #cdf = np.arange(len(interval))/len(interval)
     #indices = (np.unique(np.geomspace(1, len(interval), num=100, dtype=int)) - 1)
     #interval = interval[indices]
@@ -927,7 +878,7 @@ def computeLocalDensity(dirName, numBins, plot = False):
     else:
         return localDensity
 
-def averageLocalDensity(dirName, numBins=12):
+def averageLocalDensity(dirName, numBins=12, dirSpacing=1000):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     timeStep = ucorr.readFromParams(dirName, "dt")
@@ -936,6 +887,9 @@ def averageLocalDensity(dirName, numBins=12):
     localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    dirList = dirList[-50:]
     localDensity = []
     for dir in dirList:
         localArea = np.zeros((numBins, numBins))
@@ -973,11 +927,13 @@ def localDensityVarianceVSTime(dirName, numBins=12):
     plt.show()
 
 ######################### Cluster Velocity Correlation #########################
-def searchClusters(dirName, plot=False):
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
+    if(numParticles==None):
+        numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat"), dtype=int)
     particleLabel = np.zeros(numParticles)
     connectLabel = np.zeros(numParticles)
+    noClusterList = np.zeros(numParticles)
     clusterLabel = 0
     for i in range(1,numParticles):
         if(np.sum(contacts[i]!=-1)>2):
@@ -995,17 +951,40 @@ def searchClusters(dirName, plot=False):
                     clusterLabel += 1
                     particleLabel[i] = clusterLabel
             particleLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = particleLabel[i]
+            # more stringent condition on cluster belonging
             connectLabel[i] = 1
             connectLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = 1
         else:
             particleLabel[i] = 0
+    # get cluster lengthscale, center
+    rad = np.loadtxt(dirName + os.sep + "../particleRad.dat")
+    NpInCluster = connectLabel[connectLabel!=0].shape[0]
+    clusterSize = np.sqrt(NpInCluster) * np.mean(rad[connectLabel!=0])
+    pos = np.loadtxt(dirName + os.sep + "particlePos.dat")
+    boxSize = np.loadtxt(dirName + os.sep + "../boxSize.dat")
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    clusterPos = np.mean(pos[connectLabel!=0], axis=0)
+    # get list of particles within half of the lengthscale from the center
+    deepList = np.zeros(numParticles)
+    for i in range(numParticles):
+        if(particleLabel[i] == 0 and np.sum(contacts[i]) < 2):
+            noClusterList[i] = 1
+        delta = ucorr.pbcDistance(pos[i], clusterPos, boxSize)
+        distance = np.linalg.norm(delta)
+        if(distance < clusterSize * 0.5 and connectLabel[i] == 1):
+            deepList[i] = 1
+    np.savetxt(dirName + "/deepList.dat", deepList)
+    np.savetxt(dirName + "/noClusterList.dat", noClusterList)
     if(plot=="plot"):
+        print("Cluster position, x: ", clusterPos[0], " y: ", clusterPos[1])
+        print("Cluster size: ", clusterSize)
         print("Number of clusters: ", clusterLabel)
-        print("Cluster label list: ", particleLabel)
+        print("Number of particles in clusters: ", connectLabel[connectLabel!=0].shape[0])
         # plot packing
-        boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+        boxSize = np.loadtxt(dirName + os.sep + "../boxSize.dat")
         pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-        rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+        rad = np.array(np.loadtxt(dirName + os.sep + "../particleRad.dat"))
         xBounds = np.array([0, boxSize[0]])
         yBounds = np.array([0, boxSize[1]])
         pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
@@ -1030,13 +1009,261 @@ def searchClusters(dirName, plot=False):
             x = pos[particleId,0]
             y = pos[particleId,1]
             r = rad[particleId]
-            ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=0.6, linewidth=0.5))
-            if(connectLabel[particleId] == 1):
+            ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=[1,1,1], alpha=0.6, linewidth=0.5))
+            if(cluster=="cluster"):
+                ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=0.6, linewidth=0.5))
+                if(connectLabel[particleId] == 1):
+                    ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
+            if(cluster=="deep" and deepList[particleId] == 1):
+                ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
+            if(cluster=="nocluster" and noClusterList[particleId] == 1):
                 ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
         plt.show()
     np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel)))
-    return connectLabel
+    if(cluster=="deep"):
+        return deepList
+    elif(cluster=="nocluster"):
+        return noClusterList
+    elif(cluster=="cluster"):
+        return connectLabel
 
+##################### Velocity Correlation in/out Cluster ######################
+def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    minRad = np.min(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    bins = np.arange(2*minRad, np.sqrt(2)*boxSize[0]/2, 2*minRad)
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    dirList = dirList[-50:]
+    #dirList = np.array([dirName])
+    velCorrInCluster = np.zeros((bins.shape[0]-1,4))
+    countsInCluster = np.zeros(bins.shape[0]-1)
+    velCorrOutCluster = np.zeros((bins.shape[0]-1,4))
+    countsOutCluster = np.zeros(bins.shape[0]-1)
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "clusterList.dat")):
+            clusterLabel = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,1]
+            #clusterLabel = np.loadtxt(dirSample + os.sep + "deepList.dat")
+            #clusterLabel = np.loadtxt(dirSample + os.sep + "noClusterList.dat")
+        else:
+            clusterLabel = searchClusters(dirSample, numParticles=numParticles)
+        #pos = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particlePos.dat"))
+        pos = np.array(np.loadtxt(dirSample + os.sep + "particlePos.dat"))
+        distance = ucorr.computeDistances(pos, boxSize)
+        #vel = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particleVel.dat"))
+        vel = np.array(np.loadtxt(dirSample + os.sep + "particleVel.dat"))
+        velNorm = np.linalg.norm(vel, axis=1)
+        vel[:,0] /= velNorm
+        vel[:,1] /= velNorm
+        velNormSquared = np.mean(velNorm**2)
+        for i in range(distance.shape[0]):
+            for j in range(i):
+                    for k in range(bins.shape[0]-1):
+                        if(distance[i,j] > bins[k] and distance[i,j] <= bins[k+1]):
+                            # parallel
+                            delta = ucorr.pbcDistance(pos[i], pos[j], boxSize)/distance[i,j]
+                            parProj1 = np.dot(vel[i],delta)
+                            parProj2 = np.dot(vel[j],delta)
+                            # perpendicular
+                            deltaPerp = np.array([-delta[1], delta[0]])
+                            perpProj1 = np.dot(vel[i],deltaPerp)
+                            perpProj2 = np.dot(vel[j],deltaPerp)
+                            # correlations
+                            if(clusterLabel[i]!=0):
+                                velCorrInCluster[k,0] += parProj1 * parProj2
+                                velCorrInCluster[k,1] += perpProj1 * perpProj2
+                                velCorrInCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
+                                velCorrInCluster[k,3] += np.dot(vel[i],vel[j])
+                                countsInCluster[k] += 1
+                            else:
+                                velCorrOutCluster[k,0] += parProj1 * parProj2
+                                velCorrOutCluster[k,1] += perpProj1 * perpProj2
+                                velCorrOutCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
+                                velCorrOutCluster[k,3] += np.dot(vel[i],vel[j])
+                                countsOutCluster[k] += 1
+    binCenter = (bins[1:] + bins[:-1])/2
+    for i in range(velCorrInCluster.shape[1]):
+        velCorrInCluster[countsOutCluster>0,i] /= countsInCluster[countsOutCluster>0]
+        velCorrOutCluster[countsOutCluster>0,i] /= countsOutCluster[countsOutCluster>0]
+    #velCorrInCluster /= velNormSquared
+    #velCorrOutCluster /= velNormSquared
+    np.savetxt(dirName + os.sep + "spaceVelCorrInCluster.dat", np.column_stack((binCenter, velCorrInCluster, countsInCluster)))
+    np.savetxt(dirName + os.sep + "spaceVelCorrOutCluster.dat", np.column_stack((binCenter, velCorrOutCluster, countsOutCluster)))
+    uplot.plotCorrelation(binCenter, velCorrInCluster[:,0], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'r')
+    uplot.plotCorrelation(binCenter, velCorrInCluster[:,1], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'g')
+    uplot.plotCorrelation(binCenter, velCorrInCluster[:,2], "$C_{vv}(r)$", "$Distance,$ $r$", color = 'k')
+    #plt.show()
+
+def computeClusterPT(dirName, plot=False):
+    driving = float(ucorr.readFromDynParams(dirName, "f0"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    energy = np.loadtxt(dirName + os.sep + "energy.dat")
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    if(os.path.exists(dirName + "clusterList.dat")):
+        clusterLabel = np.loadtxt(dirName + "clusterList.dat")[:,1]
+    else:
+        clusterLabel = searchClusters(dirName)
+    activePressure = np.zeros((dirList.shape[0], 2))
+    temp = np.zeros((dirList.shape[0], 2))
+    numParticlesIn = clusterLabel[clusterLabel==1].shape[0]
+    numParticlesOut = clusterLabel[clusterLabel!=1].shape[0]
+    for i in range(dirList.shape[0]):
+        pos = np.loadtxt(dirName + os.sep + dirList[i] + "/particlePos.dat")
+        angle = np.loadtxt(dirName + os.sep + dirList[i] + "/particleAngles.dat")
+        vel = np.loadtxt(dirName + os.sep + dirList[i] + "/particleVel.dat")
+        dir = driving*np.array([np.cos(angle), np.sin(angle)]).T
+        activePressure[i,0] = np.sum(np.sum(dir[clusterLabel==1]*pos[clusterLabel==1],axis=1))
+        activePressure[i,1] = np.sum(np.sum(dir[clusterLabel!=1]*pos[clusterLabel!=1],axis=1))
+        temp[i,0] = np.sum(0.5*np.linalg.norm(vel[clusterLabel==1],axis=0)**2) / numParticlesIn
+        temp[i,1] = np.sum(0.5*np.linalg.norm(vel[clusterLabel!=1],axis=0)**2) / numParticlesOut
+    print("Active pressure - in: ", np.mean(activePressure[:,0]), " $\\pm$ ", np.std(activePressure[:,0]), " out: ", np.mean(activePressure[:,1]), " $\\pm$ ", np.std(activePressure[:,1]))
+    print("Temperature - in: ", np.mean(temp[:,0]), " $\\pm$ ", np.std(temp[:,0]), " out: ", np.mean(temp[:,1]), " $\\pm$ ", np.std(temp[:,1]))
+    if(plot=='plot'):
+        #uplot.plotCorrelation(timeList, activePressure[:,0], "$Active$ $pressure$ $in$", "$Time,$ $t$")
+        #uplot.plotCorrelation(timeList, activePressure[:,1], "$Active$ $pressure$ $out$", "$Time,$ $t$")
+        uplot.plotCorrelation(timeList*timeStep, temp[:,0], "$Temperature$ $in$", "$Time,$ $t$")
+        uplot.plotCorrelation(timeList*timeStep, temp[:,1], "$Temperature$ $out$", "$Time,$ $t$")
+        plt.show()
+    return activePressure
+
+######################### Cluster Velocity Correlation #########################
+def computeVelocityField(dirName, numBins=100, boxSize=np.array([0,0]), numParticles=None, plot=False, figureName=None, read=False, cluster=False):
+    if(numParticles == None):
+        numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    if(boxSize[0] == 0):
+        boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    bins = np.linspace(-0.5*boxSize[0],0, numBins)
+    bins = np.concatenate((np.array([bins[0]-(bins[1]-bins[0])]), bins))
+    bins = np.concatenate((bins, np.linspace(0,0.5*boxSize[0],numBins)[1:]))
+    if(read=="read" and os.path.exists(dirName + os.sep + "velocityField.dat")):
+        grid = np.loadtxt(dirName + os.sep + "velocityGrid.dat")
+        field = np.loadtxt(dirName + os.sep + "velocityField.dat")
+    else:
+        if(cluster=="cluster"):
+            print("Computing velocity field for particles in clusters")
+            if(os.path.exists(dirName + "clusterList.dat")):
+                clusterLabel = np.loadtxt(dirName + "clusterList.dat")[:,1]
+            else:
+                clusterLabel = searchClusters(dirName, numParticles=numParticles, cluster=cluster)
+        elif(cluster=="deep"):
+            print("Computing velocity field for particles deep within a cluster")
+            if(os.path.exists(dirName + "deepList.dat")):
+                clusterLabel = np.loadtxt(dirName + "deepList.dat")
+            else:
+                clusterLabel = searchClusters(dirName, numParticles=numParticles, cluster=cluster)
+        elif(cluster=="nocluster"):
+            print("Computing velocity field for particles not in a cluster")
+            if(os.path.exists(dirName + "noClusterList.dat")):
+                clusterLabel = np.loadtxt(dirName + "noClusterList.dat")
+            else:
+                clusterLabel = searchClusters(dirName, numParticles=numParticles, cluster=cluster)
+        else:
+            print("Computing velocity field for all particles")
+            clusterLabel = np.ones(numParticles)
+        vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
+        pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+        delta = ucorr.computeDeltas(pos, boxSize)
+        bins = np.linspace(-0.5*boxSize[0],0, numBins)
+        bins = np.concatenate((np.array([bins[0]-(bins[1]-bins[0])]), bins))
+        bins = np.concatenate((bins, np.linspace(0,0.5*boxSize[0],numBins)[1:]))
+        numBins = bins.shape[0]
+        field = np.zeros((numBins, numBins, 2))
+        grid = np.zeros((numBins, numBins, 2))
+        for k in range(numBins-1):
+            for l in range(numBins-1):
+                grid[k,l,0] = bins[k]
+                grid[k,l,1] = bins[l]
+        for i in range(numParticles):
+            if(clusterLabel[i]!=0):
+                rotation = np.array([[vel[i,0], -vel[i,1]], [vel[i,1], vel[i,0]]]) / np.linalg.norm(vel[i])
+                for j in range(numParticles):
+                    for k in range(numBins-1):
+                        if(delta[i,j,0] > bins[k] and delta[i,j,0] <= bins[k+1]):
+                            for l in range(numBins-1):
+                                if(delta[i,j,1] > bins[l] and delta[i,j,1] <= bins[l+1]):
+                                    field[k,l] += np.matmul(rotation, vel[j])
+        field = field.reshape(numBins*numBins, 2)
+        field /= np.max(np.linalg.norm(field,axis=1))
+        grid = grid.reshape(numBins*numBins, 2)
+        if(cluster=="cluster"):
+            np.savetxt(dirName + os.sep + "velocityGridInCluster.dat", grid)
+            np.savetxt(dirName + os.sep + "velocityFieldInCluster.dat", field)
+        else:
+            np.savetxt(dirName + os.sep + "velocityGrid.dat", grid)
+            np.savetxt(dirName + os.sep + "velocityField.dat", field)
+    if(plot=="plot"):
+        xBounds = np.array([bins[0], bins[-1]])
+        yBounds = np.array([bins[0], bins[-1]])
+        fig = plt.figure(0, dpi = 150)
+        ax = fig.gca()
+        ax.set_xlim(xBounds[0], xBounds[1])
+        ax.set_ylim(yBounds[0], yBounds[1])
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.quiver(grid[:,0], grid[:,1], field[:,0], field[:,1], facecolor='k', width=0.004, headlength=3, headaxislength=3)
+        plt.savefig("/home/francesco/Pictures/soft/packings/vfield-" + figureName + ".png", transparent=False, format = "png")
+        plt.show()
+    return grid, field
+
+######################### Cluster Velocity Correlation #########################
+def averageVelocityField(dirName, dirSpacing=1000, numBins=100, boxSize=np.array([0,0]), numParticles=None, plot=False, figureName=None, cluster=False):
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    dirList = dirList[-10:]
+    if(numParticles == None):
+        numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    if(boxSize[0] == 0):
+        boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    bins = np.linspace(-0.5*boxSize[0],0, numBins)
+    bins = np.concatenate((np.array([bins[0]-(bins[1]-bins[0])]), bins))
+    bins = np.concatenate((bins, np.linspace(0,0.5*boxSize[0],numBins)[1:]))
+    numBins = bins.shape[0]
+    field = np.zeros((numBins*numBins, 2))
+    grid = np.zeros((numBins*numBins, 2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        gridTemp, fieldTemp = computeVelocityField(dirSample, numBins, cluster=cluster)
+        grid += gridTemp
+        field += fieldTemp
+    grid /= dirList.shape[0]
+    field /= dirList.shape[0]
+    if(cluster=="cluster"):
+        np.savetxt(dirName + os.sep + "averageVelocityGridInCluster.dat", grid)
+        np.savetxt(dirName + os.sep + "averageVelocityFieldInCluster.dat", field)
+    if(cluster=="deep"):
+        np.savetxt(dirName + os.sep + "averageVelocityGridDeepCluster.dat", grid)
+        np.savetxt(dirName + os.sep + "averageVelocityFieldDeepCluster.dat", field)
+    if(cluster=="nocluster"):
+        np.savetxt(dirName + os.sep + "averageVelocityGridNoCluster.dat", grid)
+        np.savetxt(dirName + os.sep + "averageVelocityFieldNoCluster.dat", field)
+    else:
+        np.savetxt(dirName + os.sep + "averageVelocityGrid.dat", grid)
+        np.savetxt(dirName + os.sep + "averageVelocityField.dat", field)
+    if(plot=="plot"):
+        xBounds = np.array([bins[0], bins[-1]])
+        yBounds = np.array([bins[0], bins[-1]])
+        fig = plt.figure(0, dpi = 150)
+        ax = fig.gca()
+        ax.set_xlim(xBounds[0], xBounds[1])
+        ax.set_ylim(yBounds[0], yBounds[1])
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.quiver(grid[:,0], grid[:,1], field[:,0], field[:,1], facecolor='k', width=0.004, headlength=3, headaxislength=3)
+        plt.savefig("/home/francesco/Pictures/soft/packings/avfield-" + figureName + ".png", transparent=False, format = "png")
+        plt.show()
+    return grid, field
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -1167,8 +1394,28 @@ if __name__ == '__main__':
         averageLocalDensity(dirName, numBins)
 
     elif(whichCorr == "cluster"):
+        numParticles = int(sys.argv[3])
+        plot = sys.argv[4]
+        cluster = sys.argv[5]
+        searchClusters(dirName, numParticles, plot=plot, cluster=cluster)
+
+    elif(whichCorr == "clusterpt"):
         plot = sys.argv[3]
-        searchClusters(dirName, plot=plot)
+        computeClusterPT(dirName, plot=plot)
+
+    elif(whichCorr == "vfield"):
+        numBins = int(sys.argv[3])
+        plot = sys.argv[4]
+        figureName = sys.argv[5]
+        cluster = sys.argv[6]
+        computeVelocityField(dirName, numBins=numBins, plot=plot, figureName=figureName, cluster=cluster)
+
+    elif(whichCorr == "averagevfield"):
+        numBins = int(sys.argv[3])
+        plot = sys.argv[4]
+        figureName = sys.argv[5]
+        cluster = sys.argv[6]
+        computeVelocityField(dirName, numBins=numBins, plot=plot, figureName=figureName, cluster=cluster)
 
     else:
         print("Please specify the correlation you want to compute")

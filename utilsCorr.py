@@ -381,10 +381,9 @@ def readPair(dirName, index1, index2):
 def readDirectorPair(dirName, index1, index2):
     pAngle1 = np.array(np.loadtxt(dirName + os.sep + "t" + str(index1) + os.sep + "particleAngles.dat"))
     pAngle2 = np.array(np.loadtxt(dirName + os.sep + "t" + str(index2) + os.sep + "particleAngles.dat"))
-    pVel1 = np.array([np.cos(pAngle1), np.sin(pAngle1)]).T
-    pVel2 = np.array([np.cos(pAngle2), np.sin(pAngle2)]).T
-    return pVel1, pVel2
-    #return pAngle1, pAngle2
+    pDir1 = np.array([np.cos(pAngle1), np.sin(pAngle1)]).T
+    pDir2 = np.array([np.cos(pAngle2), np.sin(pAngle2)]).T
+    return pDir1, pDir2
 
 def computeParticleVelocities(vel, nv):
     numParticles = nv.shape[0]

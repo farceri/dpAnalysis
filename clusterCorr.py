@@ -399,7 +399,7 @@ def averageParticleVelSpaceCorr(dirName, dirSpacing=1000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[:100]
+    dirList = dirList[-10:]
     velCorr = np.zeros((bins.shape[0]-1,3))
     counts = np.zeros(bins.shape[0]-1)
     for d in range(dirList.shape[0]):
@@ -423,7 +423,7 @@ def averageParticleVelSpaceCorr(dirName, dirSpacing=1000):
                             perpProj2 = np.dot(vel[j],deltaPerp)
                             velCorr[k,1] += perpProj1 * perpProj2
                             # total
-                            velCorr[k,2] += np.dot(vel[i],vel[j])
+                            velCorr[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
                             counts[k] += 1
     velCorr[counts>0,0] /= counts[counts>0]
     velCorr[counts>0,1] /= counts[counts>0]
@@ -441,10 +441,11 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[:100]
+    dirList = dirList[-10:]
     if(os.path.exists(dirName + "clusterList.dat")):
         clusterLabel = np.loadtxt(dirName + "clusterList.dat")[:,1]
-    clusterLabel = searchClusters(dirName)
+    else:
+        clusterLabel = searchClusters(dirName)
     velCorrInCluster = np.zeros((bins.shape[0]-1,3))
     countsInCluster = np.zeros(bins.shape[0]-1)
     velCorrOutCluster = np.zeros((bins.shape[0]-1,3))
@@ -471,12 +472,12 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
                             if(clusterLabel[i]!=0):
                                 velCorrInCluster[k,0] += parProj1 * parProj2
                                 velCorrInCluster[k,1] += perpProj1 * perpProj2
-                                velCorrInCluster[k,2] += np.dot(vel[i],vel[j])
+                                velCorrInCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
                                 countsInCluster[k] += 1
                             else:
                                 velCorrOutCluster[k,0] += parProj1 * parProj2
                                 velCorrOutCluster[k,1] += perpProj1 * perpProj2
-                                velCorrOutCluster[k,2] += np.dot(vel[i],vel[j])
+                                velCorrOutCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
                                 countsOutCluster[k] += 1
     binCenter = (bins[1:] + bins[:-1])/2
     for i in range(velCorrInCluster.shape[1]):

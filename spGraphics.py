@@ -248,8 +248,8 @@ def plotSPFourierCorr(dirName, fileName, figureName, dyn = "nve", fixed = "temp"
 def plotSPCollision(dirName, figureName, scaled, dyn = "nve", fixed = "temp", which = "0.001"):
     fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
     if(fixed == "temp"):
-        dirList = np.array(['thermal45', 'thermal58', 'thermal67', 'thermal72', 'thermal78', 'thermal83'])
-        labelList = np.array(['$\\varphi=0.45$', '$\\varphi=0.58$', '$\\varphi=0.67$','$\\varphi=0.72$', '$\\varphi=0.78$', '$\\varphi=0.83$', '$\\varphi=0.85$', '$\\varphi=0.88$', '$\\varphi=0.91$'])
+        dirList = np.array(['thermal45', 'thermal58', 'thermal67', 'thermal72', 'thermal78', 'thermal80', 'thermal83', 'thermal85'])
+        labelList = np.array(['$\\varphi=0.45$', '$\\varphi=0.58$', '$\\varphi=0.67$','$\\varphi=0.72$', '$\\varphi=0.78$', '$\\varphi=0.80$', '$\\varphi=0.83$', '$\\varphi=0.85$'])
         colorList = cm.get_cmap('viridis', dirList.shape[0])
         phi = []
     elif(fixed == "phi"):
@@ -265,7 +265,7 @@ def plotSPCollision(dirName, figureName, scaled, dyn = "nve", fixed = "temp", wh
         colorList = cm.get_cmap('cividis', dirList.shape[0])
         damping = []
     tauc = []
-    for d in range(1,dirList.shape[0]):
+    for d in range(dirList.shape[0]):
         if(fixed == "temp"):
             dirSample = dirName + os.sep + dirList[d] + "/langevin/T" + which + "/" + dyn + "/dynamics/"
         elif(fixed == "phi"):
@@ -296,7 +296,7 @@ def plotSPCollision(dirName, figureName, scaled, dyn = "nve", fixed = "temp", wh
                 else:
                     tauc.append(1/popt[1])
                     ax.semilogy(data[:,0]/tauc[-1], curveCvv(data[:,0], *popt), color=color, lw=1, linestyle='--')
-                ax.semilogy(data[:,0]/tauc[-1], data[:,1], color=color, lw=1, marker='o', markersize=4, label=labelList[d], fillstyle='none')
+                ax.loglog(data[:,0]/tauc[-1], data[:,1], color=color, lw=1, marker='o', markersize=4, label=labelList[d], fillstyle='none')
                 print("timescale: ", tauc[-1])
                 if(fixed == "temp"):
                     phi.append(ucorr.readFromParams(dirSample, "phi"))
@@ -305,8 +305,8 @@ def plotSPCollision(dirName, figureName, scaled, dyn = "nve", fixed = "temp", wh
                 else:
                     damping.append(np.sqrt(iod[d])/meanRad)
             else:
-                ax.semilogy(data[:,0], data[:,1], color=color, lw=1, marker='o', markersize=4, label=labelList[d], fillstyle='none')
-    ax.legend(fontsize=10, loc="upper right")
+                ax.loglog(data[:,0], data[:,1], color=color, lw=1, marker='o', markersize=4, label=labelList[d], fillstyle='none')
+    ax.legend(fontsize=10, loc="upper right", ncol=2)
     ax.tick_params(axis='both', labelsize=14)
     ax.set_xlabel("$\\Delta_c$", fontsize=18)
     ax.set_ylabel("$PDF(\\Delta_c)$", fontsize=18)
@@ -364,7 +364,6 @@ def plotSPVelCorr(dirName, figureName, scaled=False, dyn = "nve", fixed = "temp"
         labelList = np.array(['$NVE$', '$\\beta \\sigma = 0.001$', '$\\beta \\sigma = 0.01$', '$\\beta \\sigma = 0.1$', '$\\beta \\sigma = 1$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 1000$'])
         colorList = cm.get_cmap('cividis', dirList.shape[0])
         iod = np.array([0, 0.001, 0.01, 0.1, 1, 10, 100, 1000])
-        meanRad = np.mean(np.loadtxt(dirName + "particleRad.dat"))
         damping = []
     for d in range(dirList.shape[0]):
         if(fixed == "temp"):
@@ -374,6 +373,7 @@ def plotSPVelCorr(dirName, figureName, scaled=False, dyn = "nve", fixed = "temp"
         else:
             dirSample = dirName + os.sep + dirList[d] + "/dynamics/"
         if(os.path.exists(dirSample + "logVelCorr.dat")):
+            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
             phi = ucorr.readFromParams(dirSample, "phi")
             timeStep = ucorr.readFromParams(dirSample, "dt")
             Temp = np.mean(np.loadtxt(dirSample + "/energy.dat")[:,4])
@@ -411,7 +411,12 @@ def plotSPVelCorr(dirName, figureName, scaled=False, dyn = "nve", fixed = "temp"
             x = np.linspace(np.min(data[:,0]), 10*np.max(data[:,0]), 1000)
             if(failed==False):
                 ax[0].semilogx(data[:,0]/width, curveCvvOsc(data[:,0], *popt), color=color, linestyle='--', lw=0.9)
-                print("damping: ", popt[1], " period: ", popt[2])
+                if(fixed == "phi"):
+                    print("T: ", Temp, " damping: ", popt[1], " timescale: ", 1/popt[1])
+                elif(fixed == "temp"):
+                    print("phi: ", phi, " damping: ", popt[1], " timescale: ", 1/popt[1])
+                else:
+                    print("iod: ", iod[d], " damping: ", popt[1], " input: ", damping[-1][0])
                 y = curveCvvOsc(x, *popt)
             else:
                 ax[0].semilogx(data[:,0]/width, curveCvv(data[:,0], *popt), color=color, linestyle='--', lw=0.9)
@@ -423,8 +428,8 @@ def plotSPVelCorr(dirName, figureName, scaled=False, dyn = "nve", fixed = "temp"
             fy = fy[np.argsort(fx)]
             fx = np.sort(fx)
             #ax[1].loglog(fx*(x[1]-x[0]), np.real(fy)*width, color=color, lw=1)
-            if(os.path.exists(dirSample + "../dynamics-short/fourierVelCorr.dat")):
-                data = np.loadtxt(dirSample + "../dynamics-short/fourierVelCorr.dat")
+            if(os.path.exists(dirSample + "../dynamics/fourierVelCorr.dat")):
+                data = np.loadtxt(dirSample + "../dynamics/fourierVelCorr.dat")
                 if(d==0):
                     fy0 = data[data[:,0]>0,2]
                 ax[1].loglog(data[data[:,0]>0,0]*width, data[data[:,0]>0,2]/Temp, color=color, lw=1, label=labelList[d])
@@ -453,22 +458,28 @@ def plotSPVelCorr(dirName, figureName, scaled=False, dyn = "nve", fixed = "temp"
         figure1Name += "-scaled"
     fig.savefig(figure1Name + ".png", transparent=True, format = "png")
     if(fixed != "phi" and fixed != "temp"):
-        if(scaled=="scaled"):
-            fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
-            damping = np.array(damping)
-            ax.semilogx(damping[1:-1,0], damping[1:-1,1]/damping[1:-1,0], color='k', markersize=8, marker='o', fillstyle='none')
-            #ax.semilogx(damping[1:,0], damping[1:,2]/damping[1:,0], color='g', markersize=8, marker='v', fillstyle='none')
-            ax.tick_params(axis='both', labelsize=14)
-            ax.set_xlabel("$\\gamma_{sim}$", fontsize=18)
-            ax.set_ylabel("$\\gamma_{decay}/\\gamma_{sim}$", fontsize=18)
-            fig.tight_layout()
-            figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pdamping-" + figureName
-            fig.savefig(figure2Name + ".png", transparent=True, format = "png")
-            np.savetxt(dirName + "/damping.dat", damping)
+        fig, ax = plt.subplots(figsize = (7, 5), dpi = 120)
+        damping = np.array(damping)
+        np.savetxt(dirName + os.sep + "dampingInOut.dat", damping)
+        ax.semilogx(damping[:,0], damping[:,1]/damping[:,0], color='k', markersize=8, marker='o', fillstyle='none')
+        #ax.semilogx(damping[1:,0], damping[1:,2]/damping[1:,0], color='g', markersize=8, marker='v', fillstyle='none')
+        ax.tick_params(axis='both', labelsize=14)
+        ax.set_xlabel("$\\gamma_{in}$", fontsize=18)
+        ax.set_ylabel("$\\gamma_{out}/\\gamma_{in}$", fontsize=18)
+        fig.tight_layout()
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pdamping-" + figureName
+        fig.savefig(figure2Name + ".png", transparent=True, format = "png")
+        np.savetxt(dirName + "/damping.dat", damping)
     else:
         fig, ax = plt.subplots(figsize = (6.5, 5), dpi = 120)
         decay = np.array(decay)
-        ax.semilogy(decay[:,0], decay[:,2], color='k', markersize=8, marker='o', fillstyle='none')
+        np.savetxt(dirName + os.sep + "tauvv-" + dyn + ".dat", decay)
+        if(dyn != "nve"):
+            nveDecay = np.loadtxt(dirName + os.sep + "tauvv-nve.dat")
+            ax.plot(decay[:,0], decay[:,1]/nveDecay[:,1], color='k', markersize=8, marker='o', fillstyle='none')
+        else:
+            ax.plot(decay[:,0], decay[:,1], color='k', markersize=8, marker='o', fillstyle='none')
+        #ax.plot(decay[:,0], decay[:,2], color='k', markersize=8, marker='o', fillstyle='none')
         ax.tick_params(axis='both', labelsize=14)
         ax.set_ylabel("$Decay$ $time,$ $\\tau_{vv}$", fontsize=18)
         if(fixed == "phi"):
@@ -477,13 +488,163 @@ def plotSPVelCorr(dirName, figureName, scaled=False, dyn = "nve", fixed = "temp"
             figure2Name = "/home/francesco/Pictures/nve-nvt-nva/ptauvv-vsT-phi" + which + figureName
             ax.set_xscale('log')
         elif(fixed == "temp"):
-            ax.set_ylim(0.003, 0.21)
+            #ax.set_ylim(0.003, 0.21)
             ax.set_xlim(0.42, 0.95)
             ax.set_xlabel("$Density,$ $\\varphi$", fontsize=18)
             np.savetxt(dirName + "/velTimescale-vsPhi-T" + which + ".dat", decay)
             figure2Name = "/home/francesco/Pictures/nve-nvt-nva/ptauvv-vsPhi-T" + which + figureName
         fig.tight_layout()
         fig.savefig(figure2Name + ".png", transparent=False, format = "png")
+    plt.show()
+
+def plotVelocityTimescale(dirName):
+    fig, ax = plt.subplots(figsize = (6.5, 5), dpi = 120)
+    dirList = np.array(['nve', 'iod0.001', 'iod0.01', 'iod0.1', 'iod1', 'iod10', 'iod100', 'iod1000'])
+    labelList = np.array(['$NVE$', '$\\beta \\sigma = 0.001$', '$\\beta \\sigma = 0.01$', '$\\beta \\sigma = 0.1$', '$\\beta \\sigma = 1$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 1000$'])
+    colorList = cm.get_cmap('cividis', dirList.shape[0])
+    markerList = np.array(['o', '>', 'v', '^', 's', 'd', 'D', '*'])
+    #nveData = np.loadtxt(dirName + os.sep + "tauvv-nve.dat")
+    for d in range(dirList.shape[0]):
+        if(d==0):
+            color = 'k'
+        else:
+            color = colorList(d/dirList.shape[0])
+        if(os.path.exists(dirName + os.sep + "tauvv-" + dirList[d] + ".dat")):
+            data = np.loadtxt(dirName + os.sep + "tauvv-" + dirList[d] + ".dat")
+            ax.semilogy(data[:,0], data[:,1], color=color, markersize=8, marker=markerList[d], fillstyle='none', lw=1, label=labelList[d])
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_ylabel("$Timescale,$ $\\tau_{vv}$", fontsize=18)
+    ax.set_xlabel("$Density,$ $\\varphi$", fontsize=18)
+    ax.legend(fontsize=10, loc="upper right", ncol=2)
+    ax.set_ylim(0.00028, 0.38)
+    fig.tight_layout()
+    figureName = "/home/francesco/Pictures/nve-nvt-nva/tauvv-vsDamping-vsPhi.dat"
+    fig.savefig(figureName + ".png", transparent=False, format = "png")
+    plt.show()
+
+def plotDampingInOut(dirName):
+    fig, ax = plt.subplots(figsize = (6.5, 5), dpi = 120)
+    dirList = np.array(['thermal45', 'thermal58', 'thermal67', 'thermal78', 'thermal83', 'thermal85', 'thermal88', 'thermal91'])
+    labelList = np.array(['$\\varphi=0.45$', '$\\varphi=0.58$', '$\\varphi=0.67$', '$\\varphi=0.78$', '$\\varphi=0.83$', '$\\varphi=0.85$', '$\\varphi=0.88$', '$\\varphi=0.91$'])
+    colorList = cm.get_cmap('viridis', dirList.shape[0])
+    markerList = np.array(['o', 'v', '^', 's', 'd', 'D', '*', '>'])
+    for d in range(dirList.shape[0]):
+        if(os.path.exists(dirName + os.sep + dirList[d] + "/langevin/T0.001/dampingInOut.dat")):
+            data = np.loadtxt(dirName + os.sep + dirList[d] + "/langevin/T0.001/dampingInOut.dat")
+            ax.loglog(data[:,0], data[:,1]/data[:,0], color=colorList(d/dirList.shape[0]), markersize=8, marker=markerList[d], fillstyle='none', lw=1, label=labelList[d])
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$\\gamma_{in}$", fontsize=18)
+    ax.set_ylabel("$\\gamma_{out}/\\gamma_{in}$", fontsize=18)
+    ax.legend(fontsize=12, loc="upper right")
+    ax.plot(np.linspace(1, 4000, 100), np.ones(100), color='k', linestyle='--', lw=0.8)
+    ax.set_xlim(1.36, 3800)
+    fig.tight_layout()
+    figureName = "/home/francesco/Pictures/nve-nvt-nva/dampingInOut-vsDamping-vsPhi.dat"
+    fig.savefig(figureName + ".png", transparent=False, format = "png")
+    plt.show()
+
+def plotSPTimescales(dirName, figureName, fixed=False, which='1000'):
+    fig, ax = plt.subplots(1, 2, figsize = (12, 5), dpi = 120)
+    if(fixed=="phi"):
+        Dr = which
+        dirList = np.array(['5000', '3000', '2000', '1000', '500', '300', '200',  '100', '50', '10', '5', '1', '1e-01', '1e-02'])
+        labelList = np.array(['$f_0 = 5000$', '$f_0 = 3000$', '$f_0 = 2000$', '$f_0 = 1000$', '$f_0 = 500$', '$f_0 = 300$', '$f_0 = 200$', '$f_0 = 100$', '$f_0 = 50$', '$f_0 = 10$', '$f_0 = 5$', '$f_0 = 1$', '$f_0 = 0.1$', '$f_0 = 0.01$'])
+        colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
+        temp = np.zeros(dirList.shape[0])
+        f0 = np.array([5000, 3000, 2000, 1000, 500, 300, 200,  100, 50, 10, 5, 1, 1e-01, 1e-02])
+    elif(fixed=="iod"):
+        dirList = np.array(['thermal45', 'thermal58', 'thermal67', 'thermal78', 'thermal83', 'thermal85', 'thermal88', 'thermal91'])
+        labelList = np.array(['$\\varphi = 0.45$', '$\\varphi = 0.58$', '$\\varphi = 0.67$', '$\\varphi = 0.78$', '$\\varphi = 0.83$', '$\\varphi = 0.85$', '$\\varphi = 0.88$', '$\\varphi = 0.91$'])
+        colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
+        phi = np.zeros(dirList.shape[0])
+    else:
+        dirList = np.array(['iod1', 'iod10', 'iod100', 'iod1000'])
+        labelList = np.array(['$\\beta \\sigma = 1$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 1000$'])
+        colorList = cm.get_cmap('cividis', dirList.shape[0]+1)
+        iod = np.array([1, 10, 100, 1000])
+        damping = np.zeros(dirList.shape[0])
+    tauvv = np.zeros(dirList.shape[0])
+    tauc = np.zeros(dirList.shape[0])
+    taup = np.zeros(dirList.shape[0])
+    tauDr = np.zeros(dirList.shape[0])
+    for d in range(dirList.shape[0]):
+        if(fixed=="phi"):
+            dirSample = dirName + "iod1000/active-langevin/Dr" + which + "-f0" + dirList[d] + "/dynamics/"
+            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            temp[d] = np.mean(np.loadtxt(dirSample + "energy.dat")[:,4])
+        elif(fixed=="iod"):
+            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod" + which + "/active-langevin/Dr1e-03-f0200/dynamics/"
+            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            phi[d] = ucorr.readFromParams(dirSample, "phi")
+        else:
+            dirSample = dirName + os.sep + dirList[d] + "/active-langevin/Dr1e-03-f0200/dynamics/"
+            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            damping[d] = np.sqrt(iod[d])/meanRad
+        if(os.path.exists(dirSample + "logDirCorr.dat")):
+            tauDr[d] = 1/ucorr.readFromDynParams(dirSample, "Dr")
+            data = np.loadtxt(dirSample + "/logDirCorr.dat")
+            #data[:,1] /= data[0,1]
+            ax[0].semilogx(data[:,0], data[:,1], color=colorList(d/dirList.shape[0]), lw=1, label=labelList[d])
+            failed = False
+            try:
+                popt, pcov = curve_fit(curveCvv, data[:,0], data[:,1], bounds=([0.99, -np.inf], [1, np.inf]))
+            except RuntimeError:
+                #print("Error - curve_fit failed")
+                failed = True
+            if(failed == False):
+                taup[d] = 1/popt[1]
+                ax[0].semilogx(data[:,0], curveCvv(data[:,0], *popt), color=colorList(d/dirList.shape[0]), linestyle='--', lw=0.9)
+            else:
+                taup[d] = data[np.argwhere(data[:,1] < np.exp(-1))[0,0],0]
+            data = np.loadtxt(dirSample + "/logVelCorr.dat")
+            ax[0].semilogx(data[:,0], data[:,1]/data[0,1], color=colorList(d/dirList.shape[0]), lw=1.2)
+            tauvv[d] = data[np.argwhere(data[:,1]/data[0,1] < np.exp(-1))[0,0],0]
+        if(os.path.exists(dirSample + "contactCollision.dat")):
+            data = np.loadtxt(dirSample + "/contactCollision.dat")
+            ax[1].loglog(data[:,0], data[:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
+            tauc[d] = data[np.argwhere(data[:,1] < np.exp(-1))[0,0],0]
+            print("Damping timescale: ", taup[d], " ", tauDr[d], " collisional timescale: ", tauc[d])
+    if(fixed=="phi"):
+        ax[1].legend(fontsize=8, loc="upper right", ncol=3)
+    else:
+        ax[1].legend(fontsize=12, loc="upper right")
+    ax[0].tick_params(axis='both', labelsize=14)
+    ax[1].tick_params(axis='both', labelsize=14)
+    ax[0].set_xlabel("$Time,$ $t$", fontsize=18)
+    ax[1].set_xlabel("$Time$ $between$ $collisions,$ $\\Delta t_c$", fontsize=18)
+    ax[0].set_ylabel("$C_{vv}(t)$", fontsize=18)
+    ax[1].set_ylabel("$PDF(\\Delta_c)$", fontsize=18)
+    fig.tight_layout()
+    if(fixed=="phi"):
+        x = f0
+        xlabel = "$Propulsion,$ $f_0$"
+        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pCvvCollision-vsPhi-" + figureName + "-iod" + which
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pTimescales-vsPhi-" + figureName + "-iod" + which
+    elif(fixed=="iod"):
+        x = phi
+        xlabel = "$Density,$ $\\varphi$"
+        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pCvvCollision-vsPhi-" + figureName + "-iod" + which
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pTimescales-vsPhi-" + figureName + "-iod" + which
+    else:
+        x = damping
+        xlabel = "$Damping,$ $\\gamma$"
+        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pCvvCollision-vsDamping-" + figureName
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pTimescales-vsDamping-" + figureName
+    fig.savefig(figure1Name + ".png", transparent=True, format = "png")
+    fig, ax = plt.subplots(figsize=(6,5), dpi = 120)
+    ax.semilogy(x, taup, color='k', markersize=8, marker='o', fillstyle='none', label="$\\tau_{nn}$", lw=1)
+    ax.semilogy(x, tauvv, color='b', markersize=7, marker='s', fillstyle='none', label="$\\tau_{vv}$", lw=1)
+    ax.semilogy(x, tauc, color='g', markersize=10, marker='*', fillstyle='none', label="$\\tau_c$", lw=1)
+    if(fixed!="iod"):
+        ax.set_xscale('log')
+    if(fixed=="phi"):
+        ax.set_yscale('log')
+    ax.legend(fontsize=12, loc='upper left')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel(xlabel, fontsize=18)
+    ax.set_ylabel("$Timescales$", fontsize=18)
+    fig.tight_layout()
+    fig.savefig(figure2Name + ".png", transparent=False, format = "png")
     plt.show()
 
 def curveCvvf0(x, a, b, c, d, e, f):
@@ -748,10 +909,10 @@ def plotSPVelSpaceCorrVSDrf0(dirName, figureName, fixed='Dr', which='200', iod='
             data = np.loadtxt(dirSample + "spaceVelCorr.dat")
             #data[:,1:3] /= data[0,1:3]
             Temp = np.mean(np.loadtxt(dirSample + "energy.dat")[:,4])
-            ax[0].plot(data[:10,0]/meanRad, data[:10,3], color=color, lw=1, label="$f_0=$"+dirList[d])
-            diff[d,0] = np.sum(data[:10,0]*data[:10,1])
-            diff[d,1] = np.sum(data[:10,0]*data[:10,2])
-            diff[d,2] = np.sum(data[:10,0]*data[:10,3])
+            ax[0].plot(data[:,0]/meanRad, data[:,1], color=color, lw=1, label="$f_0=$"+dirList[d])
+            diff[d,0] = np.sqrt(np.sum(data[:20,0]*data[:20,1]**2))
+            diff[d,1] = np.sqrt(np.sum(data[:20,0]*data[:20,2]**2))
+            diff[d,2] = np.sqrt(np.sum(data[:20,0]*data[:20,3]**2))
             if(os.path.exists(dirSample + "localDensity-N12.dat")):
                 data = np.loadtxt(dirSample + "localDensity-N12.dat")
                 ax[1].semilogy(data[:,0], data[:,1], color=color, lw=1, label="$f_0=$"+dirList[d])
@@ -793,14 +954,79 @@ def plotSPVelSpaceCorrVSDrf0(dirName, figureName, fixed='Dr', which='200', iod='
     #xlabel = "$Peclet$ $number,$ $f_0^2\\, / \\, \\gamma D_r$"
     #ax.plot(np.ones(100)*400, np.linspace(-0.1, 0.1, 100), color='k', linestyle='--', lw=0.7)#/0.5
     #ax.set_ylim(-0.0028, 0.0082)
-    ax.set_ylim(-0.011, 0.018)
+    ax.set_ylim(-0.011, 0.048)
     ax.semilogx(x, diff[:,0], color='r', lw=1.2, marker='s', fillstyle='none', label="$\\int C_{vv}^{\\parallel}(r) dr$")
     ax.semilogx(x, diff[:,1], color='g', lw=1.2, marker='v', fillstyle='none', label="$\\int C_{vv}^{\\perp}(r) dr$")
     ax.semilogx(x, diff[:,2], color='k', lw=1.2, marker='o', fillstyle='none', label="$\\int C_{vv}^{tot}(r) dr$")
     ax.legend(fontsize=12, loc='upper left')
     ax.tick_params(axis='both', labelsize=14)
     ax.set_xlabel(xlabel, fontsize=18)
-    ax.set_ylabel("$\\int C_{vv}(r) dr$", fontsize=18)
+    ax.set_ylabel("$\\sqrt{\\int |C_{vv}(r)|^2 dr}$", fontsize=18)
+    fig.tight_layout()
+    fig.savefig(figure2Name + ".png", transparent=False, format = "png")
+    plt.show()
+
+def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='1000'):
+    fig, ax = plt.subplots(1, 2, figsize = (12, 5), dpi = 120)
+    if(fixed=="iod"):
+        dirList = np.array(['thermal45', 'thermal58', 'thermal67', 'thermal1'])
+        labelList = np.array(['$\\varphi = 0.45$', '$\\varphi = 0.58$', '$\\varphi = 0.67$', '$\\varphi = 1.00$'])
+        colorList = cm.get_cmap('cividis', dirList.shape[0]+1)
+        phi = np.zeros(dirList.shape[0])
+    else:
+        dirList = np.array(['iod1', 'iod10', 'iod100', 'iod1000'])
+        labelList = np.array(['$\\beta \\sigma = 1$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 1000$'])
+        colorList = cm.get_cmap('cividis', dirList.shape[0])
+        iod = np.array([1, 10, 100, 1000])
+        damping = np.zeros(dirList.shape[0])
+    diff = np.zeros((dirList.shape[0],3))
+    for d in range(dirList.shape[0]):
+        if(fixed=="iod"):
+            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod" + which + "/active-langevin/Dr1e-03-f0200/dynamics/"
+            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            phi[d] = ucorr.readFromParams(dirSample, "phi")
+        else:
+            dirSample = dirName + os.sep + dirList[d] + "/active-langevin/Dr1e-03-f0200/dynamics/"
+            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            damping[d] = np.sqrt(iod[d])/meanRad
+        if(os.path.exists(dirSample + "spaceVelCorrInCluster.dat")):
+            data = np.loadtxt(dirSample + "/spaceVelCorrInCluster.dat")
+            ax[0].plot(data[:,0]/meanRad, data[:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
+            ax[1].plot(data[:,0]/meanRad, data[:,2], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
+            diff[d,0] = np.sqrt(np.sum(data[:,0]*data[:,1]**2))
+            diff[d,1] = np.sqrt(np.sum(data[:,0]*data[:,2]**2))
+            diff[d,2] = np.sqrt(np.sum(data[:,0]*data[:,3]**2))
+    #ax[0].set_ylim(-0.042, 0.31)
+    #ax[1].set_ylim(-0.042, 0.31)
+    ax[0].legend(fontsize=12, loc="upper right")
+    ax[0].tick_params(axis='both', labelsize=14)
+    ax[1].tick_params(axis='both', labelsize=14)
+    ax[0].set_xlabel("$Distance,$ $r \\, / \\, \\sigma$", fontsize=18)
+    ax[0].set_xlabel("$Distance,$ $r \\, / \\, \\sigma$", fontsize=18)
+    ax[0].set_ylabel("$C_{vv}^\\parallel(r)$", fontsize=18)
+    ax[1].set_ylabel("$C_{vv}^\\perp(r)$", fontsize=18)
+    fig.tight_layout()
+    if(fixed=="iod"):
+        x = phi
+        xlabel = "$Density,$ $\\varphi$"
+        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceVelCorr-vsPhi-" + figureName + "-iod" + which
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceDiff-vsPhi-" + figureName + "-iod" + which
+    else:
+        x = damping
+        xlabel = "$Damping,$ $\\gamma$"
+        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceVelCorr-vsDamping-" + figureName
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceDiff-vsDamping-" + figureName
+    fig.savefig(figure1Name + ".png", transparent=True, format = "png")
+    fig, ax = plt.subplots(figsize=(6,5), dpi = 120)
+    ax.plot(x, diff[:,0], color='r', lw=1.2, marker='s', fillstyle='none', label="$\\sqrt{\\int | C_{vv}^{\\parallel}(r) |^2 dr}$")
+    ax.plot(x, diff[:,1], color='g', lw=1.2, marker='v', fillstyle='none', label="$\\sqrt{\\int | C_{vv}^{\\perp}(r) |^2 dr}$")
+    ax.plot(x, diff[:,2], color='k', lw=1.2, marker='o', fillstyle='none', label="$\\sqrt{\\int | C_{vv}^{cross}(r) |^2 dr}$")
+    if(fixed!="iod"):
+        ax.set_xscale('log')
+    ax.legend(fontsize=12, loc='upper right')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel(xlabel, fontsize=18)
+    ax.set_ylabel("$Amount$ $of$ $correlation$", fontsize=18)
     fig.tight_layout()
     fig.savefig(figure2Name + ".png", transparent=False, format = "png")
     plt.show()
@@ -2090,6 +2316,18 @@ if __name__ == '__main__':
         which = sys.argv[7]
         plotSPVelCorr(dirName, figureName, scaled, dyn, fixed, which)
 
+    elif(whichPlot == "timescale"):
+        figureName = sys.argv[3]
+        fixed = sys.argv[4]
+        which = sys.argv[5]
+        plotSPTimescales(dirName, figureName, fixed=fixed, which=which)
+
+    elif(whichPlot == "tauvv"):
+        plotVelocityTimescale(dirName)
+
+    elif(whichPlot == "inout"):
+        plotDampingInOut(dirName)
+
     elif(whichPlot == "velcorrf0"):
         figureName = sys.argv[3]
         scaled = sys.argv[4]
@@ -2108,6 +2346,12 @@ if __name__ == '__main__':
         fixed = sys.argv[4]
         which = sys.argv[5]
         plotSPVelSpaceCorrVSDrf0(dirName, figureName, fixed, which)
+
+    elif(whichPlot == "spacevel"):
+        figureName = sys.argv[3]
+        fixed = sys.argv[4]
+        which = sys.argv[5]
+        plotSPVelSpaceCorr(dirName, figureName, fixed, which)
 
 ########################### check and plot compression #########################
     elif(whichPlot == "comp"):
