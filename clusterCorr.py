@@ -506,22 +506,27 @@ def searchClusters(dirName):
         if(np.sum(contacts[i]!=-1)>2):
             if(particleLabel[i] == 0): # this means it hasn't been checked yet
                 # check that it is not a contact of contacts of previously checked particles
-                newCluster = False
+                belongToCluster = False
                 for j in range(i):
                     for c in contacts[j, np.argwhere(contacts[j]!=-1)[:,0]]:
                         if(i==c):
                             # a contact of this particle already belongs to a cluster
                             particleLabel[i] = particleLabel[j]
-                            newCluster = True
+                            belongToCluster = True
                             break
-                if(newCluster == False):
-                    clusterLabel += 1
-                    particleLabel[i] = clusterLabel
-            particleLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = particleLabel[i]
-            connectLabel[i] = 1
-            connectLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = 1
+                if(belongToCluster == False):
+                    newCluster = False
+                    for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                        if(np.sum(contacts[c]!=-1)>2 and newCluster == False):
+                            newCluster = True
+                    if(newCluster == True):
+                        clusterLabel += 1
+                        particleLabel[i] = clusterLabel
+                        particleLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = particleLabel[i]
         else:
             particleLabel[i] = 0
+    # more stringent condition on cluster belonging
+    connectLabel[np.argwhere(particleLabel > 0)] = 1
     np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel)))
     return connectLabel
 

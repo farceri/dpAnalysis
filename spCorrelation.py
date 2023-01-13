@@ -863,7 +863,7 @@ def computeLocalDensity(dirName, numBins, plot = False):
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 30), density=True)
     edges = (edges[1:] + edges[:-1])/2
     if(plot=="plot"):
-        print("subBoxSize: ", xbin[1]-xbin[0], ybin[1]-ybin[0], " lengthscale: ", np.sqrt(np.mean(area)))
+        #print("subBoxSize: ", xbin[1]-xbin[0], ybin[1]-ybin[0], " lengthscale: ", np.sqrt(np.mean(area)))
         print("data stats: ", np.min(localDensity), np.max(localDensity), np.mean(localDensity), np.std(localDensity))
         fig = plt.figure(dpi=120)
         ax = plt.gca()
@@ -874,7 +874,7 @@ def computeLocalDensity(dirName, numBins, plot = False):
         ax.set_xlabel('$\\varphi$', fontsize=18)
         #ax.set_xlim(-0.02, 1.02)
         plt.tight_layout()
-        plt.show()
+        #plt.show()
     else:
         return localDensity
 
@@ -889,7 +889,7 @@ def averageLocalDensity(dirName, numBins=12, dirSpacing=1000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-50:]
+    #dirList = dirList[-50:]
     localDensity = []
     for dir in dirList:
         localArea = np.zeros((numBins, numBins))
@@ -939,23 +939,34 @@ def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
         if(np.sum(contacts[i]!=-1)>2):
             if(particleLabel[i] == 0): # this means it hasn't been checked yet
                 # check that it is not a contact of contacts of previously checked particles
-                newCluster = False
+                belongToCluster = False
                 for j in range(i):
                     for c in contacts[j, np.argwhere(contacts[j]!=-1)[:,0]]:
                         if(i==c):
                             # a contact of this particle already belongs to a cluster
                             particleLabel[i] = particleLabel[j]
-                            newCluster = True
+                            belongToCluster = True
                             break
-                if(newCluster == False):
-                    clusterLabel += 1
-                    particleLabel[i] = clusterLabel
-            particleLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = particleLabel[i]
-            # more stringent condition on cluster belonging
-            connectLabel[i] = 1
-            connectLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = 1
+                if(belongToCluster == False):
+                    newCluster = False
+                    for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                        if(np.sum(contacts[c]!=-1)>2 and newCluster == False):
+                            newCluster = True
+                    if(newCluster == True):
+                        clusterLabel += 1
+                        particleLabel[i] = clusterLabel
+                        particleLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = particleLabel[i]
         else:
             particleLabel[i] = 0
+    # more stringent condition on cluster belonging
+    connectLabel[np.argwhere(particleLabel > 0)] = 1
+    for i in range(numParticles):
+        connected = False
+        for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+            if(particleLabel[c] != 0 and connected == False):
+                connectLabel[i] = 1
+                connected = True
+        #connectLabel[contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]] = 1
     # get cluster lengthscale, center
     rad = np.loadtxt(dirName + os.sep + "../particleRad.dat")
     NpInCluster = connectLabel[connectLabel!=0].shape[0]
@@ -976,6 +987,7 @@ def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
             deepList[i] = 1
     np.savetxt(dirName + "/deepList.dat", deepList)
     np.savetxt(dirName + "/noClusterList.dat", noClusterList)
+    np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel)))
     if(plot=="plot"):
         print("Cluster position, x: ", clusterPos[0], " y: ", clusterPos[1])
         print("Cluster size: ", clusterSize)
@@ -1013,13 +1025,12 @@ def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
             if(cluster=="cluster"):
                 ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=0.6, linewidth=0.5))
                 if(connectLabel[particleId] == 1):
-                    ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
+                    ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.3, linewidth=0.5))
             if(cluster=="deep" and deepList[particleId] == 1):
                 ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
             if(cluster=="nocluster" and noClusterList[particleId] == 1):
                 ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
         plt.show()
-    np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel)))
     if(cluster=="deep"):
         return deepList
     elif(cluster=="nocluster"):

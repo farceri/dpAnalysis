@@ -553,8 +553,8 @@ def plotSPTimescales(dirName, figureName, fixed=False, which='1000'):
         temp = np.zeros(dirList.shape[0])
         f0 = np.array([5000, 3000, 2000, 1000, 500, 300, 200,  100, 50, 10, 5, 1, 1e-01, 1e-02])
     elif(fixed=="iod"):
-        dirList = np.array(['thermal45', 'thermal58', 'thermal67', 'thermal78', 'thermal83', 'thermal85', 'thermal88', 'thermal91'])
-        labelList = np.array(['$\\varphi = 0.45$', '$\\varphi = 0.58$', '$\\varphi = 0.67$', '$\\varphi = 0.78$', '$\\varphi = 0.83$', '$\\varphi = 0.85$', '$\\varphi = 0.88$', '$\\varphi = 0.91$'])
+        dirList = np.array(['thermal45', 'thermal58', 'thermal67', 'thermal1'])
+        labelList = np.array(['$\\varphi = 0.45$', '$\\varphi = 0.58$', '$\\varphi = 0.67$', '$\\varphi = 1$'])
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     else:
@@ -973,6 +973,11 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='1000'):
         labelList = np.array(['$\\varphi = 0.45$', '$\\varphi = 0.58$', '$\\varphi = 0.67$', '$\\varphi = 1.00$'])
         colorList = cm.get_cmap('cividis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
+    elif(fixed=="phi"):
+        dirList = np.array(['1e-03', '1e-02', '1e-01', '1'])
+        labelList = np.array(['$D_r = 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 1$'])
+        colorList = cm.get_cmap('cividis', dirList.shape[0]+1)
+        Dr = np.zeros(dirList.shape[0])
     else:
         dirList = np.array(['iod1', 'iod10', 'iod100', 'iod1000'])
         labelList = np.array(['$\\beta \\sigma = 1$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 1000$'])
@@ -983,34 +988,48 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='1000'):
     for d in range(dirList.shape[0]):
         if(fixed=="iod"):
             dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod" + which + "/active-langevin/Dr1e-03-f0200/dynamics/"
-            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            meanRad = np.mean(np.loadtxt(dirSample + "../particleRad.dat"))
             phi[d] = ucorr.readFromParams(dirSample, "phi")
+        elif(fixed=="phi"):
+            dirSample = dirName + os.sep + "/active-langevin/Dr" + dirList[d] + "-f0200/dynamics/"
+            meanRad = np.mean(np.loadtxt(dirSample + "../particleRad.dat"))
+            Dr[d] = ucorr.readFromDynParams(dirSample, "Dr")
         else:
             dirSample = dirName + os.sep + dirList[d] + "/active-langevin/Dr1e-03-f0200/dynamics/"
-            meanRad = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            meanRad = np.mean(np.loadtxt(dirSample + "../particleRad.dat"))
             damping[d] = np.sqrt(iod[d])/meanRad
         if(os.path.exists(dirSample + "spaceVelCorrInCluster.dat")):
             data = np.loadtxt(dirSample + "/spaceVelCorrInCluster.dat")
             ax[0].plot(data[:,0]/meanRad, data[:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
-            ax[1].plot(data[:,0]/meanRad, data[:,2], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
+            #ax[1].plot(data[:,0]/meanRad, data[:,2], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
             diff[d,0] = np.sqrt(np.sum(data[:,0]*data[:,1]**2))
             diff[d,1] = np.sqrt(np.sum(data[:,0]*data[:,2]**2))
             diff[d,2] = np.sqrt(np.sum(data[:,0]*data[:,3]**2))
+        if(os.path.exists(dirSample + "localDensity-N15.dat")):
+            data = np.loadtxt(dirSample + "localDensity-N15.dat")
+            ax[1].semilogy(data[:,0], data[:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
     #ax[0].set_ylim(-0.042, 0.31)
     #ax[1].set_ylim(-0.042, 0.31)
     ax[0].legend(fontsize=12, loc="upper right")
     ax[0].tick_params(axis='both', labelsize=14)
     ax[1].tick_params(axis='both', labelsize=14)
     ax[0].set_xlabel("$Distance,$ $r \\, / \\, \\sigma$", fontsize=18)
-    ax[0].set_xlabel("$Distance,$ $r \\, / \\, \\sigma$", fontsize=18)
     ax[0].set_ylabel("$C_{vv}^\\parallel(r)$", fontsize=18)
-    ax[1].set_ylabel("$C_{vv}^\\perp(r)$", fontsize=18)
+    #ax[1].set_xlabel("$Distance,$ $r \\, / \\, \\sigma$", fontsize=18)
+    #ax[1].set_ylabel("$C_{vv}^\\perp(r)$", fontsize=18)
+    ax[1].set_xlabel("$Local$ $density,$ $\\varphi$", fontsize=18)
+    ax[1].set_ylabel("$P(\\varphi)$", fontsize=18)
     fig.tight_layout()
     if(fixed=="iod"):
         x = phi
         xlabel = "$Density,$ $\\varphi$"
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceVelCorr-vsPhi-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceDiff-vsPhi-" + figureName + "-iod" + which
+    elif(fixed=="phi"):
+        x = 1/Dr
+        xlabel = "$Persistence$ $time,$ $\\tau_p$"
+        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceVelCorr-vsDr-" + figureName
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceDiff-vsDr-" + figureName
     else:
         x = damping
         xlabel = "$Damping,$ $\\gamma$"

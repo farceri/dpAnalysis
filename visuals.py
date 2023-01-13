@@ -196,11 +196,11 @@ def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = Fals
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
         plotSoftParticleQuiverVel(axFrame, pos, vel, rad)
     elif(cluster == "cluster"):
-        if(os.path.exists(dirName + os.sep + "deepList.dat")):
-            #clusterList = np.loadtxt(dirName + os.sep + "clusterList.dat")[:,1]
-            clusterList = np.loadtxt(dirName + os.sep + "deepList.dat")
-        else:
-            clusterList = spCorr.searchClusters(dirName, numParticles=rad.shape[0])
+        #if(os.path.exists(dirName + os.sep + "clusterList.dat")):
+        #    clusterList = np.loadtxt(dirName + os.sep + "clusterList.dat")[:,1]
+            #clusterList = np.loadtxt(dirName + os.sep + "deepList.dat")
+        #else:
+        clusterList = spCorr.searchClusters(dirName, numParticles=rad.shape[0], cluster=cluster)
         plotSoftParticleCluster(axFrame, pos, rad, clusterList)
     else:
         if(npt == "npt"):
