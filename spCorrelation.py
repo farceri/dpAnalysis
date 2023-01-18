@@ -535,6 +535,26 @@ def computeParticleVelPDFSubSet(dirName, firstIndex=10, mass=1e06, plot="plot"):
         uplot.plotCorrelation(edges, velPDF / np.sqrt(mass), "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", logy = True)
     return np.var(vel), np.var(velSubSet)
 
+################## Single Particle Self Velocity Correlations ##################
+def computeSingleParticleVelTimeCorr(dirName, particleId = 100):
+    numParticles = ucorr.readFromParams(dirName, "numParticles")
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    particleVelCorr = []
+    # get trajectory directories
+    stepRange = ucorr.getDirectories(dirName)
+    stepRange = np.array(np.char.strip(stepRange, 't'), dtype=int)
+    stepRange = np.sort(stepRange)
+    stepRange = stepRange[stepRange*timeStep<0.2]
+    pVel0 = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[0]) + "/particleVel.dat"))[particleId]
+    pVel0Squared = np.linalg.norm(pVel0)**2
+    for i in range(0,stepRange.shape[0]):
+        pVel = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particleVel.dat"))[particleId]
+        particleVelCorr.append(np.sum(np.multiply(pVel,pVel0)))
+    particleVelCorr /= pVel0Squared
+    np.savetxt(dirName + os.sep + "singleVelCorr.dat", np.column_stack(((stepRange+1)*timeStep, particleVelCorr)))
+    uplot.plotCorrelation((stepRange + 1) * timeStep, particleVelCorr, "$C_{vv}(\\Delta t)$", "$Time$ $interval,$ $\\Delta t$", color='k')
+    plt.show()
+
 ##################### Particle Self Velocity Correlations ######################
 def computeParticleVelTimeCorr(dirName):
     numParticles = ucorr.readFromParams(dirName, "numParticles")
@@ -549,7 +569,7 @@ def computeParticleVelTimeCorr(dirName):
     pVel0Squared = np.mean(np.linalg.norm(pVel0,axis=1)**2)/2
     for i in range(0,stepRange.shape[0]):
         pVel = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particleVel.dat"))
-        particleVelCorr.append(np.mean(np.multiply(pVel,pVel0)))
+        particleVelCorr.append(np.mean(np.sum(np.multiply(pVel,pVel0), axis=1)))
         meanVel = np.mean(pVel, axis=0)
         particleVelVar.append(np.mean((pVel - meanVel)**2))
     particleVelCorr /= pVel0Squared
@@ -575,7 +595,7 @@ def computeParticleBlockVelTimeCorr(dirName, numBlocks):
         pVel0Squared = np.mean(np.linalg.norm(pVel0,axis=1)**2)/2
         for i in range(blockFreq):
             pVel = np.array(np.loadtxt(dirName + os.sep + dirList[block*blockFreq + i] + "/particleVel.dat"))
-            blockVelCorr[i, block] = np.mean(np.multiply(pVel,pVel0))
+            blockVelCorr[i, block] = np.mean(np.sum(np.multiply(pVel,pVel0), axis=1))
             meanVel = np.mean(pVel, axis=0)
             blockVelVar[i, block] = np.mean((pVel - meanVel)**2)
         blockVelCorr[:, block] /= pVel0Squared
@@ -753,7 +773,7 @@ def averagePairCorr(dirName, dirSpacing=1):
     uplot.plotCorrelation(binCenter/minRad, pcorr, "$g(r/\\sigma)$", "$r/\\sigma$")
     #plt.show()
 
-########################### Average Space Correlator ###########################
+############################ Collision distribution ############################
 def getCollisionIntervalPDF(dirName, check=False, numBins=40):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
@@ -782,14 +802,19 @@ def getCollisionIntervalPDF(dirName, check=False, numBins=40):
     print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
     np.savetxt(dirName + os.sep + "collision.dat", np.column_stack((centers, pdf)))
     uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True)
-    plt.show()
+    print("max time: ", timeList[-1]*timeStep, " max interval: ", np.max(interval))
+    #plt.show()
 
-########################### Average Space Correlator ###########################
-def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
+###################### Contact rearrangement distribution ######################
+def getContactCollisionIntervalPDF(dirName, check=False, numBins=40):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    #dirSpacing = 1000
+    #timeList = timeList.astype(int)
+    #dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     if(os.path.exists(dirName + "/contactCollisionIntervals.dat") and check=="check"):
+        print("loading already existing file")
         interval = np.loadtxt(dirName + os.sep + "contactCollisionIntervals.dat")
     else:
         interval = np.empty(0)
@@ -798,7 +823,7 @@ def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
         for i in range(1,dirList.shape[0]):
             currentTime = timeList[i]
             currentContacts = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleContacts.dat"), dtype=np.int64)
-            colIndex = np.argwhere(currentContacts[:,0]!=previousContacts[:,0])[:,0]
+            colIndex = np.unique(np.argwhere(currentContacts!=previousContacts)[:,0])
             currentInterval = currentTime-previousTime[colIndex]
             interval = np.append(interval, currentInterval[currentInterval>1])
             previousTime[colIndex] = currentTime
@@ -807,8 +832,8 @@ def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
         interval = interval[interval>10]
         interval *= timeStep
         np.savetxt(dirName + os.sep + "contactCollisionIntervals.dat", interval)
-    bins = np.arange(np.min(interval), np.max(interval), spacing*timeStep)
-    #bins = np.linspace(np.min(interval), np.max(interval), spacing)
+    #bins = np.arange(np.min(interval), np.max(interval), 0.2*np.mean(interval))
+    bins = np.linspace(np.min(interval), np.max(interval), numBins)
     pdf, edges = np.histogram(interval, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
@@ -816,13 +841,57 @@ def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
     centers = centers[np.argwhere(pdf>0)[:,0]]
     pdf = pdf[pdf>0]
     uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True)
-    #plt.xlim(-500*timeStep, timeList[-1]*timeStep)
-    #cdf = np.arange(len(interval))/len(interval)
-    #indices = (np.unique(np.geomspace(1, len(interval), num=100, dtype=int)) - 1)
-    #interval = interval[indices]
-    #cdf = cdf[indices]
-    #uplot.plotCorrelation(interval, cdf, "$CDF(\\Delta_c)$", "$Collision$ $time,$ $\\Delta_c$", logy=True, logx=True)
+    print("max time: ", timeList[-1]*timeStep, " max interval: ", np.max(interval))
+    #plt.xlim(0, timeList[-1]*timeStep)
     #plt.show()
+
+################# Cluster contact rearrangement distribution ###################
+def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, cluster="cluster"):
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    dirSpacing = 100
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    if(os.path.exists(dirName + "/contactCollisionIntervals.dat") and check=="check"):
+        print("loading already existing file")
+        interval = np.loadtxt(dirName + os.sep + "contactCollisionIntervals.dat")
+    else:
+        interval = np.empty(0)
+        previousTime = np.zeros(numParticles)
+        previousContacts = np.array(np.loadtxt(dirName + os.sep + "t0/particleContacts.dat"))
+        for i in range(1,dirList.shape[0]):
+            dirSample = dirName + os.sep + dirList[i]
+            if(os.path.exists(dirSample + os.sep + "clusterList.dat")):
+                if(cluster == "nocluster"):
+                    clusterList = np.loadtxt(dirSample + os.sep + "noClusterList.dat")
+                else:
+                    clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,1]
+            else:
+                clusterList = searchClusters(dirSample, numParticles=numParticles, cluster=cluster)
+            particlesInClusterIndex = np.argwhere(clusterList==1)[:,0]
+            currentTime = timeList[i]
+            currentContacts = np.array(np.loadtxt(dirSample + "/particleContacts.dat"), dtype=np.int64)
+            colIndex = np.unique(np.argwhere(currentContacts!=previousContacts)[:,0])
+            colIndex = np.intersect1d(colIndex, particlesInClusterIndex)
+            currentInterval = currentTime-previousTime[colIndex]
+            interval = np.append(interval, currentInterval[currentInterval>1])
+            previousTime[colIndex] = currentTime
+            previousContacts = currentContacts
+        interval = np.sort(interval)
+        interval = interval[interval>10]
+        interval *= timeStep
+        np.savetxt(dirName + os.sep + "clusterCollisionIntervals.dat", interval)
+    #bins = np.arange(np.min(interval), np.max(interval), spacing*timeStep)
+    bins = np.linspace(np.min(interval), np.max(interval), numBins)
+    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    centers = (edges[1:] + edges[:-1])/2
+    print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
+    np.savetxt(dirName + os.sep + "clusterCollision.dat", np.column_stack((centers, pdf)))
+    centers = centers[np.argwhere(pdf>0)[:,0]]
+    pdf = pdf[pdf>0]
+    uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True)
+    print("max time: ", timeList[-1]*timeStep, " max interval: ", np.max(interval))
 
 def computeActivePressure(dirName, plot=False):
     driving = float(ucorr.readFromDynParams(dirName, "f0"))
@@ -1351,6 +1420,10 @@ if __name__ == '__main__':
         mass = float(sys.argv[4])
         computeParticleVelPDFSubSet(dirName, firstIndex, mass)
 
+    elif(whichCorr == "singlevelcorr"):
+        particleId = int(sys.argv[3])
+        computeSingleParticleVelTimeCorr(dirName, particleId)
+
     elif(whichCorr == "velcorr"):
         computeParticleVelTimeCorr(dirName)
 
@@ -1382,10 +1455,15 @@ if __name__ == '__main__':
         numBins = int(sys.argv[4])
         getCollisionIntervalPDF(dirName, check, numBins)
 
-    elif(whichCorr == "contact"):
+    elif(whichCorr == "contactcoll"):
         check = sys.argv[3]
-        spacing = int(sys.argv[4])
-        getContactCollisionIntervalPDF(dirName, check, spacing)
+        numBins = int(sys.argv[4])
+        getContactCollisionIntervalPDF(dirName, check, numBins)
+
+    elif(whichCorr == "clustercoll"):
+        check = sys.argv[3]
+        numBins = int(sys.argv[4])
+        getClusterContactCollisionIntervalPDF(dirName, check, numBins)
 
     elif(whichCorr == "activep"):
         computeActivePressure(dirName)

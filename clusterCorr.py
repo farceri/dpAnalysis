@@ -213,7 +213,6 @@ def getCollisionIntervalPDF(dirName, check=False, numBins=40):
             previousTime[colIndex] = currentTime
             previousVel = currentVel
         interval = np.sort(interval)
-        interval = interval[interval>10]
         interval *= timeStep
         np.savetxt(dirName + os.sep + "collisionIntervals.dat", interval)
     bins = np.linspace(np.min(interval), np.max(interval), numBins)
@@ -223,7 +222,7 @@ def getCollisionIntervalPDF(dirName, check=False, numBins=40):
     np.savetxt(dirName + os.sep + "collision.dat", np.column_stack((centers, pdf)))
 
 ########################### Average Space Correlator ###########################
-def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
+def getContactCollisionIntervalPDF(dirName, check=False, numBins=40):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
@@ -236,20 +235,62 @@ def getContactCollisionIntervalPDF(dirName, check=False, spacing=100):
         for i in range(1,dirList.shape[0]):
             currentTime = timeList[i]
             currentContacts = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleContacts.dat"), dtype=np.int64)
-            colIndex = np.argwhere(currentContacts[:,0]!=previousContacts[:,0])[:,0]
+            colIndex = np.argwhere(currentContacts!=previousContacts)[:,0]
             currentInterval = currentTime-previousTime[colIndex]
             interval = np.append(interval, currentInterval[currentInterval>1])
             previousTime[colIndex] = currentTime
             previousContacts = currentContacts
         interval = np.sort(interval)
-        interval = interval[interval>10]
         interval *= timeStep
         np.savetxt(dirName + os.sep + "contactCollisionIntervals.dat", interval)
-    bins = np.arange(np.min(interval), np.max(interval), spacing*timeStep)
+    bins = np.linspace(np.min(interval), np.max(interval), numBins)
     pdf, edges = np.histogram(interval, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
     np.savetxt(dirName + os.sep + "contactCollision.dat", np.column_stack((centers, pdf)))
+
+################# Cluster contact rearrangement distribution ###################
+def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, cluster="cluster"):
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    dirSpacing = 100
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    if(os.path.exists(dirName + "/contactCollisionIntervals.dat") and check=="check"):
+        print("loading already existing file")
+        interval = np.loadtxt(dirName + os.sep + "contactCollisionIntervals.dat")
+    else:
+        interval = np.empty(0)
+        previousTime = np.zeros(numParticles)
+        previousContacts = np.array(np.loadtxt(dirName + os.sep + "t0/particleContacts.dat"))
+        for i in range(1,dirList.shape[0]):
+            dirSample = dirName + os.sep + dirList[i]
+            if(os.path.exists(dirSample + os.sep + "clusterList.dat")):
+                if(cluster == "nocluster"):
+                    clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,2]
+                else:
+                    clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,1]
+            else:
+                clusterList = searchClusters(dirSample, numParticles=numParticles, cluster=cluster)
+            particlesInClusterIndex = np.argwhere(clusterList==1)[:,0]
+            currentTime = timeList[i]
+            currentContacts = np.array(np.loadtxt(dirSample + "/particleContacts.dat"), dtype=np.int64)
+            colIndex = np.unique(np.argwhere(currentContacts!=previousContacts)[:,0])
+            colIndex = np.intersect1d(colIndex, particlesInClusterIndex)
+            currentInterval = currentTime-previousTime[colIndex]
+            interval = np.append(interval, currentInterval[currentInterval>1])
+            previousTime[colIndex] = currentTime
+            previousContacts = currentContacts
+        interval = np.sort(interval)
+        interval *= timeStep
+        np.savetxt(dirName + os.sep + "clusterCollisionIntervals.dat", interval)
+    #bins = np.arange(np.min(interval), np.max(interval), spacing*timeStep)
+    bins = np.linspace(np.min(interval), np.max(interval), numBins)
+    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    centers = (edges[1:] + edges[:-1])/2
+    print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
+    np.savetxt(dirName + os.sep + "clusterCollision.dat", np.column_stack((centers, pdf)))
 
 ########################## Particle Self Correlations ##########################
 def computeParticleSelfCorr(dirName, maxPower):
@@ -527,7 +568,17 @@ def searchClusters(dirName):
             particleLabel[i] = 0
     # more stringent condition on cluster belonging
     connectLabel[np.argwhere(particleLabel > 0)] = 1
-    np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel)))
+    for i in range(numParticles):
+        connected = False
+        for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+            if(particleLabel[c] != 0 and connected == False):
+                connectLabel[i] = 1
+                connected = True
+    noClusterLabel = np.zeros(numParticles)
+    for i in range(numParticles):
+        if(particleLabel[i] == 0 and np.sum(contacts[i]) < 2):
+            noClusterLabel[i] = 1
+    np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel, noClusterLabel)))
     return connectLabel
 
 
@@ -572,10 +623,16 @@ if __name__ == '__main__':
         numBins = int(sys.argv[4])
         getCollisionIntervalPDF(dirName, check, numBins)
 
-    elif(whichCorr == "contact"):
+    elif(whichCorr == "contactcol"):
         check = sys.argv[3]
-        spacing = int(sys.argv[4])
-        getContactCollisionIntervalPDF(dirName, check, spacing)
+        numBins = int(sys.argv[4])
+        getContactCollisionIntervalPDF(dirName, check, numBins)
+
+    elif(whichCorr == "clustercol"):
+        check = sys.argv[3]
+        numBins = int(sys.argv[4])
+        cluster = sys.argv[5]
+        getContactCollisionIntervalPDF(dirName, check, numBins, cluster)
 
     elif(whichCorr == "corrsingle"):
         startBlock = int(sys.argv[3])

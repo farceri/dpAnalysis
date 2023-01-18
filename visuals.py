@@ -75,9 +75,9 @@ def getClusterColorList(pos, nClusters=10):
     return colorId
 
 def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, cluster=False, nClusters=10, alpha = 0.6):
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    boxSize = np.loadtxt(dirName + os.sep + "../boxSize.dat")
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    rad = np.array(np.loadtxt(dirName + os.sep + "../particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
@@ -106,7 +106,7 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, cluster=False,
             ax.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
             vx = vel[particleId,0]
             vy = vel[particleId,1]
-            ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)
+            ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=3)
         else:
             ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
         #plt.pause(1)
@@ -156,7 +156,7 @@ def plotSoftParticlesSubSet(ax, pos, rad, firstIndex, alpha = 0.6, colorMap = Tr
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alphaId[particleId], linewidth = lw))
 
-def plotSoftParticleQuiverVel(axFrame, pos, vel, rad, alpha = 0.6):
+def plotSoftParticleQuiverVel(axFrame, pos, vel, rad, alpha = 0.6, maxVelList = [122, 984, 107, 729, 59, 288, 373, 286, 543, 187, 6, 534, 104, 347]):
     colorId = np.zeros((rad.shape[0], 4))
     colorList = cm.get_cmap('viridis', rad.shape[0])
     count = 0
@@ -170,7 +170,9 @@ def plotSoftParticleQuiverVel(axFrame, pos, vel, rad, alpha = 0.6):
         vx = vel[particleId,0]
         vy = vel[particleId,1]
         axFrame.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
-        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)
+        for j in range(13):
+            if(particleId == maxVelList[j]):
+                axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.003, scale=1, headwidth=5)
 
 def plotSoftParticleCluster(axFrame, pos, rad, clusterList, alpha = 0.6):
     for particleId in range(pos.shape[0]):
@@ -232,8 +234,8 @@ def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepF
         stepList = stepList[-numFrames:]
     print(stepList)
     #frame figure
-    figFrame = plt.figure(dpi=150)
-    fig = plt.figure(dpi=150)
+    figFrame = plt.figure(dpi=180)
+    fig = plt.figure(dpi=180)
     gcf = plt.gcf()
     gcf.clear()
     ax = fig.gca()
@@ -257,7 +259,7 @@ def makeVelFieldFrame(dirName, numBins, bins, boxSize, numParticles, figFrame, f
     axFrame = figFrame.gca()
     setGridAxes(bins, axFrame)
     grid, field = spCorr.computeVelocityField(dirName, numBins, plot=False, boxSize=boxSize, numParticles=numParticles)
-    axFrame.quiver(grid[:,0], grid[:,1], field[:,0], field[:,1], facecolor='k', width=0.004, headlength=3, headaxislength=3)
+    axFrame.quiver(grid[:,0], grid[:,1], field[:,0], field[:,1], facecolor='k', width=0.002, scale=3)
     plt.tight_layout()
     axFrame.remove()
     frames.append(axFrame)
