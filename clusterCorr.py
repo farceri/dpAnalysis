@@ -192,6 +192,8 @@ def averageLocalDensity(dirName, numBins=12):
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 50), density=True)
     edges = (edges[:-1] + edges[1:])/2
     np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + ".dat", np.column_stack((edges, pdf)))
+    alpha2 = np.mean(localDensity**4)/(2*np.mean(localDensity**2)**2) - 1
+    np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-stats.dat", np.column_stack((np.mean(localDensity), np.var(localDensity), alpha2)))
 
 ########################### Average Space Correlator ###########################
 def getCollisionIntervalPDF(dirName, check=False, numBins=40):
@@ -243,7 +245,7 @@ def getContactCollisionIntervalPDF(dirName, check=False, numBins=40):
         interval = np.sort(interval)
         interval *= timeStep
         np.savetxt(dirName + os.sep + "contactCollisionIntervals.dat", interval)
-    bins = np.linspace(np.min(interval), np.max(interval), numBins)
+    bins = np.arange(np.min(interval), np.max(interval), 5*np.min(interval))
     pdf, edges = np.histogram(interval, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
@@ -286,7 +288,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, clus
         interval *= timeStep
         np.savetxt(dirName + os.sep + "clusterCollisionIntervals.dat", interval)
     #bins = np.arange(np.min(interval), np.max(interval), spacing*timeStep)
-    bins = np.linspace(np.min(interval), np.max(interval), numBins)
+    bins = np.arange(np.min(interval), np.max(interval), 5*np.min(interval))
     pdf, edges = np.histogram(interval, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))

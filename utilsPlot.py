@@ -9,6 +9,20 @@ from matplotlib import animation
 from matplotlib import cm
 import os
 
+def setAxes2D(ax):
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+def setPackingAxes(boxSize, ax):
+    xBounds = np.array([0, boxSize[0]])
+    yBounds = np.array([0, boxSize[1]])
+    ax.set_xlim(xBounds[0], xBounds[1])
+    ax.set_ylim(yBounds[0], yBounds[1])
+    ax.set_aspect('equal', adjustable='box')
+    setAxes2D(ax)
+
 #################################### plotting ##################################
 def plotErrorBar(ax, x, y, err, xlabel, ylabel, logx = False, logy = False):
     ax.errorbar(x, y, err, marker='o', color='k', markersize=7, markeredgecolor='k', markeredgewidth=0.7, linewidth=1.2, elinewidth=1, capsize=4)

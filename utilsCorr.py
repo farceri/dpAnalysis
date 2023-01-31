@@ -49,6 +49,15 @@ def getPairCorr(pos, boxSize, bins, minRad):
     binCenter = 0.5 * (edges[:-1] + edges[1:])
     return pairCorr / (2 * np.pi * binCenter)
 
+def polarPos(r, alpha):
+    return r * np.array([np.cos(alpha), np.sin(alpha)])
+
+def checkAngle(alpha):
+    if(alpha < 0):
+        alpha += 2*np.pi
+    elif(alpha > 2*np.pi):
+        alpha -= 2*np.pi
+    return alpha
 
 ############################ correlation functions #############################
 def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
