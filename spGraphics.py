@@ -1290,8 +1290,8 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
     fig1, ax1 = plt.subplots(figsize=(6,5), dpi = 120)
     fig2, ax2 = plt.subplots(figsize=(6,5), dpi = 120)
     if(fixed=="iod"):
-        dirList = np.array(['thermal45',  'thermal58', 'thermal67', 'thermal72',  'thermal78',  'thermal80',  'thermal83', 'thermal85',  'thermal88',  'thermal94'])#, 'thermal1'])
-        labelList = np.array(['$\\varphi = 0.45$', '$\\varphi = 0.58$', '$\\varphi = 0.67$', '$\\varphi = 0.72$', '$\\varphi = 0.78$', '$\\varphi = 0.80$', '$\\varphi = 0.83$', '$\\varphi = 0.85$', '$\\varphi = 0.88$', '$\\varphi = 0.94$'])#, '$\\varphi = 1.00$'])
+        dirList = np.array(['thermal45',  'thermal58', 'thermal67', 'thermal72',  'thermal78',  'thermal80',  'thermal83', 'thermal85',  'thermal88',  'thermal94', 'thermal1'])#, 'thermal1'])
+        labelList = np.array(['$\\varphi = 0.45$', '$\\varphi = 0.58$', '$\\varphi = 0.67$', '$\\varphi = 0.72$', '$\\varphi = 0.78$', '$\\varphi = 0.80$', '$\\varphi = 0.83$', '$\\varphi = 0.85$', '$\\varphi = 0.88$', '$\\varphi = 0.94$', '$\\varphi = 1$'])#, '$\\varphi = 1.00$'])
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
@@ -1324,10 +1324,10 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
             ax1.plot(data[:,0], data[:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
             data = np.loadtxt(dirSample + "/velPDFOutCluster.dat")
             ax1.plot(data[:,0], data[:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d], ls='--')
-        if(os.path.exists(dirSample + "localDensity-N30.dat")):
-            data = np.loadtxt(dirSample + "localDensity-N30.dat")
+        if(os.path.exists(dirSample + "localDensity-N15.dat")):
+            data = np.loadtxt(dirSample + "localDensity-N15.dat")
             ax2.semilogy(data[1:,0], data[1:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
-    ax2.legend(fontsize=10, loc="lower left")
+    ax2.legend(fontsize=10, loc="lower left", ncol=2)
     ax1.tick_params(axis='both', labelsize=14)
     ax2.tick_params(axis='both', labelsize=14)
     ax1.set_xlabel("$Speed,$ $|\\vec{v}|$", fontsize=18)

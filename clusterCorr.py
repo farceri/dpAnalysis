@@ -664,6 +664,9 @@ if __name__ == '__main__':
         numBins = int(sys.argv[3])
         averageLocalDensity(dirName, numBins)
 
+    elif(whichCorr == "velpdfcluster"):
+        averageParticleVelPDFCluster(dirName)
+
     elif(whichCorr == "collision"):
         check = sys.argv[3]
         numBins = int(sys.argv[4])
