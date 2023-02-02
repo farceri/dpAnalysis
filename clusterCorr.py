@@ -211,7 +211,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
         if(os.path.exists(dirSample + os.sep + "clusterList.dat")):
             clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")
             inLabel = clusterList[:,1]
-            outLabel = clusterList[:,1]
+            outLabel = clusterList[:,2]
         else:
             inLabel = searchClusters(dirSample, numParticles=numParticles)
             outLabel = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,2]
@@ -590,7 +590,6 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
 def searchClusters(dirName, numParticles=None):
     if(numParticles==None):
         numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat"), dtype=int)
     particleLabel = np.zeros(numParticles)
     connectLabel = np.zeros(numParticles)
