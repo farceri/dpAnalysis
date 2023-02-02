@@ -209,11 +209,12 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterList.dat")):
-            inLabel = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,1]
-            outLabel = np.loadtxt(dirSample + os.sep + "noClusterList.dat")
+            clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")
+            inLabel = clusterList[:,1]
+            outLabel = clusterList[:,1]
         else:
-            inLabel = searchClusters(dirSample, numParticles=numParticles)
-            outLabel = np.loadtxt(dirSample + os.sep + "noClusterList.dat")
+            inLabel = searchClusters(dirSample)
+            outLabel = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,2]
         vel = np.loadtxt(dirSample + os.sep + "particleVel.dat")
         velNorm = np.linalg.norm(vel, axis=1)
         velInCluster = np.append(velInCluster, velNorm[inLabel==1].flatten())
@@ -318,7 +319,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, clus
                 else:
                     clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,1]
             else:
-                clusterList = searchClusters(dirSample, numParticles=numParticles, cluster=cluster)
+                clusterList = searchClusters(dirSample)
             particlesInClusterIndex = np.argwhere(clusterList==1)[:,0]
             currentTime = timeList[i]
             currentContacts = np.array(np.loadtxt(dirSample + "/particleContacts.dat"), dtype=np.int64)
@@ -536,10 +537,13 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     dirList = dirList[-10:]
-    if(os.path.exists(dirName + "clusterList.dat")):
-        clusterLabel = np.loadtxt(dirName + "clusterList.dat")[:,1]
+    if(os.path.exists(dirName + os.sep + "clusterList.dat")):
+        clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")
+        inLabel = clusterList[:,1]
+        outLabel = clusterList[:,1]
     else:
-        clusterLabel = searchClusters(dirName)
+        inLabel = searchClusters(dirName)
+        outLabel = np.loadtxt(dirName + os.sep + "clusterList.dat")[:,2]
     velCorrInCluster = np.zeros((bins.shape[0]-1,3))
     countsInCluster = np.zeros(bins.shape[0]-1)
     velCorrOutCluster = np.zeros((bins.shape[0]-1,3))
@@ -563,12 +567,12 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
                             perpProj1 = np.dot(vel[i],deltaPerp)
                             perpProj2 = np.dot(vel[j],deltaPerp)
                             # correlations
-                            if(clusterLabel[i]!=0):
+                            if(inLabel[i]==1):
                                 velCorrInCluster[k,0] += parProj1 * parProj2
                                 velCorrInCluster[k,1] += perpProj1 * perpProj2
                                 velCorrInCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
                                 countsInCluster[k] += 1
-                            else:
+                            if(outLabel[i]==1):
                                 velCorrOutCluster[k,0] += parProj1 * parProj2
                                 velCorrOutCluster[k,1] += perpProj1 * perpProj2
                                 velCorrOutCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
