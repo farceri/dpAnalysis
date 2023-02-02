@@ -189,11 +189,55 @@ def averageLocalDensity(dirName, numBins=12):
         ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
         localDensity.append(localArea/localSquare)
     localDensity = np.array(localDensity).flatten()
+    localDensity = np.sort(localDensity)
+    localDensity = localDensity[localDensity > 0]
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 50), density=True)
     edges = (edges[:-1] + edges[1:])/2
     np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + ".dat", np.column_stack((edges, pdf)))
     alpha2 = np.mean(localDensity**4)/(2*np.mean(localDensity**2)**2) - 1
     np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-stats.dat", np.column_stack((np.mean(localDensity), np.var(localDensity), alpha2)))
+
+############################ Velocity distribution #############################
+def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    dirList = dirList[-50:]
+    velInCluster = np.empty(0)
+    velOutCluster = np.empty(0)
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "clusterList.dat")):
+            inLabel = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,1]
+            outLabel = np.loadtxt(dirSample + os.sep + "noClusterList.dat")
+        else:
+            inLabel = searchClusters(dirSample, numParticles=numParticles)
+            outLabel = np.loadtxt(dirSample + os.sep + "noClusterList.dat")
+        vel = np.loadtxt(dirSample + os.sep + "particleVel.dat")
+        velNorm = np.linalg.norm(vel, axis=1)
+        velInCluster = np.append(velInCluster, velNorm[inLabel==1].flatten())
+        velOutCluster = np.append(velOutCluster, velNorm[outLabel==1].flatten())
+    # in cluster
+    mean = np.mean(velInCluster)
+    Temp = np.var(velInCluster)
+    skewness = np.mean((velInCluster - mean)**3)/Temp**(3/2)
+    kurtosis = np.mean((velInCluster - mean)**4)/Temp**2
+    data = velInCluster# / np.sqrt(2*Temp)
+    pdf, edges = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges = 0.5 * (edges[:-1] + edges[1:])
+    print("Variance of the velocity in cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
+    np.savetxt(dirName + os.sep + "velPDFInCluster.dat", np.column_stack((edges, pdf)))
+    # out of cluster
+    mean = np.mean(velOutCluster)
+    Temp = np.var(velOutCluster)
+    skewness = np.mean((velOutCluster - mean)**3)/Temp**(3/2)
+    kurtosis = np.mean((velOutCluster - mean)**4)/Temp**2
+    data = velOutCluster# / np.sqrt(2*Temp)
+    pdf, edges = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges = 0.5 * (edges[:-1] + edges[1:])
+    print("Variance of the velocity out cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
+    np.savetxt(dirName + os.sep + "velPDFOutCluster.dat", np.column_stack((edges, pdf)))
 
 ########################### Average Space Correlator ###########################
 def getCollisionIntervalPDF(dirName, check=False, numBins=40):

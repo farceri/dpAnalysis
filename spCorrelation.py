@@ -709,11 +709,10 @@ def averageParticleVelSpaceCorr(dirName, dirSpacing=1000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-50:]
+    dirList = dirList[-1:]
     velCorr = np.zeros((bins.shape[0]-1,4))
     counts = np.zeros(bins.shape[0]-1)
     for d in range(dirList.shape[0]):
-        print(d)
         pos = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particlePos.dat"))
         distance = ucorr.computeDistances(pos, boxSize)
         vel = np.array(np.loadtxt(dirName + os.sep + dirList[d] + os.sep + "particleVel.dat"))
@@ -968,6 +967,8 @@ def averageLocalDensity(dirName, numBins=12, dirSpacing=10):
         ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
         localDensity.append(localArea/localSquare)
     localDensity = np.array(localDensity).flatten()
+    localDensity = np.sort(localDensity)
+    localDensity = localDensity[localDensity > 0]
     alpha2 = np.mean(localDensity**4)/(2*np.mean(localDensity**2)**2) - 1
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 50), density=True)
     edges = (edges[:-1] + edges[1:])/2
@@ -1105,7 +1106,7 @@ def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
     elif(cluster=="cluster"):
         return connectLabel
 
-############################ Velocity correlations #############################
+############################ Velocity distribution #############################
 def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
@@ -1148,7 +1149,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     print("Variance of the velocity out cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
     uplot.plotCorrelation(edges, pdf, "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", color='r')
     np.savetxt(dirName + os.sep + "velPDFOutCluster.dat", np.column_stack((edges, pdf)))
-    plt.show()
+    #plt.show()
 
 ########################### Average Space Correlator ###########################
 def averagePairCorrCluster(dirName, dirSpacing=1000):
@@ -1543,7 +1544,7 @@ def computeClusterBorder(dirName, numParticles, plot='plot'):
                     checkedParticles[contactId] += 1
                     if(plot=='plot'):
                         ax.add_artist(plt.Circle(newProbe, multiple*sigma, edgecolor='k', facecolor='r', alpha=0.9, linewidth=0.5))
-                        #plt.pause(0.1)
+                        plt.pause(0.1)
             probe = newProbe
         previousContacts.append(contactId)
         if(theta < theta0):

@@ -77,7 +77,11 @@ def getClusterColorList(pos, nClusters=10):
 def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, cluster=False, nClusters=10, alpha = 0.6):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    if(os.path.exists(dirName + os.sep + "particleRad.dat")):
+        sep = "/"
+    else:
+        sep = "../"
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
@@ -345,9 +349,13 @@ def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
     pos = np.array(np.loadtxt(dirName + os.sep + "positions.dat"))
-    rad = np.array(np.loadtxt(dirName + os.sep + "radii.dat"))
-    nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype=int)
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    if(os.path.exists(dirName + os.sep + "radii.dat")):
+        sep = "/"
+    else:
+        sep = "../"
+    rad = np.array(np.loadtxt(dirName + sep + "radii.dat"))
+    nv = np.array(np.loadtxt(dirName + sep + "numVertexInParticleList.dat"), dtype=int)
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     setPackingAxes(boxSize, ax)
     #setBigBoxAxes(boxSize, ax)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
