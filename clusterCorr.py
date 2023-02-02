@@ -220,6 +220,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
         velInCluster = np.append(velInCluster, velNorm[inLabel==1].flatten())
         velOutCluster = np.append(velOutCluster, velNorm[outLabel==1].flatten())
     # in cluster
+    velInCluster = velInCluster[velInCluster>0]
     mean = np.mean(velInCluster)
     Temp = np.var(velInCluster)
     skewness = np.mean((velInCluster - mean)**3)/Temp**(3/2)
@@ -230,6 +231,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     print("Variance of the velocity in cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
     np.savetxt(dirName + os.sep + "velPDFInCluster.dat", np.column_stack((edges, pdf)))
     # out of cluster
+    velOutCluster = velOutCluster[velOutCluster>0]
     mean = np.mean(velOutCluster)
     Temp = np.var(velOutCluster)
     skewness = np.mean((velOutCluster - mean)**3)/Temp**(3/2)

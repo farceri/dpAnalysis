@@ -1332,6 +1332,7 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
     ax2.tick_params(axis='both', labelsize=14)
     ax1.set_xlabel("$Speed,$ $|\\vec{v}|$", fontsize=18)
     ax1.set_ylabel("$P(|\\vec{v}|)$", fontsize=18)
+    #ax1.set_xscale('log')
     ax2.set_xlabel("$Local$ $density,$ $\\varphi$", fontsize=18)
     ax2.set_ylabel("$P(\\varphi)$", fontsize=18)
     fig1.tight_layout()

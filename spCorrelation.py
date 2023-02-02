@@ -968,7 +968,7 @@ def averageLocalDensity(dirName, numBins=12, dirSpacing=10):
         localDensity.append(localArea/localSquare)
     localDensity = np.array(localDensity).flatten()
     localDensity = np.sort(localDensity)
-    localDensity = localDensity[localDensity > 0]
+    localDensity = localDensity[localDensity>0]
     alpha2 = np.mean(localDensity**4)/(2*np.mean(localDensity**2)**2) - 1
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 50), density=True)
     edges = (edges[:-1] + edges[1:])/2
@@ -1128,6 +1128,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
         velInCluster = np.append(velInCluster, velNorm[inLabel==1].flatten())
         velOutCluster = np.append(velOutCluster, velNorm[outLabel==1].flatten())
     # in cluster
+    velInCluster = velInCluster[velInCluster>0]
     mean = np.mean(velInCluster)
     Temp = np.var(velInCluster)
     skewness = np.mean((velInCluster - mean)**3)/Temp**(3/2)
@@ -1139,6 +1140,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     uplot.plotCorrelation(edges, pdf, "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", color='b')
     np.savetxt(dirName + os.sep + "velPDFInCluster.dat", np.column_stack((edges, pdf)))
     # out of cluster
+    velOutCluster = velOutCluster[velOutCluster>0]
     mean = np.mean(velOutCluster)
     Temp = np.var(velOutCluster)
     skewness = np.mean((velOutCluster - mean)**3)/Temp**(3/2)
