@@ -213,7 +213,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
             inLabel = clusterList[:,1]
             outLabel = clusterList[:,1]
         else:
-            inLabel = searchClusters(dirSample)
+            inLabel = searchClusters(dirSample, numParticles=numParticles)
             outLabel = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,2]
         vel = np.loadtxt(dirSample + os.sep + "particleVel.dat")
         velNorm = np.linalg.norm(vel, axis=1)
@@ -319,7 +319,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, clus
                 else:
                     clusterList = np.loadtxt(dirSample + os.sep + "clusterList.dat")[:,1]
             else:
-                clusterList = searchClusters(dirSample)
+                clusterList = searchClusters(dirSample, numParticles=numParticles)
             particlesInClusterIndex = np.argwhere(clusterList==1)[:,0]
             currentTime = timeList[i]
             currentContacts = np.array(np.loadtxt(dirSample + "/particleContacts.dat"), dtype=np.int64)
@@ -542,7 +542,7 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
         inLabel = clusterList[:,1]
         outLabel = clusterList[:,1]
     else:
-        inLabel = searchClusters(dirName)
+        inLabel = searchClusters(dirName, numParticles=numParticles)
         outLabel = np.loadtxt(dirName + os.sep + "clusterList.dat")[:,2]
     velCorrInCluster = np.zeros((bins.shape[0]-1,3))
     countsInCluster = np.zeros(bins.shape[0]-1)
@@ -587,7 +587,9 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
     np.savetxt(dirName + os.sep + "spaceVelCorrOutCluster.dat", np.column_stack((binCenter, velCorrOutCluster, countsOutCluster)))
 
 ############################# Clustering algorithm #############################
-def searchClusters(dirName):
+def searchClusters(dirName, numParticles=None):
+    if(numParticles==None):
+        numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat"), dtype=int)
     particleLabel = np.zeros(numParticles)
