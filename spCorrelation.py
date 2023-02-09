@@ -1206,7 +1206,7 @@ def averagePairCorrCluster(dirName, dirSpacing=1000):
     plt.show()
 
 ################# Cluster contact rearrangement distribution ###################
-def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=100000):
+def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=1000):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
@@ -1221,7 +1221,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
         intervalOutCluster = np.empty(0)
         previousTime = np.zeros(numParticles)
         previousContacts = np.array(np.loadtxt(dirName + os.sep + "t0/particleContacts.dat"))
-        for i in range(1,dirList.shape[0]):
+        for d in range(1,dirList.shape[0]):
             dirSample = dirName + os.sep + dirList[d]
             if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
                 clusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")
@@ -1230,7 +1230,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
                 clusterLabels = searchDBClusters(dirSample, eps=cutoff, min_samples=10)
             particlesInClusterIndex = np.argwhere(clusterLabels!=-1)[:,0]
             particlesOutClusterIndex = np.argwhere(clusterLabels==-1)[:,0]
-            currentTime = timeList[i]
+            currentTime = timeList[d]
             currentContacts = np.array(np.loadtxt(dirSample + "/particleContacts.dat"), dtype=np.int64)
             colIndex = np.unique(np.argwhere(currentContacts!=previousContacts)[:,0])
             # in cluster collisions
@@ -1249,22 +1249,22 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
         np.savetxt(dirName + os.sep + "inClusterCollisionIntervals.dat", intervalInCluster)
         intervalOutCluster = np.sort(intervalOutCluster)
         intervalOutCluster *= timeStep
-        np.savetxt(dirName + os.sep + "outClusterCollisionIntervals.dat", interval)
+        np.savetxt(dirName + os.sep + "outClusterCollisionIntervals.dat", intervalOutCluster)
     # in cluster collision distribution
     bins = np.arange(np.min(intervalInCluster), np.max(intervalInCluster), 5*np.min(intervalInCluster))
-    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    pdf, edges = np.histogram(intervalInCluster, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time in cluster:", np.mean(intervalInCluster), " standard deviation: ", np.std(intervalInCluster))
     np.savetxt(dirName + os.sep + "inClusterCollision.dat", np.column_stack((centers, pdf)))
     uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True, color='g')
     # out cluster collision distribution
     bins = np.arange(np.min(intervalOutCluster), np.max(intervalOutCluster), 5*np.min(intervalOutCluster))
-    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    pdf, edges = np.histogram(intervalOutCluster, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time in cluster:", np.mean(intervalOutCluster), " standard deviation: ", np.std(intervalOutCluster))
     np.savetxt(dirName + os.sep + "outClusterCollision.dat", np.column_stack((centers, pdf)))
     uplot.plotCorrelation(centers, pdf, "$PDF(\\Delta_c)$", "$Time$ $between$ $collisions,$ $\\Delta_c$", logy=True, color='k')
-    print("max time: ", timeList[-1]*timeStep, " max interval: ", np.max(interval))
+    print("max time: ", timeList[-1]*timeStep, " max interval: ", np.max([np.max(intervalInCluster), np.max(intervalOutCluster)]))
 
 ##################### Velocity Correlation in/out Cluster ######################
 def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):

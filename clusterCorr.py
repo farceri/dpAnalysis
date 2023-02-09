@@ -505,7 +505,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=10000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-50:]
+    dirList = dirList[-10:]
     velInCluster = np.empty(0)
     velOutCluster = np.empty(0)
     for d in range(dirList.shape[0]):
@@ -553,11 +553,10 @@ def averagePairCorrCluster(dirName, dirSpacing=10000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-2:]
+    dirList = dirList[-10:]
     pcorrInCluster = np.zeros(rbins.shape[0]-1)
     pcorrOutCluster = np.zeros(rbins.shape[0]-1)
     for d in range(dirList.shape[0]):
-        print(d)
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
@@ -579,13 +578,13 @@ def averagePairCorrCluster(dirName, dirSpacing=10000):
     print("First peak of pair corr in cluster is at:", firstPeak, "equal to", firstPeak/minRad, "times the min radius:", minRad)
 
 ################# Cluster contact rearrangement distribution ###################
-def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=10000):
+def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=1000):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-50:]
+    dirList = dirList[-10:]
     if(os.path.exists(dirName + "/inClusterCollisionIntervals.dat") and check=="check"):
         print("loading already existing file")
         intervalInCluster = np.loadtxt(dirName + os.sep + "inClusterCollisionIntervals.dat")
@@ -604,7 +603,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
                 clusterLabels = searchClusters(dirSample, numParticles)
             particlesInClusterIndex = np.argwhere(clusterLabels!=-1)[:,0]
             particlesOutClusterIndex = np.argwhere(clusterLabels==-1)[:,0]
-            currentTime = timeList[i]
+            currentTime = timeList[d]
             currentContacts = np.array(np.loadtxt(dirSample + "/particleContacts.dat"), dtype=np.int64)
             colIndex = np.unique(np.argwhere(currentContacts!=previousContacts)[:,0])
             # in cluster collisions
@@ -646,7 +645,7 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-2:]
+    dirList = dirList[-5:]
     velCorrInCluster = np.zeros((bins.shape[0]-1,3))
     countsInCluster = np.zeros(bins.shape[0]-1)
     velCorrOutCluster = np.zeros((bins.shape[0]-1,3))
