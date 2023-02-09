@@ -23,6 +23,30 @@ def setPackingAxes(boxSize, ax):
     ax.set_aspect('equal', adjustable='box')
     setAxes2D(ax)
 
+def plotPacking(boxSize, pos, rad, labels=np.empty([])):
+    fig = plt.figure(0, dpi = 150)
+    ax = fig.gca()
+    setPackingAxes(boxSize, ax)
+    numParticles = rad.shape[0]
+    colorId = np.zeros((pos.shape[0], 4))
+    if(labels.size != 1):
+        numLabels = np.max(labels)+1
+        colorList = cm.get_cmap('prism', numLabels)
+        for i in range(numParticles):
+            if(labels[i]==-1): # particles not in a cluster
+                colorId[i] = [1,1,1,1]
+            else:
+                colorId[i] = colorList(labels[i]/numLabels)
+    else:
+        for i in range(numParticles):
+            colorId[i] = [0,0,1,0]
+    for particleId in range(numParticles):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=0.6, linewidth=0.5))
+    plt.pause(0.5)
+
 #################################### plotting ##################################
 def plotErrorBar(ax, x, y, err, xlabel, ylabel, logx = False, logy = False):
     ax.errorbar(x, y, err, marker='o', color='k', markersize=7, markeredgecolor='k', markeredgewidth=0.7, linewidth=1.2, elinewidth=1, capsize=4)

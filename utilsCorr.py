@@ -5,6 +5,7 @@ Created by Francesco
 #functions and script to compute correlations in space and time
 import numpy as np
 from scipy.fft import fft, fftfreq, fft2
+from sklearn.cluster import DBSCAN
 import os
 
 ############################## general utilities ###############################
@@ -58,6 +59,15 @@ def checkAngle(alpha):
     elif(alpha > 2*np.pi):
         alpha -= 2*np.pi
     return alpha
+
+def computeAdjacencyMatrix(dirName, numParticles=None):
+    if(numParticles==None):
+        numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat"), dtype=int)
+    adjacency = np.zeros((numParticles, numParticles), dtype=int)
+    for i in range(numParticles):
+        adjacency[i,contacts[i,np.argwhere(contacts[i]!=-1)[:,0]].astype(int)] = 1
+    return adjacency
 
 ############################ correlation functions #############################
 def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
@@ -192,6 +202,29 @@ def computeDeltaChi(data):
         return t2 - t1
     else:
         return 0
+
+def getDBClusterLabels(pos, boxSize, eps, min_samples, contacts, contactFilter=False):
+    numParticles = pos.shape[0]
+    distance = computeDistances(pos, boxSize)
+    db = DBSCAN(eps=eps, min_samples=min_samples, metric='precomputed').fit(distance)
+    labels = db.labels_
+    if(contactFilter == 'contact'):
+        connectLabel = np.zeros(numParticles)
+        for i in range(numParticles):
+            if(np.sum(contacts[i]!=-1)>1):
+                    for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                        if(np.sum(contacts[c]!=-1)>2):
+                            # this is at least a three particle cluster
+                            connectLabel[i] = 1
+        labels[connectLabel==0] = -1
+    return labels
+
+def getNoClusterLabel(labels, contacts):
+    noLabels = np.zeros(labels.shape[0])
+    for i in range(labels.shape[0]):
+        if(labels[i] != -1 and np.sum(contacts[i]) < 2):
+            noLabels[i] = 1
+    return noLabels
 
 
 ############################## Fourier Analysis ################################
@@ -349,6 +382,12 @@ def getOrderedDirectories(dirName):
     listDir = listDir[np.argsort(listScalar)]
     listScalar = np.sort(listScalar)
     return listDir, listScalar
+
+def getDirSep(dirName, fileName):
+    if(os.path.exists(dirName + os.sep + fileName + ".dat")):
+        return "/"
+    else:
+        return "/../"
 
 def readFromParams(dirName, paramName):
     with open(dirName + os.sep + "params.dat") as file:

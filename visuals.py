@@ -5,9 +5,11 @@ Created by Francesco
 #functions and script to visualize a 2d dpm packing
 import numpy as np
 from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import axes3d, Axes3D
 from matplotlib import animation
 from matplotlib import cm
 from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
 import itertools
 import sys
 import os
@@ -15,6 +17,51 @@ import shapeDescriptors
 import shapeGraphics
 import spCorrelation as spCorr
 import utilsCorr as ucorr
+
+
+def setAxes3D(ax):
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+
+def set3DPackingAxes(boxSize, ax):
+    xBounds = np.array([0, boxSize[0]])
+    yBounds = np.array([0, boxSize[1]])
+    zBounds = np.array([0, boxSize[2]])
+    ax.set_xlim(xBounds[0], xBounds[1])
+    ax.set_ylim(yBounds[0], yBounds[1])
+    ax.set_ylim(zBounds[0], zBounds[1])
+    #ax.set_box_aspect(aspect = (1,1,1))
+    #ax.set_aspect('equal', adjustable='box')
+    setAxes3D(ax)
+
+def plot3DPacking(dirName, figureName):
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
+    xBounds = np.array([0, boxSize[0]])
+    yBounds = np.array([0, boxSize[1]])
+    zBounds = np.array([0, boxSize[2]])
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    pos[:,2] -= np.floor(pos[:,2]/boxSize[2]) * boxSize[2]
+    fig = plt.figure(dpi=100)
+    ax = Axes3D(fig)
+    set3DPackingAxes(boxSize, ax)
+    u = np.linspace(0, 2*np.pi, 120)
+    v = np.linspace(0, np.pi, 120)
+    colorId = getRadColorList(rad)
+    for i in range(pos.shape[0]):
+        x = pos[i,0] + rad[i]*np.outer(np.cos(u), np.sin(v))
+        y = pos[i,1] + rad[i]*np.outer(np.sin(u), np.sin(v))
+        z = pos[i,2] + rad[i]*np.outer(np.ones(np.size(u)), np.cos(v))
+        ax.plot_surface(x,y,z, color=colorId[i], rstride=4, cstride=4, alpha=1)
+    plt.savefig("/home/francesco/Pictures/soft/packings/3d-" + figureName + ".png", transparent=True, format = "png")
+    plt.show()
 
 def setAxes2D(ax):
     ax.set_xticklabels([])
@@ -66,21 +113,26 @@ def getEkinColorList(vel):
         count += 1
     return colorId
 
-def getClusterColorList(pos, nClusters=10):
-    y_pred = KMeans(n_clusters=nClusters).fit_predict(pos)
-    colorList = cm.get_cmap('tab20', nClusters)
-    colorId = np.zeros((pos.shape[0], 4))
-    for particleId in range(pos.shape[0]):
-        colorId[particleId] = colorList(y_pred[particleId])
+def getClusterColorList(pos, boxSize, contacts, eps=0.03, min_samples=10):
+    labels = ucorr.getDBClusterLabels(pos, boxSize, eps, min_samples, contacts)
+    colorId = getColorListFromLabels(labels)
     return colorId
 
-def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, cluster=False, nClusters=10, alpha = 0.6):
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+def getColorListFromLabels(labels):
+    numLabels = np.unique(labels).shape[0]-1
+    colorList = cm.get_cmap('prism', numLabels)
+    colorId = np.zeros((labels.shape[0], 4))
+    for particleId in range(labels.shape[0]):
+        if(labels[particleId]==-1): # particles not in a cluster
+            colorId[particleId] = [1,1,1,1]
+        else:
+            colorId[particleId] = colorList(labels[particleId]/numLabels)
+    return colorId
+
+def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_samples=10, cluster=False, alpha = 0.6):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    if(os.path.exists(dirName + os.sep + "particleRad.dat")):
-        sep = "/"
-    else:
-        sep = "../"
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
@@ -93,7 +145,12 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, cluster=False,
     ax.set_aspect('equal', adjustable='box')
     setBigBoxAxes(boxSize, ax, 0.05)
     if(cluster==True):
-        colorId = getClusterColorList(pos, nClusters)
+        if(os.path.exists(dirName + os.sep + "dbClusterLabels.dat")):
+            labels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")
+            colorId = getColorListFromLabels(labels)
+        else:
+            contacts = np.array(np.loadtxt(dirName + sep + "particleContacts.dat"), dtype=int)
+            colorId = getClusterColorList(pos, boxSize, contacts, eps, min_samples)
     elif(ekmap==True):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
         colorId = getEkinColorList(vel)
@@ -110,7 +167,7 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, cluster=False,
             ax.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
             vx = vel[particleId,0]
             vy = vel[particleId,1]
-            ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)#width=0.002, scale=3)
+            ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)#width=0.002, scale=3)20
         else:
             ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
         #plt.pause(1)
@@ -607,12 +664,16 @@ if __name__ == '__main__':
     if(whichPlot == "ss"):
         plotSPPacking(dirName, figureName)
 
+    elif(whichPlot == "ss3d"):
+        plot3DPacking(dirName, figureName)
+
     elif(whichPlot == "ssvel"):
         plotSPPacking(dirName, figureName, quiver=True)
 
     elif(whichPlot == "sscluster"):
-        nClusters = int(sys.argv[4])
-        plotSPPacking(dirName, figureName, cluster=True, nClusters=nClusters)
+        eps = float(sys.argv[4])
+        min_samples = int(sys.argv[5])
+        plotSPPacking(dirName, figureName, eps=eps, min_samples=min_samples, cluster=True)
 
     elif(whichPlot == "ssvideo"):
         numFrames = int(sys.argv[4])
