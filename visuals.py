@@ -120,7 +120,7 @@ def getClusterColorList(pos, boxSize, contacts, eps=0.03, min_samples=10):
 
 def getColorListFromLabels(labels):
     numLabels = np.unique(labels).shape[0]-1
-    colorList = cm.get_cmap('prism', numLabels)
+    colorList = cm.get_cmap('tab20', numLabels)
     colorId = np.zeros((labels.shape[0], 4))
     for particleId in range(labels.shape[0]):
         if(labels[particleId]==-1): # particles not in a cluster
@@ -167,12 +167,12 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
             ax.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
             vx = vel[particleId,0]
             vy = vel[particleId,1]
-            ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)#width=0.002, scale=3)20
+            ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
         else:
             ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
         #plt.pause(1)
     if(cluster==True):
-        figureName = "/home/francesco/Pictures/soft/packings/cluster" + figureName + ".png"
+        figureName = "/home/francesco/Pictures/soft/packings/cluster-" + figureName + ".png"
     elif(ekmap==True):
         figureName = "/home/francesco/Pictures/soft/packings/ekmap-" + figureName + ".png"
     elif(quiver==True):

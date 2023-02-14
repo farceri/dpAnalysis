@@ -661,7 +661,8 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
         distance = ucorr.computeDistances(pos, boxSize)
         vel = np.array(np.loadtxt(dirSample + os.sep + "particleVel.dat"))
         velNorm = np.linalg.norm(vel, axis=1)
-        velNormSquared = np.mean(velNorm**2)
+        velNormSquaredInCluster = np.mean(velNorm[clusterLabels!=-1]**2)
+        velNormSquaredOutCluster = np.mean(velNorm[clusterLabels==-1]**2)
         for i in range(distance.shape[0]):
             for j in range(i):
                     for k in range(bins.shape[0]-1):
@@ -687,10 +688,10 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
                                 countsOutCluster[k] += 1
     binCenter = (bins[1:] + bins[:-1])/2
     for i in range(velCorrInCluster.shape[1]):
-        velCorrInCluster[countsOutCluster>0,i] /= countsInCluster[countsOutCluster>0]
+        velCorrInCluster[countsInCluster>0,i] /= countsInCluster[countsInCluster>0]
         velCorrOutCluster[countsOutCluster>0,i] /= countsOutCluster[countsOutCluster>0]
-    velCorrInCluster /= velNormSquared
-    velCorrOutCluster /= velNormSquared
+    velCorrInCluster /= velNormSquaredInCluster
+    velCorrOutCluster /= velNormSquaredOutCluster
     np.savetxt(dirName + os.sep + "spaceVelCorrInCluster.dat", np.column_stack((binCenter, velCorrInCluster, countsInCluster)))
     np.savetxt(dirName + os.sep + "spaceVelCorrOutCluster.dat", np.column_stack((binCenter, velCorrOutCluster, countsOutCluster)))
 
