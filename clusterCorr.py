@@ -447,7 +447,8 @@ def searchClusters(dirName, numParticles=None):
         numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat"), dtype=int)
     particleLabel = np.zeros(numParticles)
-    clusterLabels = np.ones(numParticles)*-1 # initilize all to -1
+    clusterLabels = np.zeros(numParticles) # initilize all to -1
+    noClusterLabels = np.zeros(numParticles)
     clusterNumber = 0
     for i in range(1,numParticles):
         if(np.sum(contacts[i]!=-1)>2):
@@ -480,12 +481,12 @@ def searchClusters(dirName, numParticles=None):
             if(particleLabel[c] != 0 and connected == False):
                 clusterLabels[i] = 1
                 connected = True
-    noClusterLabels = np.zeros(numParticles)
+    # stringent condition on particles not in cluster
     for i in range(numParticles):
         if(particleLabel[i] == 0 and np.sum(contacts[i]) < 2):
             noClusterLabels[i] = 1
     np.savetxt(dirName + "/clusterLabels.dat", np.column_stack((particleLabel, clusterLabels, noClusterLabels)))
-    return clusterLabels
+    return clusterLabels, noClusterLabels
 
 def searchDBClusters(dirName, eps=0, min_samples=10, contactFilter=False):
     sep = ucorr.getDirSep(dirName, "boxSize")
@@ -512,13 +513,14 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=10000):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
         else:
             #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-            clusterLabels = searchClusters(dirSample, numParticles)
+            clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
         vel = np.loadtxt(dirSample + os.sep + "particleVel.dat")
         velNorm = np.linalg.norm(vel, axis=1)
-        velInCluster = np.append(velInCluster, velNorm[clusterLabels!=-1].flatten())
-        velOutCluster = np.append(velOutCluster, velNorm[clusterLabels==-1].flatten())
+        velInCluster = np.append(velInCluster, velNorm[clusterLabels==1].flatten())
+        velOutCluster = np.append(velOutCluster, velNorm[noClusterLabels==1].flatten())
     # in cluster
     velInCluster = velInCluster[velInCluster>0]
     mean = np.mean(velInCluster)
@@ -560,13 +562,14 @@ def averagePairCorrCluster(dirName, dirSpacing=10000):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
         else:
             #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-            clusterLabels = searchClusters(dirSample, numParticles)
-        phiInCluster = np.sum(np.pi*particleRad[clusterLabels!=-1]**2)
-        phiOutCluster = np.sum(np.pi*particleRad[clusterLabels==-1]**2)
-        NpInCluster = clusterLabels[clusterLabels!=-1].shape[0]
-        NpOutCluster = clusterLabels[clusterLabels==-1].shape[0]
+            clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
+        phiInCluster = np.sum(np.pi*particleRad[clusterLabels==1]**2)
+        phiOutCluster = np.sum(np.pi*particleRad[noClusterLabels==1]**2)
+        NpInCluster = clusterLabels[clusterLabels==1].shape[0]
+        NpOutCluster = clusterLabels[noClusterLabels==1].shape[0]
         pos = ucorr.getPBCPositions(dirSample + os.sep + "particlePos.dat", boxSize)
         pcorrInCluster += ucorr.getPairCorr(pos[clusterLabels!=-1], boxSize, rbins, minRad)/(NpInCluster * phiInCluster)
         pcorrOutCluster += ucorr.getPairCorr(pos[clusterLabels==-1], boxSize, rbins, minRad)/(NpOutCluster * phiOutCluster)
@@ -598,11 +601,12 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
             dirSample = dirName + os.sep + dirList[d]
             if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
                 clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
+                noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
             else:
                 #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-                clusterLabels = searchClusters(dirSample, numParticles)
-            particlesInClusterIndex = np.argwhere(clusterLabels!=-1)[:,0]
-            particlesOutClusterIndex = np.argwhere(clusterLabels==-1)[:,0]
+                clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
+            particlesInClusterIndex = np.argwhere(clusterLabels==1)[:,0]
+            particlesOutClusterIndex = np.argwhere(noClusterLabels==1)[:,0]
             currentTime = timeList[d]
             currentContacts = np.array(np.loadtxt(dirSample + "/particleContacts.dat"), dtype=np.int64)
             colIndex = np.unique(np.argwhere(currentContacts!=previousContacts)[:,0])
@@ -654,9 +658,10 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
         else:
             #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-            clusterLabels = searchClusters(dirSample, numParticles)
+            clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
         pos = np.array(np.loadtxt(dirSample + os.sep + "particlePos.dat"))
         distance = ucorr.computeDistances(pos, boxSize)
         vel = np.array(np.loadtxt(dirSample + os.sep + "particleVel.dat"))
@@ -676,12 +681,12 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
                             perpProj1 = np.dot(vel[i],deltaPerp)
                             perpProj2 = np.dot(vel[j],deltaPerp)
                             # correlations
-                            if(clusterLabels[i]!=-1):
+                            if(clusterLabels[i]==1):
                                 velCorrInCluster[k,0] += parProj1 * parProj2
                                 velCorrInCluster[k,1] += perpProj1 * perpProj2
                                 velCorrInCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5
                                 countsInCluster[k] += 1
-                            else:
+                            if(noClusterLabels[i]==1):
                                 velCorrOutCluster[k,0] += parProj1 * parProj2
                                 velCorrOutCluster[k,1] += perpProj1 * perpProj2
                                 velCorrOutCluster[k,2] += (perpProj1 * parProj2 + parProj1 * perpProj2)*0.5

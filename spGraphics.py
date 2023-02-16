@@ -48,6 +48,28 @@ def plotEnergy(dirName, figureName):
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
+def plotParticleForces(dirName, index0, index1, index2, dim):
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    force0 = []
+    force1 = []
+    force2 = []
+    for d in range(dirList.shape[0]):
+        force = np.loadtxt(dirName + os.sep + dirList[d] + "/forces.dat")
+        force0.append(force[index0,dim])
+        force1.append(force[index1,dim])
+        force2.append(force[index2,dim])
+    fig = plt.figure(figsize = (7, 5), dpi = 120)
+    ax = fig.gca()
+    ax.plot(timeList, force0, linewidth=1, color='k', marker='o', fillstyle='none', label="$vertex$" + " " + str(index0))
+    ax.plot(timeList, force1, linewidth=1, color='b', marker='o', fillstyle='none', label="$vertex$" + " " + str(index1))
+    ax.plot(timeList, force2, linewidth=1, color='g', marker='o', fillstyle='none', label="$vertex$" + " " + str(index2))
+    ax.legend(fontsize=10, loc='lower right')
+    ax.tick_params(axis='both', labelsize=12)
+    ax.set_xlabel("$Simulation$ $step$", fontsize=15)
+    ax.set_ylabel("$Forces$", fontsize=15)
+    plt.tight_layout()
+    plt.show()
+
 def plotActiveEnergy(dirName, figureName):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     energy = np.loadtxt(dirName + os.sep + "energy.dat")
@@ -990,15 +1012,15 @@ def plotSPVelSpaceCorrVSDrf0(dirName, figureName, fixed='Dr', which='200', iod='
     fig, ax = plt.subplots(1, 2, figsize = (12, 5), dpi = 120)
     if(fixed=="f0"):
         f0 = which
-        dirList = np.array(['1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '50', '100', '1000', '10000', '../../iod' + iod])
-        labelList = np.array(['$D_r = 10^{-3}$', '$D_r = 5 \\times 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 5 \\times 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 5 \\times 10^{-1}$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$', '$D_r = 10000$', '$NVT$'])
-        Dr = np.array([0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100, 1000, 10000, 1e05])
+        dirList = np.array(['1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '50', '100', '1000', '../../iod' + iod])
+        labelList = np.array(['$D_r = 10^{-3}$', '$D_r = 5 \\times 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 5 \\times 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 5 \\times 10^{-1}$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$', '$NVT$'])
+        Dr = np.array([0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100, 1000, 1e05])
         taup = np.zeros(dirList.shape[0])
     elif(fixed=="Dr"):
         Dr = which
-        dirList = np.array(['5000', '3000', '2000', '1000', '500', '300', '200',  '100', '50', '10', '5', '1', '5e-01', '1e-01', '1e-02', '../../iod' + iod])
-        labelList = np.array(['$f_0 = 5000$', '$f_0 = 3000$', '$f_0 = 2000$', '$f_0 = 1000$', '$f_0 = 500$', '$f_0 = 300$', '$f_0 = 200$', '$f_0 = 100$', '$f_0 = 50$', '$f_0 = 10$', '$f_0 = 5$', '$f_0 = 1$', '$f_0 = 5e-01$', '$f_0 = 1e-01$', '$f_0 = 1e-02$', '$NVT$'])
-        f0 = np.array([5000, 3000, 2000, 1000, 500, 300, 200, 100, 50, 10, 5, 1, 5e-01, 1e-01, 1e-02, 0])
+        dirList = np.array(['1000', '700', '500', '300', '200',  '100', '50', '30', '20', '10', '../../iod' + iod])
+        labelList = np.array(['$f_0 = 1000$', '$f_0 = 700$', '$f_0 = 500$', '$f_0 = 300$', '$f_0 = 200$', '$f_0 = 100$', '$f_0 = 50$', '$f_0 = 30$', '$f_0 = 20$', '$f_0 = 10$', '$NVT$'])
+        f0 = np.array([1000, 700, 500, 300, 200, 100, 50, 30, 20, 10, 0])
     colorList = cm.get_cmap('plasma', dirList.shape[0])#winter
     phi = ucorr.readFromParams(dirName + dirList[-1], "phi")
     Temp = np.zeros((dirList.shape[0]+1,2))
@@ -1027,8 +1049,8 @@ def plotSPVelSpaceCorrVSDrf0(dirName, figureName, fixed='Dr', which='200', iod='
             diff[d,0] = np.sqrt(np.sum(data[:,0]*data[:,1]**2))
             diff[d,1] = np.sqrt(np.sum(data[:,0]*data[:,2]**2))
             diff[d,2] = np.sqrt(np.sum(data[:,0]*data[:,3]**2))
-        if(os.path.exists(dirSample + "localDensity-N15.dat")):#N8 for 1k
-            data = np.loadtxt(dirSample + "localDensity-N15.dat")
+        if(os.path.exists(dirSample + "localDensity-N8.dat")):#N8 for 1k
+            data = np.loadtxt(dirSample + "localDensity-N8.dat")
             ax[1].semilogy(data[:,0], data[:,1], color=color, lw=1, label=labelList[d])
     ax[0].tick_params(axis='both', labelsize=14)
     ax[1].tick_params(axis='both', labelsize=14)
@@ -1039,7 +1061,7 @@ def plotSPVelSpaceCorrVSDrf0(dirName, figureName, fixed='Dr', which='200', iod='
     ax[1].set_ylabel("$P(\\varphi)$", fontsize=18)
     if(fixed=='f0'):
         np.savetxt(dirName + os.sep + "spaceCorr-iod" + iod + ".dat", np.column_stack((Dr, taup, diff[:,0], diff[:,1], diff[:,2])))
-    ax[0].legend(fontsize=10, loc='upper right', ncol=2)
+    ax[1].legend(fontsize=10, loc='lower left', ncol=2)
     #colorBar = cm.ScalarMappable(cmap=colorList)
     #cb = plt.colorbar(colorBar)
     if(fixed=="f0"):
@@ -1092,8 +1114,8 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '2', '5', '10', '100', '1000'])
-        labelList = np.array(['$D_r = 10^{-3}$', '$D_r = 5 \\times 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 5 \\times 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 5 \\times 10^{-1}$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$', '$D_r = 1000$'])
+        dirList = np.array(['1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '100', '1000'])
+        labelList = np.array(['$D_r = 0.001$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.1$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$', '$D_r = 1000$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
         Dr = np.zeros(dirList.shape[0])
     else:
@@ -1128,7 +1150,7 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
             ax[1].semilogy(data[1:,0], data[1:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
     #ax[0].set_ylim(-0.042, 0.31)
     #ax[1].set_ylim(-0.042, 0.31)
-    ax[0].legend(fontsize=10, loc="upper right")
+    ax[0].legend(fontsize=10, loc="upper right", ncol=2)
     ax[0].tick_params(axis='both', labelsize=14)
     ax[1].tick_params(axis='both', labelsize=14)
     ax[0].set_xlabel("$Distance,$ $r \\, / \\, \\sigma$", fontsize=18)
@@ -1141,7 +1163,7 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
     if(fixed=="iod"):
         x = phi
         xlabel = "$Density,$ $\\varphi$"
-        loc = 'upper right'
+        loc = 'upper left'
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceVelCorr-vsPhi-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceDiff-vsPhi-" + figureName + "-iod" + which
     elif(fixed=="phi"):
@@ -1166,7 +1188,7 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
     #ax.set_ylim(-0.002, 0.198)
     if(fixed=="phi"):
         ax.set_xscale('log')
-    ax.legend(fontsize=12, loc=loc)
+    ax.legend(fontsize=10, loc=loc)
     ax.tick_params(axis='both', labelsize=14)
     ax.set_xlabel(xlabel, fontsize=18)
     ax.set_ylabel("$Amount$ $of$ $correlation$", fontsize=18)
@@ -1302,14 +1324,14 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '100'])
-        labelList = np.array(['$D_r = 10^{-3}$', '$D_r = 5 \\times 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 5 \\times 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 5 \\times 10^{-1}$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$'])
+        dirList = np.array(['1e-04', '5e-04', '1e-03', '5e-03', '1e-02', '2e-02', '3e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '100'])
+        labelList = np.array(['$D_r = 10^{-4}$', '$D_r = 5 \\times 10^{-4}$', '$D_r = 10^{-3}$', '$D_r = 5 \\times 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 2 \\times 10^{-2}$', '$D_r = 3 \\times 10^{-2}$', '$D_r = 5 \\times 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 5 \\times 10^{-1}$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
         Dr = np.zeros(dirList.shape[0])
     else:
-        dirList = np.array(['iod1', 'iod2', 'iod5', 'iod10', 'iod20', 'iod50', 'iod100', 'iod200', 'iod500', 'iod1000'])
-        labelList = np.array(['$\\beta \\sigma = 1$', '$\\beta \\sigma = 2$', '$\\beta \\sigma = 5$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 20$', '$\\beta \\sigma = 50$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 200$', '$\\beta \\sigma = 500$', '$\\beta \\sigma = 1000$'])
-        iod = np.array([1, 2, 5, 10, 20, 50, 100, 200, 500, 1000])
+        dirList = np.array(['iod1', 'iod2', 'iod5', 'iod10', 'iod20', 'iod50', 'iod100', 'iod200', 'iod500', 'iod700', 'iod900', 'iod1000'])
+        labelList = np.array(['$\\beta \\sigma = 1$', '$\\beta \\sigma = 2$', '$\\beta \\sigma = 5$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 20$', '$\\beta \\sigma = 50$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 200$', '$\\beta \\sigma = 500$', '$\\beta \\sigma = 700$', '$\\beta \\sigma = 900$', '$\\beta \\sigma = 1000$'])
+        iod = np.array([1, 2, 5, 10, 20, 50, 100, 200, 500, 700, 900, 1000])
         colorList = cm.get_cmap('cividis', dirList.shape[0])
     damping = np.zeros(dirList.shape[0])
     alpha2 = np.zeros(dirList.shape[0])
@@ -1333,6 +1355,7 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
         if(os.path.exists(dirSample + "localDensity-N15.dat")):
             data = np.loadtxt(dirSample + "localDensity-N15.dat")
             ax2.semilogy(data[1:,0], data[1:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
+            #ax1.plot(data[data[:,1]>0,0], -np.log(data[data[:,1]>0,1]), color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
             data = np.loadtxt(dirSample + "localDensity-N15-stats.dat")
             alpha2[d] = 2*data[2] + 1 # correction
     #ax2.legend(fontsize=10, loc="lower left", ncol=2)
@@ -1340,8 +1363,10 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
     ax2.tick_params(axis='both', labelsize=14)
     ax1.set_xlabel("$Speed,$ $|\\vec{v}|$", fontsize=18)
     ax1.set_ylabel("$P(|\\vec{v}|)$", fontsize=18)
+    #ax1.set_xlabel("$Local$ $density,$ $\\varphi$", fontsize=18)
+    #ax1.set_ylabel("$Free$ $energy,$ $F(\\varphi)$", fontsize=18)
     #ax1.set_xscale('log')
-    ax1.set_ylim(-0.8,20.2)
+    #ax1.set_ylim(-0.8,20.2)
     ax2.set_xlabel("$Local$ $density,$ $\\varphi$", fontsize=18)
     ax2.set_ylabel("$P(\\varphi)$", fontsize=18)
     fig1.tight_layout()
@@ -1387,12 +1412,12 @@ def fitPhiPDF(dirName, figureName):
         data = data[1:]
         x = data[data[:,1]>0,0]
         y = -np.log(data[data[:,1]>0,1])
-        ax.plot(x, y, color='k', lw=1, marker='o', fillstyle='none')
+        ax.plot(x, y, color='k', lw=1, marker='o', fillstyle='none', label="$data$")
         # interpolate
         spl = splrep(x, y, s=0.5)
         interX = np.linspace(np.min(x), np.max(x), 1000)
         interY = splev(interX, spl)
-        ax.plot(interX, interY, lw=1, color='b')
+        ax.plot(interX, interY, lw=1, color='b', label="$smooth$ $interpolation$")
         # fit interpolation
         failed = False
         try:
@@ -1401,13 +1426,14 @@ def fitPhiPDF(dirName, figureName):
             print("Error - curve_fit failed")
             failed = True
         if(failed == False):
-            ax.plot(interX, curve4Poly(interX, *popt), color='g', lw=1, linestyle='--')
+            ax.plot(interX, curve4Poly(interX, *popt), color='g', lw=1, linestyle='--', label="$4Poly$ $fit$")
         print("Fitting parameters: c4 ", popt[0], " c3 ", popt[1], " c2 ", popt[2], " c1 ", popt[3], " c0 ", popt[4])
         print("Mass: ", np.sqrt(popt[2]/(4*popt[0])))
-        y = np.linspace(-2, 8, 100)
-        ax.plot(np.ones(100)*(-popt[1]/(4*popt[0])), y, linestyle='--', color='r', lw=1)
+        #y = np.linspace(-2, 8, 100)
+        #ax.plot(np.ones(100)*(-popt[1]/(4*popt[0])), y, linestyle='--', color='r', lw=1)
     ax.tick_params(axis='both', labelsize=14)
-    ax.set_ylim(-1.3, 5.6)
+    ax.legend(fontsize=12, loc='upper left')
+    #ax.set_ylim(-1.3, 5.6)
     ax.set_xlabel("$Local$ $density,$ $\\varphi$", fontsize=18)
     ax.set_ylabel("$Free$ $energy,$ $F(\\varphi)$", fontsize=18)
     fig.tight_layout()
@@ -2729,6 +2755,13 @@ if __name__ == '__main__':
     if(whichPlot == "energy"):
         figureName = sys.argv[3]
         plotEnergy(dirName, figureName)
+
+    elif(whichPlot == "forces"):
+        index0 = int(sys.argv[3])
+        index1 = int(sys.argv[4])
+        index2 = int(sys.argv[5])
+        dim = int(sys.argv[6])
+        plotParticleForces(dirName, index0, index1, index2, dim)
 
     elif(whichPlot == "active"):
         figureName = sys.argv[3]
