@@ -887,13 +887,12 @@ def averageLocalDensity(dirName, numBins=12, dirSpacing=10):
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     #dirList = dirList[-50:]
-    localDensity = []
+    localDensity = np.empty(0)
     for dir in dirList:
         localArea = np.zeros((numBins, numBins))
         pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
         ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
-        localDensity.append(localArea/localSquare)
-    localDensity = np.array(localDensity).flatten()
+        localDensity = np.append(localDensity, localArea/localSquare)
     localDensity = np.sort(localDensity)
     localDensity = localDensity[localDensity>0]
     alpha2 = np.mean(localDensity**4)/(2*(np.mean(localDensity**2)**2)) - 1
@@ -905,27 +904,31 @@ def averageLocalDensity(dirName, numBins=12, dirSpacing=10):
     #var = np.var(sampleDensity)
     #skewness = np.mean((sampleDensity - np.mean(sampleDensity))**4)/(3*var**2) - 1
     uplot.plotCorrelation(edges, pdf, "$Local$ $density$", "$Time,$ $t$")
-    #plt.show()
+    plt.show()
 
-def localDensityVarianceVSTime(dirName, numBins=12):
+def computeLocalDensityAndNumberVSTime(dirName, numBins=12, plot=False):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    timeStep = ucorr.readFromParams(dirName, "dt")
     xbin = np.linspace(0, boxSize[0], numBins+1)
     ybin = np.linspace(0, boxSize[1], numBins+1)
     localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
-    rad = np.array(np.loadtxt(dirName + os.sep + "t0/particleRad.dat"))
+    pRad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
-    localDensityVar = []
+    localDensityVar = np.empty(0)
+    localNumberVar = np.empty(0)
     for dir in dirList:
         localArea = np.zeros((numBins, numBins))
+        localNumber = np.zeros((numBins, numBins))
         pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
-        ucorr.computeLocalAreaGrid(pos, pRad, xbin, ybin, localArea)
+        ucorr.computeLocalAreaAndNumberGrid(pos, pRad, xbin, ybin, localArea, localNumber)
         localDensity = localArea/localSquare
-        localDensityVar.append(np.std(localDensity)/np.mean(localDensity))
-    np.savetxt(dirName + "localDensityVarVSTime" + str(numBins) + ".dat", np.column_stack((timeList*timeStep, localDensityVar)))
-    uplot.plotCorrelation(timeList*timeStep, localDensityVar, "$Variance$ $of$ $local$ $density$", "$Time,$ $t$")
-    plt.show()
+        localDensityVar = np.append(localDensityVar, np.var(localDensity))
+        localNumberVar = np.append(localNumberVar, np.var(localNumber))
+    if(plot=="plot"):
+        np.savetxt(dirName + "localDensityAndNumberVarVSTime-N" + str(numBins) + ".dat", np.column_stack((timeList, localDensityVar, localNumberVar)))
+        uplot.plotCorrelation(timeList, localDensityVar, "$Variance$ $of$ $local$ $density$", "$Time,$ $t$", color='k')
+        uplot.plotCorrelation(timeList, localNumberVar, "$Variance$ $of$ $local$ $number$", "$Time,$ $t$", color='g')
+        plt.show()
 
 ######################### Cluster Velocity Correlation #########################
 def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
@@ -972,7 +975,7 @@ def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
     if(os.path.exists(dirName + os.sep + "boxSize.dat")):
         sep = "/"
     else:
-        sep = "../"
+        sep = "/../"
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     rad = np.loadtxt(dirName + sep + "particleRad.dat")
     NpInCluster = connectLabel[connectLabel!=0].shape[0]
@@ -982,17 +985,15 @@ def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     clusterPos = np.mean(pos[connectLabel!=0], axis=0)
     # get list of particles within half of the lengthscale from the center
-    deepList = np.zeros(numParticles)
+    #deepList = np.zeros(numParticles)
     for i in range(numParticles):
         if(particleLabel[i] == 0 and np.sum(contacts[i]) < 2):
             noClusterList[i] = 1
-        delta = ucorr.pbcDistance(pos[i], clusterPos, boxSize)
-        distance = np.linalg.norm(delta)
-        if(distance < clusterSize * 0.5 and connectLabel[i] == 1):
-            deepList[i] = 1
-    np.savetxt(dirName + "/deepList.dat", deepList)
-    np.savetxt(dirName + "/noClusterList.dat", noClusterList)
-    np.savetxt(dirName + "/clusterList.dat", np.column_stack((particleLabel, connectLabel)))
+    #    delta = ucorr.pbcDistance(pos[i], clusterPos, boxSize)
+    #    distance = np.linalg.norm(delta)
+    #    if(distance < clusterSize * 0.5 and connectLabel[i] == 1):
+    #        deepList[i] = 1
+    np.savetxt(dirName + "/clusterLabels.dat", np.column_stack((connectLabel, noClusterList, particleLabel)))
     if(plot=="plot"):
         print("Cluster position, x: ", clusterPos[0], " y: ", clusterPos[1])
         print("Cluster size: ", clusterSize)
@@ -1028,7 +1029,7 @@ def searchClusters(dirName, numParticles=None, plot=False, cluster="cluster"):
             if(cluster=="deep" and deepList[particleId] == 1):
                 ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.6, linewidth=0.5))
         plt.show()
-    return connectLabel, noClusterList
+    return connectLabel, noClusterList, particleLabel
 
 def searchDBClusters(dirName, eps=0, min_samples=10, plot=False, contactFilter='contact'):
     sep = ucorr.getDirSep(dirName, "boxSize")
@@ -1039,14 +1040,18 @@ def searchDBClusters(dirName, eps=0, min_samples=10, plot=False, contactFilter='
     if(eps == 0):
         eps = 2 * np.max(np.loadtxt(dirName + sep + "particleRad.dat"))
     labels = ucorr.getDBClusterLabels(pos, boxSize, eps, min_samples, contacts, contactFilter)
-    np.savetxt(dirName + os.sep + "dbClusterLabels.dat", labels)
+    clusterLabels = np.zeros(pos.shape[0])
+    noClusterLabels = np.zeros(pos.shape[0])
+    clusterLabels[labels!=-1] = 1
+    noClusterLabels[labels==-1] = 1
+    np.savetxt(dirName + os.sep + "dbClusterLabels.dat", np.column_stack((clusterLabels, noClusterLabels, labels)))
     #print("Found", np.unique(labels).shape[0]-1, "clusters") # zero is a label
     # plotting
     if(plot=="plot"):
         rad = np.loadtxt(dirName + sep + "particleRad.dat")
         uplot.plotPacking(boxSize, pos, rad, labels)
         #plt.show()
-    return labels
+    return clusterLabels, noClusterLabels, labels
 
 def averageDBClusterSize(dirName, dirSpacing, eps=0.03, min_samples=10, plot=False, contactFilter=False):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
@@ -1060,13 +1065,13 @@ def averageDBClusterSize(dirName, dirSpacing, eps=0.03, min_samples=10, plot=Fal
     allClustersSize = []
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d] + "/"
-        if(os.path.exists(dirSample + os.sep + "dbClusterLabels!.dat")):
-            labels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")
+        if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
+            labels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,0]
             if(plot=="plot"):
                 pos = ucorr.getPBCPositions(dirSample + os.sep + "particlePos.dat", boxSize)
                 uplot.plotPacking(boxSize, pos, rad, labels)
         else:
-            labels = searchDBClusters(dirSample, eps=0, min_samples=min_samples, plot=plot, contactFilter=contactFilter)
+            _,_,labels = searchDBClusters(dirSample, eps=0, min_samples=min_samples, plot=plot, contactFilter=contactFilter)
         plt.clf()
         # get area of particles in clusters and area of individual clusters
         numLabels = np.unique(labels).shape[0]-1
@@ -1090,17 +1095,18 @@ def computeClusterPT(dirName, plot=False):
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
-            clusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")
+            clusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,0]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,1]
         else:
-            clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
+            clusterLabels, noClusterLabels,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
         pos = np.loadtxt(dirSample + "/particlePos.dat")
         angle = np.loadtxt(dirSample + "/particleAngles.dat")
         vel = np.loadtxt(dirSample + "/particleVel.dat")
         dir = driving*np.array([np.cos(angle), np.sin(angle)]).T
-        activePressure[i,0] = np.sum(np.sum(dir[clusterLabels!=-1]*pos[clusterLabels!=-1],axis=1))
-        activePressure[i,1] = np.sum(np.sum(dir[clusterLabels==-1]*pos[clusterLabels==-1],axis=1))
-        temperature[i,0] = np.sum(0.5*np.linalg.norm(vel[clusterLabels!=-1],axis=0)**2) / clusterLabels[clusterLabels!=-1].shape[0]
-        temperature[i,1] = np.sum(0.5*np.linalg.norm(vel[clusterLabels==-1],axis=0)**2) / clusterLabels[clusterLabels==-1].shape[0]
+        activePressure[i,0] = np.sum(np.sum(dir[clusterLabels!=-1]*pos[clusterLabels==1],axis=1))
+        activePressure[i,1] = np.sum(np.sum(dir[clusterLabels==-1]*pos[noClusterLabels==1],axis=1))
+        temperature[i,0] = np.sum(0.5*np.linalg.norm(vel[clusterLabels==1],axis=0)**2) / clusterLabels[clusterLabels==1].shape[0]
+        temperature[i,1] = np.sum(0.5*np.linalg.norm(vel[noClusterLabels==1],axis=0)**2) / clusterLabels[noClusterLabels==1].shape[0]
     print("Active pressure - in: ", np.mean(activePressure[:,0]), " $\\pm$ ", np.std(activePressure[:,0]), " out: ", np.mean(activePressure[:,1]), " $\\pm$ ", np.std(activePressure[:,1]))
     print("Temperature - in: ", np.mean(temperature[:,0]), " $\\pm$ ", np.std(temperature[:,0]), " out: ", np.mean(temperature[:,1]), " $\\pm$ ", np.std(temperature[:,1]))
     if(plot=='plot'):
@@ -1123,11 +1129,11 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
-            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
-            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
+            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,0]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
         else:
-            #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-            clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
+            #clusterLabels, noClusterLabels,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
+            clusterLabels, noClusterLabels,_ = searchClusters(dirSample, numParticles)
         vel = np.loadtxt(dirSample + os.sep + "particleVel.dat")
         velNorm = np.linalg.norm(vel, axis=1)
         velInCluster = np.append(velInCluster, velNorm[clusterLabels==1].flatten())
@@ -1172,26 +1178,22 @@ def averagePairCorrCluster(dirName, dirSpacing=1000):
     dirList = dirList[-50:]
     pcorrInCluster = np.zeros(rbins.shape[0]-1)
     pcorrOutCluster = np.zeros(rbins.shape[0]-1)
-    phiInCluster = []
-    phiOutCluster = []
-    NpInCluster = []
-    NpOutCluster = []
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
-            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
-            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
+            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,0]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
         else:
-            #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-            clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
-        phiInCluster.append(np.sum(np.pi*particleRad[clusterLabels==1]**2))
-        phiOutCluster.append(np.sum(np.pi*particleRad[noClusterLabels==1]**2))
-        NpInCluster.append(clusterLabels[clusterLabels!=-1].shape[0])
-        NpOutCluster.append(clusterLabels[clusterLabels==-1].shape[0])
+            #clusterLabels, noClusterLabels,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
+            clusterLabels, noClusterLabels,_ = searchClusters(dirSample, numParticles)
+        phiInCluster = np.sum(np.pi*particleRad[clusterLabels==1]**2)
+        phiOutCluster = np.sum(np.pi*particleRad[noClusterLabels==1]**2)
+        NpInCluster = clusterLabels[clusterLabels==1].shape[0]
+        NpOutCluster = clusterLabels[noClusterLabels==1].shape[0]
         #pos = np.array(np.loadtxt(dirSample + os.sep + "particlePos.dat"))
         pos = ucorr.getPBCPositions(dirSample + os.sep + "particlePos.dat", boxSize)
-        pcorrInCluster += ucorr.getPairCorr(pos[clusterLabels!=-1], boxSize, rbins, minRad)/(NpInCluster[-1] * phiInCluster[-1])
-        pcorrOutCluster += ucorr.getPairCorr(pos[clusterLabels==-1], boxSize, rbins, minRad)/(NpOutCluster[-1] * phiOutCluster[-1])
+        pcorrInCluster += ucorr.getPairCorr(pos[clusterLabels==1], boxSize, rbins, minRad)/(NpInCluster * phiInCluster)
+        pcorrOutCluster += ucorr.getPairCorr(pos[noClusterLabels==1], boxSize, rbins, minRad)/(NpOutCluster * phiOutCluster)
     pcorrInCluster[pcorrInCluster>0] /= dirList.shape[0]
     pcorrOutCluster[pcorrOutCluster>0] /= dirList.shape[0]
     binCenter = (rbins[:-1] + rbins[1:])*0.5
@@ -1200,8 +1202,6 @@ def averagePairCorrCluster(dirName, dirSpacing=1000):
     print("First peak of pair corr in cluster is at:", firstPeak, "equal to", firstPeak/minRad, "times the min radius:", minRad)
     uplot.plotCorrelation(binCenter/minRad, pcorrInCluster, "$g(r/\\sigma)$", "$r/\\sigma$", color='b')
     uplot.plotCorrelation(binCenter/minRad, pcorrOutCluster, "$g(r/\\sigma)$", "$r/\\sigma$", color='r')
-    #np.savetxt(dirName + os.sep + "numParticlesCluster.dat", np.column_stack((np.mean(NpInCluster), np.std(NpInCluster), np.mean(NpOutCluster), np.std(NpOutCluster))))
-    #np.savetxt(dirName + os.sep + "numParticlesCluster.dat", np.column_stack((np.mean(phiInCluster), np.std(phiInCluster), np.mean(phiOutCluster), np.std(phiOutCluster))))
     plt.show()
 
 ################# Cluster contact rearrangement distribution ###################
@@ -1223,11 +1223,11 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
         for d in range(1,dirList.shape[0]):
             dirSample = dirName + os.sep + dirList[d]
             if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
-                clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
-                noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
+                clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,0]
+                noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
             else:
-                #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-                clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
+                #clusterLabels, noClusterLabels,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
+                clusterLabels, noClusterLabels,_ = searchClusters(dirSample, numParticles)
             particlesInClusterIndex = np.argwhere(clusterLabels==1)[:,0]
             particlesOutClusterIndex = np.argwhere(noClusterLabels==1)[:,0]
             currentTime = timeList[d]
@@ -1284,11 +1284,11 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
-            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
-            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
+            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,0]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
         else:
-            #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
-            clusterLabels, noClusterLabels = searchClusters(dirSample, numParticles)
+            #clusterLabels, noClusterLabels,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
+            clusterLabels, noClusterLabels,_ = searchClusters(dirSample, numParticles)
         pos = np.array(np.loadtxt(dirSample + os.sep + "particlePos.dat"))
         distance = ucorr.computeDistances(pos, boxSize)
         vel = np.array(np.loadtxt(dirSample + os.sep + "particleVel.dat"))
@@ -1323,7 +1323,7 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
                                 countsOutCluster[k] += 1
     binCenter = (bins[1:] + bins[:-1])/2
     for i in range(velCorrInCluster.shape[1]):
-        velCorrInCluster[countsOutCluster>0,i] /= countsInCluster[countsOutCluster>0]
+        velCorrInCluster[countsInCluster>0,i] /= countsInCluster[countsInCluster>0]
         velCorrOutCluster[countsOutCluster>0,i] /= countsOutCluster[countsOutCluster>0]
     #velCorrInCluster /= velNormSquared
     #velCorrOutCluster /= velNormSquared
@@ -1347,11 +1347,10 @@ def computeClusterBorder(dirName, numParticles, plot='plot'):
     yBounds = np.array([0, boxSize[1]])
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
-    if(os.path.exists(dirName + os.sep + "dbClusterLabels.dat")):
-        #clusterList = np.loadtxt(dirName + os.sep + "clusterList.dat")[:,1]
-        clusterList = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")
+    if(os.path.exists(dirName + os.sep + "clusterLabels.dat")):
+        clusterList = np.loadtxt(dirName + os.sep + "clusterLabels.dat")[:,0]
     else:
-        clusterList = searchClusters(dirName, numParticles=numParticles, cluster='cluster')
+        clusterList,_ = searchClusters(dirName, numParticles=numParticles, cluster='cluster')
     clusterParticles = np.argwhere(clusterList==1)[:,0]
     # compute particle neighbors with a distance cutoff
     distances = ucorr.computeDistances(pos, boxSize)
@@ -1540,9 +1539,9 @@ def computeVelocityFieldCluster(dirName, numBins=100, plot=False, figureName=Non
     bins = np.concatenate((np.array([bins[0]-(bins[1]-bins[0])]), bins))
     bins = np.concatenate((bins, np.linspace(0,0.5*boxSize[0],numBins)[1:]))
     if(read=='read' and os.path.exists(dirName + os.sep + "dbClusterLabels.dat")):
-        clusterLabels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")
+        clusterLabels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")[:,0]
     else:
-        clusterLabels = searchDBClusters(dirName, eps=0, min_samples=10)
+        clusterLabels,_,_ = searchDBClusters(dirName, eps=0, min_samples=10)
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
         pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
         delta = ucorr.computeDeltas(pos, boxSize)
@@ -1633,6 +1632,98 @@ def averageVelocityFieldCluster(dirName, dirSpacing=1000, numBins=100, plot=Fals
         plt.savefig("/home/francesco/Pictures/soft/packings/avfield-" + figureName + ".png", transparent=False, format = "png")
         plt.show()
     return grid, field
+
+############################ Velocity distribution #############################
+def averageClusterFluctuations(dirName, dirSpacing=10000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    phi = int(ucorr.readFromParams(dirName, "phi"))
+    particleRad = np.array(np.loadtxt(dirName + "/particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    #dirList = dirList[-50:]
+    numberCluster = np.zeros(dirList.shape[0])
+    densityCluster = np.zeros(dirList.shape[0])
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
+            clusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,0]
+        else:
+            clusterLabels, _,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
+            #clusterLabels, _,_ = searchClusters(dirSample, numParticles)
+        numberCluster[d] = clusterLabels[clusterLabels==1].shape[0]
+        densityCluster[d] = np.sum(np.pi*particleRad[clusterLabels==1]**2)
+        print(dirList[d], numberCluster[d], densityCluster[d])
+    # in cluster
+    data = np.array([np.mean(numberCluster), np.std(numberCluster), np.mean(densityCluster), np.std(densityCluster)])
+    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", data)
+    print("Number of particles in cluster: ", data[0], " +- ", data[1])
+    print("Cluster area: ", data[2], " +- ", data[3])
+    uplot.plotCorrelation(timeList, numberCluster/numParticles, "$N_p,$ $A_p$", xlabel = "$Time,$ $t$", color='k')
+    #plt.show()
+
+def computeLocalDensityAndNumberFluctuations(dirName, plot=False, color='k'):
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
+    pRad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
+    numBins = np.arange(2,101)
+    meanNum = np.zeros(numBins.shape[0])
+    deltaNum = np.zeros(numBins.shape[0])
+    meanPhi = np.zeros(numBins.shape[0])
+    deltaPhi = np.zeros(numBins.shape[0])
+    for i in range(numBins.shape[0]):
+        xbin = np.linspace(0, boxSize[0], numBins[i]+1)
+        ybin = np.linspace(0, boxSize[1], numBins[i]+1)
+        localSquare = (boxSize[0]/numBins[i])*(boxSize[1]/numBins[i])
+        localArea = np.zeros((numBins[i], numBins[i]))
+        localNumber = np.zeros((numBins[i], numBins[i]))
+        ucorr.computeLocalAreaAndNumberGrid(pos, pRad, xbin, ybin, localArea, localNumber)
+        localDensity = (localArea/localSquare).reshape(numBins[i]*numBins[i])
+        localNumber = localNumber.reshape(numBins[i]*numBins[i])
+        meanNum[i] = np.mean(localNumber)
+        deltaNum[i] = np.var(localNumber)
+        meanPhi[i] = np.mean(localDensity)
+        deltaPhi[i] = np.var(localDensity)
+    np.savetxt(dirName + "localNumberDensity.dat", np.column_stack((numBins, meanNum, deltaNum, meanPhi, deltaPhi)))
+    if(plot=="plot"):
+        uplot.plotCorrelation(meanNum, deltaNum, "$Variance$ $of$ $local$ $number,$ $\\Delta N^2$", "$Local$ $number,$ $N_s$", color=color, logx=True, logy=True)
+        plt.pause(0.5)
+    return meanNum, deltaNum, meanPhi, deltaPhi
+
+def averageLocalDensityAndNumberFluctuations(dirName, plot=False, dirSpacing=10000):
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    numBins = np.arange(2,101)
+    meanNumList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    deltaNumList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    meanPhiList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    deltaPhiList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    colorList = cm.get_cmap('inferno', dirList.shape[0])
+    for d in range(dirList.shape[0]):
+        if(os.path.exists(dirName + os.sep + "localNumberDensity.dat")):
+            data = np.loadtxt(dirName + os.sep + "localNumberDensity.dat")
+            meanNumList[d] = data[:,1]
+            deltaNumList[d] = data[:,2]
+            meanPhiList[d] = data[:,3]
+            deltaPhiList[d] = data[:,4]
+        else:
+            meanNumList[d], deltaNumList[d], meanPhiList[d], deltaPhiList[d] = computeLocalDensityAndNumberFluctuations(dirName + os.sep + dirList[d], plot=False, color=colorList(d/dirList.shape[0]))
+    meanNum = np.mean(meanNumList, axis=0)
+    stdMeanNum = np.std(meanNumList, axis=0)
+    deltaNum = np.mean(deltaNumList, axis=0)
+    stdDeltaNum = np.std(deltaNumList, axis=0)
+    meanPhi = np.mean(meanPhiList, axis=0)
+    stdMeanPhi = np.std(meanPhiList, axis=0)
+    deltaPhi = np.mean(deltaPhiList, axis=0)
+    stdDeltaPhi = np.std(deltaPhiList, axis=0)
+    np.savetxt(dirName + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
+    if(plot=="plot"):
+        uplot.plotCorrWithError(meanNum, deltaNum, stdDeltaNum, "$Variance$ $of$ $local$ $number,$ $\\Delta N^2$", "$Local$ $number,$ $N_s$", color='k', logx=True, logy=True)
+        plt.show()
+
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -1747,10 +1838,10 @@ if __name__ == '__main__':
         plot = sys.argv[4]
         computeLocalDensity(dirName, numBins, plot)
 
-    elif(whichCorr == "densitytime"):
+    elif(whichCorr == "nphitime"):
         numBins = int(sys.argv[3])
         plot = sys.argv[4]
-        localDensityVSTime(dirName, numBins, plot)
+        computeLocalDensityAndNumberVSTime(dirName, numBins, plot)
 
     elif(whichCorr == "averageld"):
         numBins = int(sys.argv[3])
@@ -1811,6 +1902,17 @@ if __name__ == '__main__':
         plot = sys.argv[4]
         figureName = sys.argv[5]
         averageVelocityFieldCluster(dirName, numBins=numBins, plot=plot, figureName=figureName)
+
+    elif(whichCorr == "clusterflu"):
+        averageClusterFluctuations(dirName)
+
+    elif(whichCorr == "phinum"):
+        plot = sys.argv[3]
+        computeLocalDensityAndNumberFluctuations(dirName, plot)
+
+    elif(whichCorr == "averagephinum"):
+        plot = sys.argv[3]
+        averageLocalDensityAndNumberFluctuations(dirName, plot)
 
     else:
         print("Please specify the correlation you want to compute")

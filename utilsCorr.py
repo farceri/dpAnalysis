@@ -167,6 +167,15 @@ def computeLocalAreaGrid(pos, rad, xbin, ybin, localArea):
                     if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
                         localArea[x, y] += np.pi*rad[pId]**2
 
+def computeLocalAreaAndNumberGrid(pos, rad, xbin, ybin, localArea, localNumber):
+    for pId in range(pos.shape[0]):
+        for x in range(xbin.shape[0]-1):
+            if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
+                for y in range(ybin.shape[0]-1):
+                    if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
+                        localArea[x, y] += np.pi*rad[pId]**2
+                        localNumber[x, y] += 1
+
 def computeLocalTempGrid(pos, vel, xbin, ybin, localTemp): #this works only for 2d
     counts = np.zeros((localTemp.shape[0], localTemp.shape[1]))
     for pId in range(pos.shape[0]):
@@ -213,7 +222,7 @@ def getDBClusterLabels(pos, boxSize, eps, min_samples, contacts, contactFilter=F
         for i in range(numParticles):
             if(np.sum(contacts[i]!=-1)>1):
                     for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
-                        if(np.sum(contacts[c]!=-1)>2):
+                        if(np.sum(contacts[c]!=-1)>1):
                             # this is at least a three particle cluster
                             connectLabel[i] = 1
         labels[connectLabel==0] = -1
