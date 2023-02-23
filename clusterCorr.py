@@ -817,7 +817,7 @@ if __name__ == '__main__':
     elif(whichCorr == "clustercol"):
         check = sys.argv[3]
         numBins = int(sys.argv[4])
-        getContactCollisionIntervalPDF(dirName, check, numBins)
+        getClusterContactCollisionIntervalPDF(dirName, check, numBins)
 
     elif(whichCorr == "vccluster"):
         averageParticleVelSpaceCorrCluster(dirName)

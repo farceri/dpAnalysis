@@ -903,8 +903,8 @@ def averageLocalDensity(dirName, numBins=12, dirSpacing=10):
     #mean = np.mean(sampleDensity)
     #var = np.var(sampleDensity)
     #skewness = np.mean((sampleDensity - np.mean(sampleDensity))**4)/(3*var**2) - 1
-    uplot.plotCorrelation(edges, pdf, "$Local$ $density$", "$Time,$ $t$")
-    plt.show()
+    uplot.plotCorrelation(edges, pdf, "$Local$ $density$ $distribution$", "$Local$ $density$")
+    #plt.show()
 
 def computeLocalDensityAndNumberVSTime(dirName, numBins=12, plot=False):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))

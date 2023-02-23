@@ -1579,10 +1579,10 @@ def plotSPClusterSize(dirName, figureName, fixed=False, which='10'):
         #    clusterSize[d,1] = np.std(data)
         if(os.path.exists(dirSample + "clusterFluctuations.dat")):
             data = np.loadtxt(dirSample + "clusterFluctuations.dat")
-            clusterNum[d,0] = data[0]
-            clusterNum[d,1] = data[1]
-            clusterSize[d,0] = data[2]
-            clusterSize[d,1] = data[3]
+            clusterNum[d,0] = np.mean(data[:,1])
+            clusterNum[d,1] = np.std(data[:,1])
+            clusterSize[d,0] = np.mean(data[:,2])
+            clusterSize[d,1] = np.std(data[:,2])
     if(fixed=="iod"):
         x = phi
         xlabel = "$Density,$ $\\varphi$"
@@ -1615,6 +1615,61 @@ def plotSPClusterSize(dirName, figureName, fixed=False, which='10'):
     fig2.savefig(figure2Name + ".png", transparent=True, format = "png")
     plt.show()
 
+def plotSPClusterSizeVSTime(dirName, figureName, fixed=False, which='10'):
+    fig, ax = plt.subplots(figsize=(7.5,5), dpi = 120)
+    if(fixed=="iod"):
+        dirList = np.array(['thermal45',  'thermal58', 'thermal67', 'thermal72',  'thermal78',  'thermal80',  'thermal83', 'thermal85',  'thermal88',  'thermal94', 'thermal1'])#, 'thermal1'])
+        labelList = np.array(['$0.45$', '$0.58$', '$0.67$', '$0.72$', '$0.78$', '$0.80$', '$0.83$', '$0.85$', '$0.88$', '$0.94$', '$1.00$'])#, '$\\varphi = 1.00$'])
+        colorList = cm.get_cmap('viridis', dirList.shape[0])
+        phi = np.zeros(dirList.shape[0])
+    elif(fixed=="phi"):
+        dirList = np.array(['1e-04', '1e-03', '1.2e-02', '1.5e-02', '1'])
+        labelList = np.array(['$0.0001$', '$0.001$', '$0.012$', '$0.015$', '$1$'])
+        colorList = cm.get_cmap('plasma', dirList.shape[0])
+        Dr = np.zeros(dirList.shape[0])
+    else:
+        dirList = np.array(['iod1', 'iod2', 'iod5', 'iod10', 'iod20', 'iod50', 'iod100', 'iod200', 'iod500', 'iod1000'])
+        labelList = np.array(['$\\beta \\sigma = 1$', '$\\beta \\sigma = 2$', '$\\beta \\sigma = 5$', '$\\beta \\sigma = 10$', '$\\beta \\sigma = 20$', '$\\beta \\sigma = 50$', '$\\beta \\sigma = 100$', '$\\beta \\sigma = 200$', '$\\beta \\sigma = 500$', '$\\beta \\sigma = 1000$'])
+        iod = np.array([1, 2, 5, 10, 20, 50, 100, 200, 500, 1000])
+        colorList = cm.get_cmap('cividis', dirList.shape[0])
+        damping = np.zeros(dirList.shape[0])
+    for d in range(dirList.shape[0]):
+        if(fixed=="iod"):
+            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod" + which + "/active-langevin/Dr1e-03-f0200/dynamics/"
+            phi[d] = ucorr.readFromParams(dirSample, "phi")
+        elif(fixed=="phi"):
+            dirSample = dirName + os.sep + "iod" + which + "/active-langevin/Dr" + dirList[d] + "-f0200/dynamics/"
+            Dr[d] = ucorr.readFromDynParams(dirSample, "Dr")
+        else:
+            dirSample = dirName + os.sep + dirList[d] + "/active-langevin/Dr" + which + "-f0200/dynamics/"
+            damping[d] = ucorr.readFromDynParams(dirSample, "damping")
+        if(os.path.exists(dirSample + "clusterFluctuations.dat")):
+            data = np.loadtxt(dirSample + "clusterFluctuations.dat")
+            ax.plot(data[:,0], data[:,2], lw=1.2, color=colorList(d/dirList.shape[0]))
+    # make color bar for legend
+    colorBar = cm.ScalarMappable(cmap=colorList)
+    cb = plt.colorbar(colorBar)
+    if(fixed=="iod"):
+        label = "$\\varphi$"
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pClusterTime-vsPhi-" + figureName + "-iod" + which
+    elif(fixed=="phi"):
+        label = "$D_r$"
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pClusterTime-vsDr-" + figureName + "-iod" + which
+    else:
+        label = "$m/\\gamma$"
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pClusterTime-vsDamping-" + figureName + "-Dr" + which
+    cb.set_ticks(np.arange(0.5/labelList.shape[0],1,1/labelList.shape[0]))
+    cb.ax.tick_params(labelsize=12)
+    ticklabels = labelList
+    cb.set_ticklabels(ticklabels)
+    cb.set_label(label=label, fontsize=14, labelpad=5, rotation='horizontal')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$Simulation$ $time,$ $t$", fontsize=18)
+    ax.set_ylabel("$Cluster$ $area,$ $A_c(t)$", fontsize=18)
+    fig.tight_layout()
+    fig.savefig(figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
 def plotSPClusterSystemSize(dirName, figureName, iod = '10'):
     fig, ax = plt.subplots(figsize=(6.5,5), dpi = 120)
     dirList = np.array(['1024', '2048', '4096', '8192'])
@@ -1636,6 +1691,33 @@ def plotSPClusterSystemSize(dirName, figureName, iod = '10'):
     ax.set_ylabel("$Cluster$ $area,$ $\\langle A_c \\rangle$", fontsize=18)
     fig.tight_layout()
     figureName = "/home/francesco/Pictures/nve-nvt-nva/pCluster-vsSystemSize-" + figureName + "-Dr" + which
+    fig.savefig(figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
+def plotSPDensityProfile(dirName, figureName, iod = '10'):
+    fig, ax = plt.subplots(figsize=(7.5,5), dpi = 120)
+    fileList = np.arange(6,32,2)
+    colorList = cm.get_cmap('inferno', fileList.shape[0])
+    for d in range(fileList.shape[0]):
+        fileName = dirName + os.sep + "localDensity-N" + str(fileList[d]) + ".dat"
+        if(os.path.exists(fileName)):
+            data = np.loadtxt(fileName)
+            plt.plot(data[:,0], data[:,1], lw=1.2, color=colorList(d/fileList.shape[0]))
+            if(fileList[d]==16):
+                plt.plot(data[:,0], data[:,1], color='k', marker='*', markersize=10, lw=0, fillstyle='none')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$Local$ $density,$ $\\varphi_l$", fontsize=18)
+    ax.set_ylabel("$PDF(\\varphi_l)$", fontsize=18)
+    colorBar = cm.ScalarMappable(cmap=colorList)
+    cb = plt.colorbar(colorBar)
+    label = "$N_{bins}$"
+    cb.set_ticks([1/26, 25/26])
+    cb.ax.tick_params(labelsize=14)
+    ticklabels = ['$6$', '$30$']
+    cb.set_ticklabels(ticklabels)
+    cb.set_label(label=label, fontsize=18, labelpad=0, rotation='horizontal')
+    fig.tight_layout()
+    figureName = "/home/francesco/Pictures/nve-nvt-nva/pDensityWindow-" + figureName
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
@@ -3006,10 +3088,20 @@ if __name__ == '__main__':
         which = sys.argv[5]
         plotSPClusterSize(dirName, figureName, fixed, which)
 
+    elif(whichPlot == "clustertime"):
+        figureName = sys.argv[3]
+        fixed = sys.argv[4]
+        which = sys.argv[5]
+        plotSPClusterSizeVSTime(dirName, figureName, fixed, which)
+
     elif(whichPlot == "clustersize"):
         figureName = sys.argv[3]
         which = sys.argv[4]
         plotSPClusterSystemSize(dirName, figureName, which)
+
+    elif(whichPlot == "phiprofile"):
+        figureName = sys.argv[3]
+        plotSPDensityProfile(dirName, figureName)
 
 ########################### check and plot compression #########################
     elif(whichPlot == "comp"):
