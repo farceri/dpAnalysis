@@ -700,6 +700,32 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
     np.savetxt(dirName + os.sep + "spaceVelCorrInCluster.dat", np.column_stack((binCenter, velCorrInCluster, countsInCluster)))
     np.savetxt(dirName + os.sep + "spaceVelCorrOutCluster.dat", np.column_stack((binCenter, velCorrOutCluster, countsOutCluster)))
 
+############################ Velocity distribution #############################
+def averageClusterFluctuations(dirName, dirSpacing=10000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    phi = int(ucorr.readFromParams(dirName, "phi"))
+    particleRad = np.array(np.loadtxt(dirName + "/particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    numberCluster = np.zeros(dirList.shape[0])
+    densityCluster = np.zeros(dirList.shape[0])
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
+            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,0]
+        else:
+            #clusterLabels = searchDBClusters(dirSample, eps=0, min_samples=10)
+            clusterLabels,_ = searchClusters(dirSample, numParticles)
+        numberCluster[d] = clusterLabels[clusterLabels==1].shape[0]
+        densityCluster[d] = np.sum(np.pi*particleRad[clusterLabels==1]**2)
+        print(dirList[d], numberCluster[d], densityCluster[d])
+    # in cluster
+    data = np.array([np.mean(numberCluster), np.std(numberCluster), np.mean(densityCluster), np.std(densityCluster)])
+    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", data)
+    print("Number of particles in cluster: ", data[0], " +- ", data[1])
+    print("Cluster area: ", data[2], " +- ", data[3])
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -797,6 +823,9 @@ if __name__ == '__main__':
 
     elif(whichCorr == "vccluster"):
         averageParticleVelSpaceCorrCluster(dirName)
+
+    elif(whichCorr == "clusterflu"):
+        averageClusterFluctuations(dirName)
 
     else:
         print("Please specify the correlation you want to compute")

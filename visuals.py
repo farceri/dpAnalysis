@@ -182,7 +182,7 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
     plt.savefig(figureName, transparent=False, format = "png")
     plt.show()
 
-def plotSoftParticles(ax, pos, rad, alpha = 0.6, colorMap = True, lw = 0.5):
+def plotSoftParticles(ax, pos, rad, alpha = 0.4, colorMap = True, lw = 0.5):
     colorId = np.zeros((rad.shape[0], 4))
     if(colorMap == True):
         colorList = cm.get_cmap('viridis', rad.shape[0])
@@ -231,12 +231,12 @@ def plotSoftParticleQuiverVel(axFrame, pos, vel, rad, alpha = 0.6, maxVelList = 
         vx = vel[particleId,0]
         vy = vel[particleId,1]
         axFrame.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
-        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=10)#width=0.003, scale=1, headwidth=5)
+        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)#width=0.003, scale=1, headwidth=5)
         #for j in range(13):
         #    if(particleId == maxVelList[j]):
         #        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.003, scale=1, headwidth=5)
 
-def plotSoftParticleCluster(axFrame, pos, rad, clusterList, alpha = 0.6):
+def plotSoftParticleCluster(axFrame, pos, rad, clusterList, alpha = 0.4):
     for particleId in range(pos.shape[0]):
         x = pos[particleId,0]
         y = pos[particleId,1]
@@ -264,7 +264,7 @@ def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = Fals
         #    clusterList = np.loadtxt(dirName + os.sep + "clusterList.dat")[:,1]
             #clusterList = np.loadtxt(dirName + os.sep + "deepList.dat")
         #else:
-        clusterList = spCorr.searchClusters(dirName, numParticles=rad.shape[0], cluster=cluster)
+        clusterList,_ = spCorr.searchClusters(dirName, numParticles=rad.shape[0])
         plotSoftParticleCluster(axFrame, pos, rad, clusterList)
     else:
         if(npt == "npt"):
@@ -361,7 +361,7 @@ def makeSPVelFieldVideo(dirName, figureName, numFrames = 20, firstStep = 0, step
         anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
     anim.save("/home/francesco/Pictures/soft/packings/velfield-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
-def plotDeformableParticles(ax, pos, rad, nv, faceColor = [0,0.5,1], edgeColor = [0.3,0.3,0.3], colorMap = False, edgeColorMap = False, alpha = 0.7, ls = '-', lw = 0.5):
+def plotDeformableParticles(ax, pos, rad, nv, faceColor = [0,0.5,1], edgeColor = [0.3,0.3,0.3], colorMap = False, edgeColorMap = False, alpha = 0.7, ls = '-', lw = 0.2):
     start = 0
     colorList = cm.get_cmap('viridis', nv.shape[0])
     colorId = np.zeros((nv.shape[0], 4))
