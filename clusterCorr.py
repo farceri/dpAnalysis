@@ -721,7 +721,7 @@ def averageClusterFluctuations(dirName, dirSpacing=10000):
         numberCluster[d] = clusterLabels[clusterLabels==1].shape[0]
         densityCluster[d] = np.sum(np.pi*particleRad[clusterLabels==1]**2)
     # in cluster
-    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", np.column_stack((numberCluster, densityCluster)))
+    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", np.column_stack((timeList, numberCluster, densityCluster)))
     print("Number of particles in cluster: ", np.mean(numberCluster), " +- ", np.std(numberCluster))
     print("Cluster area: ", np.mean(densityCluster), " +- ", np.std(densityCluster))
 
