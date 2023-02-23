@@ -506,12 +506,12 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=10000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-10:]
+    dirList = dirList[-50:]
     velInCluster = np.empty(0)
     velOutCluster = np.empty(0)
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
+        if(os.path.exists(dirSample + os.sep + "clusterLabels!.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
             noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
         else:
@@ -626,16 +626,16 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
         np.savetxt(dirName + os.sep + "inClusterCollisionIntervals.dat", intervalInCluster)
         intervalOutCluster = np.sort(intervalOutCluster)
         intervalOutCluster *= timeStep
-        np.savetxt(dirName + os.sep + "outClusterCollisionIntervals.dat", interval)
+        np.savetxt(dirName + os.sep + "outClusterCollisionIntervals.dat", intervalOutCluster)
     # in cluster collision distribution
     bins = np.arange(np.min(intervalInCluster), np.max(intervalInCluster), 5*np.min(intervalInCluster))
-    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    pdf, edges = np.histogram(intervalInCluster, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time in cluster:", np.mean(intervalInCluster), " standard deviation: ", np.std(intervalInCluster))
     np.savetxt(dirName + os.sep + "inClusterCollision.dat", np.column_stack((centers, pdf)))
     # out cluster collision distribution
     bins = np.arange(np.min(intervalOutCluster), np.max(intervalOutCluster), 5*np.min(intervalOutCluster))
-    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    pdf, edges = np.histogram(intervalOutCluster, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
     print("average collision time in cluster:", np.mean(intervalOutCluster), " standard deviation: ", np.std(intervalOutCluster))
     np.savetxt(dirName + os.sep + "outClusterCollision.dat", np.column_stack((centers, pdf)))
@@ -793,7 +793,7 @@ if __name__ == '__main__':
     elif(whichCorr == "clustercol"):
         check = sys.argv[3]
         numBins = int(sys.argv[4])
-        getContactCollisionIntervalPDF(dirName, check, numBins)
+        getClusterContactCollisionIntervalPDF(dirName, check, numBins)
 
     elif(whichCorr == "vccluster"):
         averageParticleVelSpaceCorrCluster(dirName)
