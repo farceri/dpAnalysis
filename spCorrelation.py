@@ -1654,13 +1654,11 @@ def averageClusterFluctuations(dirName, dirSpacing=10000):
             #clusterLabels, _,_ = searchClusters(dirSample, numParticles)
         numberCluster[d] = clusterLabels[clusterLabels==1].shape[0]
         densityCluster[d] = np.sum(np.pi*particleRad[clusterLabels==1]**2)
-        print(dirList[d], numberCluster[d], densityCluster[d])
     # in cluster
-    data = np.array([np.mean(numberCluster), np.std(numberCluster), np.mean(densityCluster), np.std(densityCluster)])
-    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", data)
-    print("Number of particles in cluster: ", data[0], " +- ", data[1])
-    print("Cluster area: ", data[2], " +- ", data[3])
-    uplot.plotCorrelation(timeList, numberCluster/numParticles, "$N_p,$ $A_p$", xlabel = "$Time,$ $t$", color='k')
+    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", np.column_stack((numberCluster, densityCluster)))
+    print("Number of particles in cluster: ", np.mean(numberCluster), " +- ", np.std(numberCluster))
+    print("Cluster area: ", np.mean(densityCluster), " +- ", np.std(densityCluster))
+    uplot.plotCorrelation(timeList, densityCluster, "$A_p$", xlabel = "$Time,$ $t$", color='k')
     #plt.show()
 
 def computeLocalDensityAndNumberFluctuations(dirName, plot=False, color='k'):

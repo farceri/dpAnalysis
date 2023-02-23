@@ -506,12 +506,12 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=10000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-50:]
+    dirList = dirList[-10:]
     velInCluster = np.empty(0)
     velOutCluster = np.empty(0)
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "clusterLabels!.dat")):
+        if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
             noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,2]
         else:
@@ -720,12 +720,10 @@ def averageClusterFluctuations(dirName, dirSpacing=10000):
             clusterLabels,_ = searchClusters(dirSample, numParticles)
         numberCluster[d] = clusterLabels[clusterLabels==1].shape[0]
         densityCluster[d] = np.sum(np.pi*particleRad[clusterLabels==1]**2)
-        print(dirList[d], numberCluster[d], densityCluster[d])
     # in cluster
-    data = np.array([np.mean(numberCluster), np.std(numberCluster), np.mean(densityCluster), np.std(densityCluster)])
-    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", data)
-    print("Number of particles in cluster: ", data[0], " +- ", data[1])
-    print("Cluster area: ", data[2], " +- ", data[3])
+    np.savetxt(dirName + os.sep + "clusterFluctuations.dat", np.column_stack((numberCluster, densityCluster)))
+    print("Number of particles in cluster: ", np.mean(numberCluster), " +- ", np.std(numberCluster))
+    print("Cluster area: ", np.mean(densityCluster), " +- ", np.std(densityCluster))
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -819,7 +817,7 @@ if __name__ == '__main__':
     elif(whichCorr == "clustercol"):
         check = sys.argv[3]
         numBins = int(sys.argv[4])
-        getClusterContactCollisionIntervalPDF(dirName, check, numBins)
+        getContactCollisionIntervalPDF(dirName, check, numBins)
 
     elif(whichCorr == "vccluster"):
         averageParticleVelSpaceCorrCluster(dirName)
