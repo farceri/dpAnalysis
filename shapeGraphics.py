@@ -11,16 +11,8 @@ import itertools
 import sys
 import os
 import utilsCorr as ucorr
+import utilsPlot as uplot
 import shapeDescriptors
-
-def getStepList(numFrames, firstStep, stepFreq):
-    maxStep = int(firstStep + stepFreq * numFrames)
-    stepList = np.arange(firstStep, maxStep, stepFreq, dtype=int)
-    if(stepList.shape[0] < numFrames):
-        numFrames = stepList.shape[0]
-    else:
-        stepList = stepList[-numFrames:]
-    return stepList
 
 def getContactDiff(dirName, numParticles, stepList):
     initialContacts = np.loadtxt(dirName + os.sep + "t" + str(stepList[0]) + "/contacts.dat", dtype=int)
@@ -283,7 +275,7 @@ def plotShapeCorrelation(dirName, figureName):
     plt.show()
 
 def plotShapeStressCorrelation(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, numBins=30):
-    stepList = getStepList(numFrames, firstStep, stepFreq)
+    stepList = uplot.getStepList(numFrames, firstStep, stepFreq)
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype=int)
     numParticles = nv.shape[0]

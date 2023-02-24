@@ -1145,7 +1145,7 @@ def plotSPCollisionPersistence(dirName, figureName, fixed=False, which='10'):
         if(os.path.exists(dirSample + "/contactCollision.dat")):
             taup[d] = 1/ucorr.readFromDynParams(dirSample, "Dr")
             if(d < 6 and os.path.exists(dirSample + "/inClusterCollision.dat")):
-                collision = np.loadtxt(dirSample + "/contactCollisionIntervals.dat")
+                collision = np.loadtxt(dirSample + "/inClusterCollisionIntervals.dat")
             else:
                 collision = np.loadtxt(dirSample + "/contactCollisionIntervals.dat")
             collision, counts = np.unique(collision, return_counts=True)
@@ -1212,8 +1212,8 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-04', '5e-04', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '2', '5', '10', '50', '100', '1000'])
-        labelList = np.array(['$D_r = 0.0001$', '$D_r = 0.0005$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$'])
+        dirList = np.array(['1e-04', '5e-04', '1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '2', '5', '10', '50', '100', '1000'])
+        labelList = np.array(['$D_r = 0.0001$', '$D_r = 0.0005$', '$D_r = 0.001$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
         Dr = np.zeros(dirList.shape[0])
     else:
@@ -1427,8 +1427,10 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-04', '5e-04', '1e-03', '5e-03', '7e-03', '1e-02', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '100'])
-        labelList = np.array(['$D_r = 10^{-4}$', '$D_r = 5 \\times 10^{-4}$', '$D_r = 10^{-3}$', '$D_r = 5 \\times 10^{-3}$', '$D_r = 7 \\times 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 1.2 \\times 10^{-2}$', '$D_r = 1.5 \\times 10^{-2}$', '$D_r = 2 \\times 10^{-2}$', '$D_r = 3 \\times 10^{-2}$', '$D_r = 5 \\times 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 5 \\times 10^{-1}$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$'])
+        #dirList = np.array(['1e-04', '5e-04', '1e-03', '5e-03', '7e-03', '1e-02', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '100', '1000'])
+        #labelList = np.array(['$D_r = 10^{-4}$', '$D_r = 5 \\times 10^{-4}$', '$D_r = 10^{-3}$', '$D_r = 5 \\times 10^{-3}$', '$D_r = 7 \\times 10^{-3}$', '$D_r = 10^{-2}$', '$D_r = 1.2 \\times 10^{-2}$', '$D_r = 1.5 \\times 10^{-2}$', '$D_r = 2 \\times 10^{-2}$', '$D_r = 3 \\times 10^{-2}$', '$D_r = 5 \\times 10^{-2}$', '$D_r = 10^{-1}$', '$D_r = 5 \\times 10^{-1}$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$', '$D_r = 1000$'])
+        dirList = np.array(['1e-04', '5e-04', '1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '2', '5', '10', '50', '100', '1000'])
+        labelList = np.array(['$D_r = 0.0001$', '$D_r = 0.0005$', '$D_r = 0.001$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
         Dr = np.zeros(dirList.shape[0])
     else:
@@ -1461,7 +1463,7 @@ def plotSPVelPhiPDF(dirName, figureName, fixed=False, which='10'):
             #ax1.plot(data[data[:,1]>0,0], -np.log(data[data[:,1]>0,1]), color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
             data = np.loadtxt(dirSample + "localDensity-N15-stats.dat")
             alpha2[d] = 2*data[2] + 1 # correction
-    ax1.legend(fontsize=8, loc="upper right", ncol=2)
+    ax2.legend(fontsize=8, loc="upper right", ncol=2)
     ax1.tick_params(axis='both', labelsize=14)
     ax2.tick_params(axis='both', labelsize=14)
     ax1.set_xlabel("$Speed,$ $|\\vec{v}|$", fontsize=18)

@@ -17,6 +17,7 @@ import shapeDescriptors
 import shapeGraphics
 import spCorrelation as spCorr
 import utilsCorr as ucorr
+import utilsPlot as uplot
 
 
 def setAxes3D(ax):
@@ -113,11 +114,6 @@ def getEkinColorList(vel):
         count += 1
     return colorId
 
-def getClusterColorList(pos, boxSize, contacts, eps=0.03, min_samples=10):
-    labels = ucorr.getDBClusterLabels(pos, boxSize, eps, min_samples, contacts)
-    colorId = getColorListFromLabels(labels)
-    return colorId
-
 def getColorListFromLabels(labels):
     numLabels = np.unique(labels).shape[0]-1
     colorList = cm.get_cmap('tab20', numLabels)
@@ -146,11 +142,11 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
     setBigBoxAxes(boxSize, ax, 0.05)
     if(cluster==True):
         if(os.path.exists(dirName + os.sep + "dbClusterLabels.dat")):
-            labels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")
-            colorId = getColorListFromLabels(labels)
+            labels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")[:,2]
+            #labels[labels!=0] = -1
         else:
-            contacts = np.array(np.loadtxt(dirName + sep + "particleContacts.dat"), dtype=int)
-            colorId = getClusterColorList(pos, boxSize, contacts, eps, min_samples)
+            _,_, labels = spCorr.searchDBClusters(dirName)
+        colorId = getColorListFromLabels(labels)
     elif(ekmap==True):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
         colorId = getEkinColorList(vel)
@@ -198,7 +194,7 @@ def plotSoftParticles(ax, pos, rad, alpha = 0.4, colorMap = True, lw = 0.5):
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth = lw))
 
-def plotSoftParticlesSubSet(ax, pos, rad, firstIndex, alpha = 0.6, colorMap = True, lw = 0.5):
+def plotSoftParticlesSubSet(ax, pos, rad, tagList, alpha = 0.6, colorMap = True, lw = 0.5):
     colorId = np.zeros((rad.shape[0], 4))
     if(colorMap == True):
         colorList = cm.get_cmap('viridis', rad.shape[0])
@@ -208,9 +204,9 @@ def plotSoftParticlesSubSet(ax, pos, rad, firstIndex, alpha = 0.6, colorMap = Tr
     for particleId in np.argsort(rad):
         colorId[particleId] = colorList(count/rad.shape[0])
         count += 1
-    colorId[:firstIndex] = [0,0,0,1]
+    colorId[tagList==1] = [0,0,0,1]
     alphaId = np.ones(colorId.shape[0])
-    alphaId[firstIndex:] = alpha
+    alphaId[tagList==1] = alpha
     for particleId in range(pos.shape[0]):
         x = pos[particleId,0]
         y = pos[particleId,1]
@@ -242,11 +238,57 @@ def plotSoftParticleCluster(axFrame, pos, rad, clusterList, alpha = 0.4):
         y = pos[particleId,1]
         r = rad[particleId]
         if(clusterList[particleId] == 1):
-            axFrame.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=alpha, linewidth = 0.7))
+            axFrame.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='b', alpha=alpha, linewidth = 0.7))
         else:
             axFrame.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=[1,1,1], alpha=alpha, linewidth = 0.7))
 
-def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 0, npt = False, quiver = False, cluster = False):
+def makeSoftParticleClusterFrame(dirName, rad, boxSize, figFrame, frames, clusterList):
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    gcfFrame = plt.gcf()
+    gcfFrame.clear()
+    axFrame = figFrame.gca()
+    setPackingAxes(boxSize, axFrame)
+    plotSoftParticleCluster(axFrame, pos, rad, clusterList)
+    plt.tight_layout()
+    axFrame.remove()
+    frames.append(axFrame)
+
+def makeSPPackingClusterVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepFreq = 1e04):
+    def animate(i):
+        frames[i].figure=fig
+        fig.axes.append(frames[i])
+        fig.add_axes(frames[i])
+        return gcf.artists
+    frameTime = 300
+    frames = []
+    stepList = uplot.getStepList(numFrames, firstStep, stepFreq)
+    print(stepList)
+    #frame figure
+    figFrame = plt.figure(dpi=150)
+    fig = plt.figure(dpi=150)
+    gcf = plt.gcf()
+    gcf.clear()
+    ax = fig.gca()
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    setPackingAxes(boxSize, ax)
+    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    if(os.path.exists(dirName + os.sep + "t0/dbClusterLabels.dat")):
+        labels = np.loadtxt(dirName + os.sep + "t0/dbClusterLabels.dat")[:,2]
+    else:
+        _,_,labels = spCorr.searchDBClusters(dirName)
+    clusterList = np.zeros(rad.shape[0])
+    clusterList[labels==0] = 1
+    # the first configuration gets two frames for better visualization
+    makeSoftParticleClusterFrame(dirName + os.sep + "t" + str(stepList[0]), rad, boxSize, figFrame, frames, clusterList)
+    for i in stepList:
+        dirSample = dirName + os.sep + "t" + str(i)
+        makeSoftParticleClusterFrame(dirSample, rad, boxSize, figFrame, frames, clusterList)
+        anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
+    anim.save("/home/francesco/Pictures/soft/packings/initCluster-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
+
+def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 10, npt = False, quiver = False, cluster = False):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
@@ -255,16 +297,16 @@ def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = Fals
     axFrame = figFrame.gca()
     setPackingAxes(boxSize, axFrame)
     if(subSet == "subset"):
-        plotSoftParticlesSubSet(axFrame, pos, rad, firstIndex)
+        tagList = np.zeros(rad.shape[0])
+        tagList[:firstIndex] = 1
     elif(quiver == "quiver"):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
         plotSoftParticleQuiverVel(axFrame, pos, vel, rad)
     elif(cluster == "cluster"):
-        #if(os.path.exists(dirName + os.sep + "clusterList.dat")):
-        #    clusterList = np.loadtxt(dirName + os.sep + "clusterList.dat")[:,1]
-            #clusterList = np.loadtxt(dirName + os.sep + "deepList.dat")
-        #else:
-        clusterList,_ = spCorr.searchClusters(dirName, numParticles=rad.shape[0])
+        if(os.path.exists(dirName + os.sep + "clusterLabels.dat")):
+            clusterList = np.loadtxt(dirName + os.sep + "clusterLabels.dat")[:,0]
+        else:
+            clusterList,_,_ = spCorr.searchClusters(dirName, numParticles=rad.shape[0])
         plotSoftParticleCluster(axFrame, pos, rad, clusterList)
     else:
         if(npt == "npt"):
@@ -283,7 +325,7 @@ def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepF
     frameTime = 300
     frames = []
     if(logSpaced == False):
-        stepList = shapeGraphics.getStepList(numFrames, firstStep, stepFreq)
+        stepList = uplot.getStepList(numFrames, firstStep, stepFreq)
     else:
         stepList = []
         for dir in os.listdir(dirName):
@@ -593,7 +635,7 @@ def makeRearrengementsVideo(dirName, figureName, numFrames = 20, firstStep = 1e0
         return gcf.artists
     frameTime = 200
     frames = []
-    stepList = shapeGraphics.getStepList(numFrames, firstStep, stepFreq)
+    stepList = uplot.getStepList(numFrames, firstStep, stepFreq)
     print(stepList)
     #frame figure
     figFrame = plt.figure(dpi=150)
@@ -700,6 +742,12 @@ if __name__ == '__main__':
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
         makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, cluster = "cluster")
+
+    elif(whichPlot == "clustertime"):
+        numFrames = int(sys.argv[4])
+        firstStep = float(sys.argv[5])
+        stepFreq = float(sys.argv[6])
+        makeSPPackingClusterVideo(dirName, figureName, numFrames, firstStep, stepFreq)
 
     elif(whichPlot == "ssvideosubset"):
         numFrames = int(sys.argv[4])
