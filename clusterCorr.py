@@ -581,13 +581,10 @@ def averagePairCorrCluster(dirName, dirSpacing=10000):
     print("First peak of pair corr in cluster is at:", firstPeak, "equal to", firstPeak/minRad, "times the min radius:", minRad)
 
 ################# Cluster contact rearrangement distribution ###################
-def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=1000):
+def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
-    timeList = timeList.astype(int)
-    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-10:]
     if(os.path.exists(dirName + "/inClusterCollisionIntervals.dat") and check=="check"):
         print("loading already existing file")
         intervalInCluster = np.loadtxt(dirName + os.sep + "inClusterCollisionIntervals.dat")

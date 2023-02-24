@@ -1205,12 +1205,11 @@ def averagePairCorrCluster(dirName, dirSpacing=1000):
     plt.show()
 
 ################# Cluster contact rearrangement distribution ###################
-def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=1000):
+def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
-    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     if(os.path.exists(dirName + "/contactCollisionIntervals.dat") and check=="check"):
         print("loading already existing file")
         intervalInCluster = np.loadtxt(dirName + os.sep + "inClusterCollisionIntervals.dat")
@@ -1283,7 +1282,7 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
     countsOutCluster = np.zeros(bins.shape[0]-1)
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
+        if(os.path.exists(dirSample + os.sep + "clusterLabels!.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,0]
             noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
         else:

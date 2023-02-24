@@ -1120,8 +1120,8 @@ def plotSPCollisionPersistence(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '2', '5', '10', '100', '1000'])
-        labelList = np.array(['$D_r = 0.001$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$', '$D_r = 1000$'])
+        dirList = np.array(['1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '2', '5', '10', '50', '100', '1000'])
+        labelList = np.array(['$D_r = 0.001$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
         Dr = np.zeros(dirList.shape[0])
     else:
@@ -1144,8 +1144,8 @@ def plotSPCollisionPersistence(dirName, figureName, fixed=False, which='10'):
             damping[d] = ucorr.readFromDynParams(dirSample, "damping")
         if(os.path.exists(dirSample + "/contactCollision.dat")):
             taup[d] = 1/ucorr.readFromDynParams(dirSample, "Dr")
-            if(os.path.exists(dirSample + "/inClusterCollision.dat")):
-                collision = np.loadtxt(dirSample + "/inClusterCollisionIntervals.dat")
+            if(d < 6 and os.path.exists(dirSample + "/inClusterCollision.dat")):
+                collision = np.loadtxt(dirSample + "/contactCollisionIntervals.dat")
             else:
                 collision = np.loadtxt(dirSample + "/contactCollisionIntervals.dat")
             collision, counts = np.unique(collision, return_counts=True)
@@ -1161,7 +1161,9 @@ def plotSPCollisionPersistence(dirName, figureName, fixed=False, which='10'):
                 failed = True
             if(failed == False):
                 ax.plot(collision, curveCumSum(collision, *popt), color='k', lw=2, linestyle='--')
-            tauc[d] = collision[np.argwhere(cdf>0.9)[0,0]]
+                tauc[d] = popt[0]
+            else:
+                tauc[d] = collision[np.argwhere(cdf>0.9)[0,0]]
             print(dirList[d], " timescale: ", tauc[d])
     ax.legend(fontsize=10, loc="lower right", ncol=2)
     #ax.set_xlim(-0.07, 2.07)
@@ -1177,8 +1179,8 @@ def plotSPCollisionPersistence(dirName, figureName, fixed=False, which='10'):
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pCollision-vsPhi-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pTaus-vsPhi-" + figureName + "-iod" + which
     elif(fixed=="phi"):
-        x = 1/Dr
-        xlabel = "$Inverse$ $rotational$ $diffusion,$ $1/D_r$"
+        x = Dr
+        xlabel = "$Rotational$ $diffusion,$ $D_r$"
         loc = 'upper left'
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pCollision-vsDr-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pTaus-vsDr-" + figureName + "-iod" + which
@@ -1197,7 +1199,7 @@ def plotSPCollisionPersistence(dirName, figureName, fixed=False, which='10'):
         ax.set_xscale('log')
     ax.set_xlabel(xlabel, fontsize=18)
     ax.set_ylabel("$Timescales$", fontsize=18)
-    ax.legend(("$Collision$ $time$ $\\tau_c$", "$Persistent$ $time$ $\\tau_p$"), fontsize=12, loc="upper left")
+    ax.legend(("$Collision$ $time$ $\\tau_c$", "$Persistent$ $time$ $\\tau_p$"), fontsize=12, loc="upper right")
     fig.tight_layout()
     fig.savefig(figure2Name + ".png", transparent=False, format = "png")
     plt.show()
@@ -1210,8 +1212,8 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-04', '5e-04', '1e-03', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '100', '1000'])
-        labelList = np.array(['$0.0001$', '$D_r = 0.0005$', '$D_r = 0.001$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 5$', '$D_r = 10$', '$D_r = 100$', '$D_r = 1000$'])
+        dirList = np.array(['1e-04', '5e-04', '5e-03', '1e-02', '5e-02', '1e-01', '5e-01', '1', '2', '5', '10', '50', '100', '1000'])
+        labelList = np.array(['$D_r = 0.0001$', '$D_r = 0.0005$', '$D_r = 0.005$', '$D_r = 0.01$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
         Dr = np.zeros(dirList.shape[0])
     else:
@@ -1233,12 +1235,12 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
         if(os.path.exists(dirSample + "spaceVelCorr.dat")):
             Dr[d] = ucorr.readFromDynParams(dirSample, "Dr")
             meanRad = np.mean(np.loadtxt(dirSample + "/particleRad.dat"))
-            if(os.path.exists(dirSample + "spaceVelCorrInCluster.dat")):
+            if(d < 6 and os.path.exists(dirSample + "spaceVelCorrInCluster.dat")):
                 data = np.loadtxt(dirSample + "/spaceVelCorrInCluster.dat")
             else:
                 data = np.loadtxt(dirSample + "/spaceVelCorr.dat")
             data[:,0] /= meanRad
-            #data = data[data[:,0]<63]
+            data = data[data[:,0]<63]
             ax[0].plot(data[:,0], data[:,1], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
             #ax[0].plot(data[:,0], data[:,2], color=colorList(d/dirList.shape[0]), lw=1.2, label=labelList[d])
             #data = data[data[:,0]<80,:]
@@ -1267,9 +1269,9 @@ def plotSPVelSpaceCorr(dirName, figureName, fixed=False, which='10'):
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceVelCorr-vsPhi-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceDiff-vsPhi-" + figureName + "-iod" + which
     elif(fixed=="phi"):
-        x = Dr
-        #xlabel = "$Persistence$ $time,$ $\\tau_p$"
-        xlabel = "$Rotational$ $diffusion,$ $D_r$"
+        x = 1/Dr
+        xlabel = "$Persistence$ $time,$ $\\tau_p$"
+        #xlabel = "$Rotational$ $diffusion,$ $D_r$"
         loc = 'upper left'
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceVelCorr-vsDr-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pSpaceDiff-vsDr-" + figureName + "-iod" + which
@@ -1623,8 +1625,8 @@ def plotSPClusterSizeVSTime(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0])
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-04', '1e-03', '1.2e-02', '1.5e-02', '1'])
-        labelList = np.array(['$0.0001$', '$0.001$', '$0.012$', '$0.015$', '$1$'])
+        dirList = np.array(['1e-04', '1e-03', '7e-03', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '1'])
+        labelList = np.array(['$0.0001$', '$0.001$', '$0.007$', '$0.012$', '$0.015$', '$0.02$', '$0.03$', '$0.05$', '$0.1$', '$1$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0])
         Dr = np.zeros(dirList.shape[0])
     else:
