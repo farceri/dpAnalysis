@@ -139,7 +139,8 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
     ax.set_xlim(xBounds[0], xBounds[1])
     ax.set_ylim(yBounds[0], yBounds[1])
     ax.set_aspect('equal', adjustable='box')
-    setBigBoxAxes(boxSize, ax, 0.05)
+    setPackingAxes(boxSize, ax)
+    #setBigBoxAxes(boxSize, ax, 0.05)
     if(cluster==True):
         if(os.path.exists(dirName + os.sep + "dbClusterLabels.dat")):
             labels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")[:,2]
@@ -227,7 +228,7 @@ def plotSoftParticleQuiverVel(axFrame, pos, vel, rad, alpha = 0.6, maxVelList = 
         vx = vel[particleId,0]
         vy = vel[particleId,1]
         axFrame.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
-        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=20)#width=0.003, scale=1, headwidth=5)
+        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=10)#width=0.003, scale=1, headwidth=5)
         #for j in range(13):
         #    if(particleId == maxVelList[j]):
         #        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.003, scale=1, headwidth=5)

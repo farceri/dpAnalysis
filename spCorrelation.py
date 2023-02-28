@@ -1050,7 +1050,7 @@ def searchDBClusters(dirName, eps=0, min_samples=10, plot=False, contactFilter='
     if(plot=="plot"):
         rad = np.loadtxt(dirName + sep + "particleRad.dat")
         uplot.plotPacking(boxSize, pos, rad, labels)
-        #plt.show()
+        plt.show()
     return clusterLabels, noClusterLabels, labels
 
 def averageDBClusterSize(dirName, dirSpacing, eps=0.03, min_samples=10, plot=False, contactFilter=False):
@@ -1274,7 +1274,7 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-50:]
+    dirList = dirList[-10:]
     #dirList = np.array([dirName])
     velCorrInCluster = np.zeros((bins.shape[0]-1,4))
     countsInCluster = np.zeros(bins.shape[0]-1)
@@ -1633,7 +1633,7 @@ def averageVelocityFieldCluster(dirName, dirSpacing=1000, numBins=100, plot=Fals
     return grid, field
 
 ############################ Velocity distribution #############################
-def averageClusterFluctuations(dirName, dirSpacing=10000):
+def averageClusterFluctuations(dirName, dirSpacing=1000):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     phi = int(ucorr.readFromParams(dirName, "phi"))
     particleRad = np.array(np.loadtxt(dirName + "/particleRad.dat"))
@@ -1719,7 +1719,7 @@ def averageLocalDensityAndNumberFluctuations(dirName, plot=False, dirSpacing=100
     np.savetxt(dirName + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
     if(plot=="plot"):
         uplot.plotCorrWithError(meanNum, deltaNum, stdDeltaNum, "$Variance$ $of$ $local$ $number,$ $\\Delta N^2$", "$Local$ $number,$ $N_s$", color='k', logx=True, logy=True)
-        plt.show()
+        plt.pause(0.5)
 
 
 if __name__ == '__main__':

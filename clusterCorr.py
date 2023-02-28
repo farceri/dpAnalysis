@@ -501,12 +501,12 @@ def searchDBClusters(dirName, eps=0, min_samples=10, contactFilter=False):
     return labels
 
 ############################ Velocity distribution #############################
-def averageParticleVelPDFCluster(dirName, dirSpacing=10000):
+def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-10:]
+    dirList = dirList[-50:]
     velInCluster = np.empty(0)
     velOutCluster = np.empty(0)
     for d in range(dirList.shape[0]):
@@ -724,6 +724,60 @@ def averageClusterFluctuations(dirName, dirSpacing=10000):
     print("Number of particles in cluster: ", np.mean(numberCluster), " +- ", np.std(numberCluster))
     print("Cluster area: ", np.mean(densityCluster), " +- ", np.std(densityCluster))
 
+def computeLocalDensityAndNumberFluctuations(dirName):
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
+    pRad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
+    numBins = np.arange(2,101)
+    meanNum = np.zeros(numBins.shape[0])
+    deltaNum = np.zeros(numBins.shape[0])
+    meanPhi = np.zeros(numBins.shape[0])
+    deltaPhi = np.zeros(numBins.shape[0])
+    for i in range(numBins.shape[0]):
+        xbin = np.linspace(0, boxSize[0], numBins[i]+1)
+        ybin = np.linspace(0, boxSize[1], numBins[i]+1)
+        localSquare = (boxSize[0]/numBins[i])*(boxSize[1]/numBins[i])
+        localArea = np.zeros((numBins[i], numBins[i]))
+        localNumber = np.zeros((numBins[i], numBins[i]))
+        ucorr.computeLocalAreaAndNumberGrid(pos, pRad, xbin, ybin, localArea, localNumber)
+        localDensity = (localArea/localSquare).reshape(numBins[i]*numBins[i])
+        localNumber = localNumber.reshape(numBins[i]*numBins[i])
+        meanNum[i] = np.mean(localNumber)
+        deltaNum[i] = np.var(localNumber)
+        meanPhi[i] = np.mean(localDensity)
+        deltaPhi[i] = np.var(localDensity)
+    np.savetxt(dirName + "localNumberDensity.dat", np.column_stack((numBins, meanNum, deltaNum, meanPhi, deltaPhi)))
+    return meanNum, deltaNum, meanPhi, deltaPhi
+
+def averageLocalDensityAndNumberFluctuations(dirName, dirSpacing=10000):
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    numBins = np.arange(2,101)
+    meanNumList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    deltaNumList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    meanPhiList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    deltaPhiList = np.zeros((dirList.shape[0], numBins.shape[0]))
+    for d in range(dirList.shape[0]):
+        if(os.path.exists(dirName + os.sep + "localNumberDensity.dat")):
+            data = np.loadtxt(dirName + os.sep + "localNumberDensity.dat")
+            meanNumList[d] = data[:,1]
+            deltaNumList[d] = data[:,2]
+            meanPhiList[d] = data[:,3]
+            deltaPhiList[d] = data[:,4]
+        else:
+            meanNumList[d], deltaNumList[d], meanPhiList[d], deltaPhiList[d] = computeLocalDensityAndNumberFluctuations(dirName + os.sep + dirList[d])
+    meanNum = np.mean(meanNumList, axis=0)
+    stdMeanNum = np.std(meanNumList, axis=0)
+    deltaNum = np.mean(deltaNumList, axis=0)
+    stdDeltaNum = np.std(deltaNumList, axis=0)
+    meanPhi = np.mean(meanPhiList, axis=0)
+    stdMeanPhi = np.std(meanPhiList, axis=0)
+    deltaPhi = np.mean(deltaPhiList, axis=0)
+    stdDeltaPhi = np.std(deltaPhiList, axis=0)
+    np.savetxt(dirName + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
+
 if __name__ == '__main__':
     dirName = sys.argv[1]
     whichCorr = sys.argv[2]
@@ -823,6 +877,9 @@ if __name__ == '__main__':
 
     elif(whichCorr == "clusterflu"):
         averageClusterFluctuations(dirName)
+
+    elif(whichCorr == "averagephinum"):
+        averageLocalDensityAndNumberFluctuations(dirName)
 
     else:
         print("Please specify the correlation you want to compute")
