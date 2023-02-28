@@ -545,7 +545,7 @@ def averageParticleVelPDFCluster(dirName, dirSpacing=1000):
     np.savetxt(dirName + os.sep + "velPDFOutCluster.dat", np.column_stack((edges, pdf)))
 
 ########################### Average Space Correlator ###########################
-def averagePairCorrCluster(dirName, dirSpacing=10000):
+def averagePairCorrCluster(dirName, dirSpacing=1000):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     phi = ucorr.readFromParams(dirName, "phi")
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
@@ -555,7 +555,7 @@ def averagePairCorrCluster(dirName, dirSpacing=10000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-10:]
+    dirList = dirList[-50:]
     pcorrInCluster = np.zeros(rbins.shape[0]-1)
     pcorrOutCluster = np.zeros(rbins.shape[0]-1)
     for d in range(dirList.shape[0]):
@@ -581,7 +581,7 @@ def averagePairCorrCluster(dirName, dirSpacing=10000):
     print("First peak of pair corr in cluster is at:", firstPeak, "equal to", firstPeak/minRad, "times the min radius:", minRad)
 
 ################# Cluster contact rearrangement distribution ###################
-def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=10000):
+def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirSpacing=1000):
     timeStep = ucorr.readFromParams(dirName, "dt")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
@@ -640,7 +640,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
     np.savetxt(dirName + os.sep + "outClusterCollision.dat", np.column_stack((centers, pdf)))
 
 ##################### Velocity Correlation in/out Cluster ######################
-def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
+def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=1000):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     minRad = np.min(np.loadtxt(dirName + os.sep + "particleRad.dat"))
@@ -648,7 +648,7 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    dirList = dirList[-5:]
+    dirList = dirList[-10:]
     velCorrInCluster = np.zeros((bins.shape[0]-1,3))
     countsInCluster = np.zeros(bins.shape[0]-1)
     velCorrOutCluster = np.zeros((bins.shape[0]-1,3))
@@ -699,8 +699,8 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=100000):
     np.savetxt(dirName + os.sep + "spaceVelCorrInCluster.dat", np.column_stack((binCenter, velCorrInCluster, countsInCluster)))
     np.savetxt(dirName + os.sep + "spaceVelCorrOutCluster.dat", np.column_stack((binCenter, velCorrOutCluster, countsOutCluster)))
 
-############################ Velocity distribution #############################
-def averageClusterFluctuations(dirName, dirSpacing=10000):
+############################# Cluster Fluctuations #############################
+def averageClusterFluctuations(dirName, dirSpacing=1000):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     phi = int(ucorr.readFromParams(dirName, "phi"))
     particleRad = np.array(np.loadtxt(dirName + "/particleRad.dat"))
