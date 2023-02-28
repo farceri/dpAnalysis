@@ -1683,7 +1683,7 @@ def computeLocalDensityAndNumberFluctuations(dirName, plot=False, color='k'):
         deltaNum[i] = np.var(localNumber)
         meanPhi[i] = np.mean(localDensity)
         deltaPhi[i] = np.var(localDensity)
-    np.savetxt(dirName + "localNumberDensity.dat", np.column_stack((numBins, meanNum, deltaNum, meanPhi, deltaPhi)))
+    np.savetxt(dirName + os.sep + "localNumberDensity.dat", np.column_stack((numBins, meanNum, deltaNum, meanPhi, deltaPhi)))
     if(plot=="plot"):
         uplot.plotCorrelation(meanNum, deltaNum, "$Variance$ $of$ $local$ $number,$ $\\Delta N^2$", "$Local$ $number,$ $N_s$", color=color, logx=True, logy=True)
         plt.pause(0.5)
@@ -1716,7 +1716,7 @@ def averageLocalDensityAndNumberFluctuations(dirName, plot=False, dirSpacing=100
     stdMeanPhi = np.std(meanPhiList, axis=0)
     deltaPhi = np.mean(deltaPhiList, axis=0)
     stdDeltaPhi = np.std(deltaPhiList, axis=0)
-    np.savetxt(dirName + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
+    np.savetxt(dirName + os.sep + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
     if(plot=="plot"):
         uplot.plotCorrWithError(meanNum, deltaNum, stdDeltaNum, "$Variance$ $of$ $local$ $number,$ $\\Delta N^2$", "$Local$ $number,$ $N_s$", color='k', logx=True, logy=True)
         plt.pause(0.5)

@@ -747,7 +747,7 @@ def computeLocalDensityAndNumberFluctuations(dirName):
         deltaNum[i] = np.var(localNumber)
         meanPhi[i] = np.mean(localDensity)
         deltaPhi[i] = np.var(localDensity)
-    np.savetxt(dirName + "localNumberDensity.dat", np.column_stack((numBins, meanNum, deltaNum, meanPhi, deltaPhi)))
+    np.savetxt(dirName + os.sep + "localNumberDensity.dat", np.column_stack((numBins, meanNum, deltaNum, meanPhi, deltaPhi)))
     return meanNum, deltaNum, meanPhi, deltaPhi
 
 def averageLocalDensityAndNumberFluctuations(dirName, dirSpacing=10000):
@@ -776,7 +776,7 @@ def averageLocalDensityAndNumberFluctuations(dirName, dirSpacing=10000):
     stdMeanPhi = np.std(meanPhiList, axis=0)
     deltaPhi = np.mean(deltaPhiList, axis=0)
     stdDeltaPhi = np.std(deltaPhiList, axis=0)
-    np.savetxt(dirName + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
+    np.savetxt(dirName + os.sep + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
 
 if __name__ == '__main__':
     dirName = sys.argv[1]

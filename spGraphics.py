@@ -1522,9 +1522,10 @@ def fitPhiPDF(dirName, figureName, numBins):
     fig2, ax2 = plt.subplots(figsize=(5,4), dpi = 120)
     if(os.path.exists(dirName + "localDensity-N" + numBins + ".dat")):
         data = np.loadtxt(dirName + "localDensity-N" + numBins + ".dat")
+        #data = data[1:-1]
+        data = data[2:-4]
         ax2.semilogy(data[:,0], data[:,1], color='k', lw=1, marker='o', fillstyle='none')
         T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
-        data = data[1:]
         x = data[data[:,1]>0,0]
         y = -np.log(data[data[:,1]>0,1])
         ax1.plot(x, T*y, color='k', lw=1, marker='o', fillstyle='none', label="$data$")
@@ -1549,10 +1550,10 @@ def fitPhiPDF(dirName, figureName, numBins):
     ax1.tick_params(axis='both', labelsize=12)
     ax2.tick_params(axis='both', labelsize=12)
     #ax1.legend(fontsize=12, loc='upper left')
-    ax1.set_xlim(-0.007, 1.17)
-    ax1.set_ylim(-0.021, 0.106)
-    ax2.set_xlim(-0.007, 1.17)
-    ax2.set_ylim(8.2e-05, 6.12)
+    ax1.set_xlim(-0.007, 1.37)
+    ax1.set_ylim(-0.0082, 0.028)
+    ax2.set_xlim(-0.007, 1.37)
+    ax2.set_ylim(1.4e-03, 7.58)
     ax1.set_xlabel("$Local$ $density,$ $\\varphi_l$", fontsize=16)
     ax1.set_ylabel("$Free$ $energy,$ $F(\\varphi_l)$", fontsize=16)
     ax2.set_xlabel("$Local$ $density,$ $\\varphi_l$", fontsize=16)
@@ -1565,6 +1566,51 @@ def fitPhiPDF(dirName, figureName, numBins):
     fig2.savefig(figure2Name + ".png", transparent=True, format = "png")
     plt.show()
 
+def fitPhiPDF2(dirName, figureName, numBins):
+    fig, ax = plt.subplots(2, 1, figsize = (6,7.5), sharex=True, dpi = 120)
+    if(os.path.exists(dirName + "localDensity-N" + numBins + ".dat")):
+        data = np.loadtxt(dirName + "localDensity-N" + numBins + ".dat")
+        #data = data[1:-1]
+        data = data[2:-4]
+        ax[0].semilogy(data[:,0], data[:,1], color='k', lw=1, marker='o', fillstyle='none')
+        T = np.mean(np.loadtxt(dirName + "energy.dat")[:,4])
+        x = data[data[:,1]>0,0]
+        y = -np.log(data[data[:,1]>0,1])
+        ax[1].plot(x, T*y, color='k', lw=1, marker='o', fillstyle='none', label="$data$")
+        # interpolate
+        spl = splrep(x, y, s=0.5)
+        interX = np.linspace(np.min(x), np.max(x), 1000)
+        interY = splev(interX, spl)
+        #ax1.plot(interX, interY, lw=1, color='b', label="$smooth$ $interpolation$")
+        # fit interpolation
+        failed = False
+        try:
+            popt, pcov = curve_fit(curve4Poly, interX, interY)
+        except RuntimeError:
+            print("Error - curve_fit failed")
+            failed = True
+        if(failed == False):
+            ax[1].plot(interX, T*curve4Poly(interX, *popt), color=[0,0.4,1], lw=2, linestyle='--', label="$4Poly$ $fit$")
+        print("Fitting parameters: c4 ", popt[0], " c3 ", popt[1], " c2 ", popt[2], " c1 ", popt[3], " c0 ", popt[4])
+        print("Mass: ", np.sqrt(popt[2]/(4*popt[0])))
+        #y = np.linspace(-2, 8, 100)
+        #ax1.plot(np.ones(100)*(-popt[1]/(4*popt[0])), y, linestyle='--', color='r', lw=1)
+    ax[0].tick_params(axis='both', labelsize=12)
+    ax[1].tick_params(axis='both', labelsize=12)
+    #ax1.legend(fontsize=12, loc='upper left')
+    ax[0].set_xlim(-0.007, 1.57)
+    ax[0].set_ylim(1.4e-03, 7.58)
+    ax[1].set_xlim(-0.007, 1.57)
+    ax[1].set_ylim(-0.0082, 0.028)
+    ax[0].set_ylabel("$Distribution,$ $P(\\varphi_l)$", fontsize=16)
+    ax[1].set_ylabel("$Free$ $energy,$ $F(\\varphi_l)$", fontsize=16, labelpad=-5)
+    ax[1].set_xlabel("$Local$ $density,$ $\\varphi_l$", fontsize=16)
+    fig.tight_layout()
+    plt.subplots_adjust(hspace=0)
+    figureName = "/home/francesco/Pictures/nve-nvt-nva/pfitPhiPDF-F-" + figureName
+    fig.savefig(figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
 def plotSPClusterFluctuations(dirName, figureName, fixed=False, which='10'):
     fig1, ax1 = plt.subplots(figsize=(6.5,5), dpi = 120)
     fig2, ax2 = plt.subplots(figsize=(6.5,5), dpi = 120)
@@ -1574,8 +1620,10 @@ def plotSPClusterFluctuations(dirName, figureName, fixed=False, which='10'):
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
-        dirList = np.array(['1e-05', '1e-04', '1e-03', '1e-02', '1e-01', '1'])
-        labelList = np.array(['$D_r = 0.00001$', '$D_r = 0.0001$', '$D_r = 0.001$', '$D_r = 0.01$', '$D_r = 0.1$', '$D_r = 1$'])
+        dirList = np.array(['1e-05', '5e-05', '1e-04', '5e-04', '1e-03', '7e-03', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '2e-01', '5e-01', '1', '2', '5', '10', '20', '50', '100', '1000'])
+        labelList = np.array(['$D_r = 10^{-5}$', '$D_r = 5 \\times 10^{-5}$', '$D_r = 10^{-4}$', '$D_r = 5 \\times 10^{-4}$', '$D_r = 0.001$', '$D_r = 0.007$', '$D_r = 0.012$', '$D_r = 0.015$', '$D_r = 0.02$', '$D_r = 0.03$', '$D_r = 0.05$', '$D_r = 0.1$', '$D_r = 0.2$', '$D_r = 0.5$', '$D_r = 1$', '$D_r = 2$', '$D_r = 5$', '$D_r = 10$', '$D_r = 20$', '$D_r = 50$', '$D_r = 100$', '$D_r = 1000$'])
+        #dirList = np.array(['1e-05', '1e-04', '1e-03', '1e-02', '1e-01', '1'])
+        #labelList = np.array(['$D_r = 0.00001$', '$D_r = 0.0001$', '$D_r = 0.001$', '$D_r = 0.01$', '$D_r = 0.1$', '$D_r = 1$'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
         Dr = np.zeros(dirList.shape[0])
     else:
@@ -1612,8 +1660,8 @@ def plotSPClusterFluctuations(dirName, figureName, fixed=False, which='10'):
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pClusterNum-vsPhi-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pClusterSize-vsPhi-" + figureName + "-iod" + which
     elif(fixed=="phi"):
-        x = Dr
-        xlabel = "$Rotational$ $diffusion,$ $D_r$"
+        x = 1/Dr
+        xlabel = "$Persistent$ $time,$ $\\tau_p$"
         figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pClusterNum-vsDr-" + figureName + "-iod" + which
         figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pClusterSize-vsDr-" + figureName + "-iod" + which
     else:
@@ -1638,8 +1686,8 @@ def plotSPClusterFluctuations(dirName, figureName, fixed=False, which='10'):
     fig2.savefig(figure2Name + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPNumberFluctuations(dirName, figureName, fixed=False, which='10'):
-    fig, ax = plt.subplots(figsize=(7.5,5), dpi = 120)
+def plotSPNumberDensityFluctuations(dirName, figureName, fixed=False, which='10'):
+    fig, ax = plt.subplots(2, 1, figsize = (7,8), sharex=True, dpi = 120)
     if(fixed=="iod"):
         dirList = np.array(['thermal45',  'thermal58', 'thermal67', 'thermal72',  'thermal78',  'thermal80',  'thermal83', 'thermal85',  'thermal88',  'thermal94', 'thermal1'])#, 'thermal1'])
         labelList = np.array(['$0.45$', '$0.58$', '$0.67$', '$0.72$', '$0.78$', '$0.80$', '$0.83$', '$0.85$', '$0.88$', '$0.94$', '$1.00$'])#, '$\\varphi = 1.00$'])
@@ -1647,8 +1695,8 @@ def plotSPNumberFluctuations(dirName, figureName, fixed=False, which='10'):
         phi = np.zeros(dirList.shape[0])
     elif(fixed=="phi"):
         dirList = np.array(['1e-05', '1e-04', '1e-03', '1e-02', '1e-01', '1'])
-        labelList = np.array(['$D_r = 0.00001$', '$D_r = 0.0001$', '$D_r = 0.001$', '$D_r = 0.01$', '$D_r = 0.1$', '$D_r = 1$'])
-        colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
+        labelList = np.array(['$10^{-5}$', '$10^{-4}$', '$10^{-3}$', '$0.01$', '$0.1$', '$1$'])
+        colorList = cm.get_cmap('plasma', dirList.shape[0])
         Dr = np.zeros(dirList.shape[0])
     else:
         dirList = np.array(['iod1', 'iod2', 'iod5', 'iod10', 'iod20', 'iod50', 'iod100', 'iod200', 'iod500', 'iod1000'])
@@ -1668,30 +1716,36 @@ def plotSPNumberFluctuations(dirName, figureName, fixed=False, which='10'):
             damping[d] = ucorr.readFromDynParams(dirSample, "damping")
         if(os.path.exists(dirSample + "averageLocalNumberDensity.dat")):
             data = np.loadtxt(dirSample + "averageLocalNumberDensity.dat")
-            ax.errorbar(data[:,0], data[:,3], data[:,4], lw=1.2, color=colorList(d/dirList.shape[0]), marker='o', fillstyle='none', capsize=3)
+            ax[0].errorbar(data[:,1], data[:,3], data[:,4], lw=1.2, color=colorList(d/dirList.shape[0]), marker='o', fillstyle='none', capsize=3)
+            ax[1].errorbar(data[:,1], data[:,7], data[:,8], lw=1.2, color=colorList(d/dirList.shape[0]), marker='o', fillstyle='none', capsize=3)
     # make color bar for legend
-    colorBar = cm.ScalarMappable(cmap=colorList)
-    cb = plt.colorbar(colorBar)
     if(fixed=="iod"):
         label = "$\\varphi$"
-        figureName = "/home/francesco/Pictures/nve-nvt-nva/pNumberVar-vsPhi-" + figureName + "-iod" + which
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pNumberPhiVar-vsPhi-" + figureName + "-iod" + which
     elif(fixed=="phi"):
         label = "$D_r$"
-        figureName = "/home/francesco/Pictures/nve-nvt-nva/pNumberVar-vsDr-" + figureName + "-iod" + which
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pNumberPhiVar-vsDr-" + figureName + "-iod" + which
     else:
         label = "$m/\\gamma$"
-        figureName = "/home/francesco/Pictures/nve-nvt-nva/pNumberVar-vsDamping-" + figureName + "-Dr" + which
-    ax.set_yscale('log')
-    ax.set_xscale('log')
-    cb.set_ticks(np.arange(0.5/labelList.shape[0],1,1/labelList.shape[0]))
-    cb.ax.tick_params(labelsize=12)
-    ticklabels = labelList
-    cb.set_ticklabels(ticklabels)
-    cb.set_label(label=label, fontsize=14, labelpad=5, rotation='horizontal')
-    ax.tick_params(axis='both', labelsize=14)
-    ax.set_xlabel("$Local$ $number,$ $N_s$", fontsize=18)
-    ax.set_ylabel("$Variance$ $of$ $local$ $number,$ $\\Delta N^2$", fontsize=18)
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pNumberPhiVar-vsDamping-" + figureName + "-Dr" + which
+    ax[0].set_yscale('log')
+    ax[0].set_xscale('log')
+    ax[1].set_yscale('log')
+    ax[1].set_xscale('log')
+    ax[0].tick_params(axis='both', labelsize=14)
+    ax[1].tick_params(axis='both', labelsize=14)
+    ax[0].set_ylabel("$Number$ $variance,$ $\\Delta N^2$", fontsize=18)
+    ax[1].set_ylabel("$Density$ $variance,$ $\\Delta \\varphi^2$", fontsize=18)
+    ax[1].set_xlabel("$Local$ $number,$ $N_{sub}$", fontsize=18)
     fig.tight_layout()
+    plt.subplots_adjust(hspace=0)
+    #colorBar = cm.ScalarMappable(cmap=colorList)
+    #cb = fig.colorbar(colorBar, ax=ax, shrink=0.7)
+    #cb.set_ticks(np.arange(0.5/labelList.shape[0],1,1/labelList.shape[0]))
+    #cb.ax.tick_params(labelsize=14)
+    #ticklabels = labelList
+    #cb.set_ticklabels(ticklabels)
+    #cb.set_label(label=label, fontsize=16, labelpad=10, rotation='horizontal')
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
@@ -3167,17 +3221,22 @@ if __name__ == '__main__':
         numBins = sys.argv[4]
         fitPhiPDF(dirName, figureName, numBins)
 
+    elif(whichPlot == "fitphi2"):
+        figureName = sys.argv[3]
+        numBins = sys.argv[4]
+        fitPhiPDF2(dirName, figureName, numBins)
+
     elif(whichPlot == "clusterflu"):
         figureName = sys.argv[3]
         fixed = sys.argv[4]
         which = sys.argv[5]
         plotSPClusterFluctuations(dirName, figureName, fixed, which)
 
-    elif(whichPlot == "numberflu"):
+    elif(whichPlot == "numphiflu"):
         figureName = sys.argv[3]
         fixed = sys.argv[4]
         which = sys.argv[5]
-        plotSPNumberFluctuations(dirName, figureName, fixed, which)
+        plotSPNumberDensityFluctuations(dirName, figureName, fixed, which)
 
     elif(whichPlot == "clustertime"):
         figureName = sys.argv[3]
