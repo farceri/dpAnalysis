@@ -147,6 +147,10 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
             #labels[labels!=0] = -1
         else:
             _,_, labels = spCorr.searchDBClusters(dirName)
+        contacts = np.loadtxt(dirName + os.sep + "particleContacts.dat")
+        for i in range(labels.shape[0]):
+            if(np.sum(contacts[i]!=-1)>2):
+                labels[i] = -1
         colorId = getColorListFromLabels(labels)
     elif(ekmap==True):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
@@ -275,7 +279,7 @@ def makeSPPackingClusterVideo(dirName, figureName, numFrames = 20, firstStep = 0
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     setPackingAxes(boxSize, ax)
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    if(os.path.exists(dirName + os.sep + "t0/dbClusterLabels.dat")):
+    if(os.path.exists(dirName + os.sep + "t0/dbClusterLabels!.dat")):
         labels = np.loadtxt(dirName + os.sep + "t0/dbClusterLabels.dat")[:,2]
     else:
         _,_,labels = spCorr.searchDBClusters(dirName)
@@ -532,7 +536,7 @@ def makeDPMPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, s
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     rad = np.array(np.loadtxt(dirName + os.sep + "radii.dat"))
     # the first configuration gets two frames for better visualization
-    pos = np.array(np.loadtxt(dirName + os.sep + "t0/positions.dat"))
+    pos = np.array(np.loadtxt(dirName + os.sep + "t10000/positions.dat"))
     makeDeformablePackingFrame(pos, rad, nv, boxSize, figFrame, frames)
     numVertices = rad.shape[0]
     for i in stepList:

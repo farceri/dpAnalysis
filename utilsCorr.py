@@ -25,6 +25,25 @@ def computeDistances(pos, boxSize):
     distances = np.sqrt(np.sum(distances**2, axis=2))
     return distances
 
+def computeNeighbors(pos, boxSize, cutoff, maxNeighbors=20):
+    numParticles = pos.shape[0]
+    neighbors = np.ones((numParticles, maxNeighbors))*-1
+    neighborCount = np.zeros(numParticles, dtype=int)
+    distance = computeDistances(pos, boxSize)
+    for i in range(1,numParticles):
+        for j in range(i):
+            if(distance[i,j] < cutoff):
+                neighbors[i,neighborCount[i]] = j
+                neighbors[j,neighborCount[j]] = i
+                neighborCount[i] += 1
+                neighborCount[j] += 1
+                if(neighborCount[i] > maxNeighbors-1 or neighborCount[j] > maxNeighbors-1):
+                    print("maxNeighbors update")
+                    newMaxNeighbors = np.max([neighborCount[i], neighborCount[j]])
+                    neighbors = np.pad(neighbors, (0, newMaxNeighbors-maxNeighbors), 'constant', constant_values=-1)[:numParticles]
+                    maxNeighbors = newMaxNeighbors
+    return neighbors
+
 def computeDeltas(pos, boxSize):
     numParticles = pos.shape[0]
     deltas = (np.repeat(pos[:, np.newaxis, :], numParticles, axis=1) - np.repeat(pos[np.newaxis, :, :], numParticles, axis=0))

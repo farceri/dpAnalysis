@@ -253,6 +253,36 @@ def getContactCollisionIntervalPDF(dirName, check=False, numBins=40):
     print("average collision time:", np.mean(interval), " standard deviation: ", np.std(interval))
     np.savetxt(dirName + os.sep + "contactCollision.dat", np.column_stack((centers, pdf)))
 
+##################### Riorientation interval distribution ######################
+def getRiorientationIntervalPDF(dirName, check=False, numBins=40):
+    timeStep = ucorr.readFromParams(dirName, "dt")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    if(os.path.exists(dirName + "/riorientationIntervals.dat") and check=="check"):
+        print("loading already existing file")
+        interval = np.loadtxt(dirName + os.sep + "riorientationIntervals.dat")
+    else:
+        interval = np.empty(0)
+        previousTime = np.zeros(numParticles)
+        previousAngles = np.array(np.loadtxt(dirName + os.sep + "t0/particleAngles.dat"))
+        for i in range(1,dirList.shape[0]):
+            currentTime = timeList[i]
+            currentAngles = np.array(np.loadtxt(dirName + os.sep + dirList[i] + "/particleAngles.dat"))
+            riorientIndex = np.unique(np.argwhere(currentAngles!=previousAngles)[:,0])
+            currentInterval = currentTime-previousTime[riorientIndex]
+            interval = np.append(interval, currentInterval[currentInterval>1])
+            previousTime[riorientIndex] = currentTime
+            previousAngles = currentAngles
+        interval = np.sort(interval)
+        interval = interval[interval>10]
+        interval *= timeStep
+        np.savetxt(dirName + os.sep + "riorientationIntervals.dat", interval)
+    bins = np.arange(np.min(interval), np.max(interval), 10*np.min(interval))
+    pdf, edges = np.histogram(interval, bins=bins, density=True)
+    centers = (edges[1:] + edges[:-1])/2
+    print("average riorientation time:", np.mean(interval), " standard deviation: ", np.std(interval))
+    np.savetxt(dirName + os.sep + "riorientationPDF.dat", np.column_stack((centers, pdf)))
+
 ########################## Particle Self Correlations ##########################
 def computeParticleSelfCorr(dirName, maxPower):
     numParticles = ucorr.readFromParams(dirName, "numParticles")
@@ -636,7 +666,7 @@ def getClusterContactCollisionIntervalPDF(dirName, check=False, numBins=40, dirS
     bins = np.arange(np.min(intervalOutCluster), np.max(intervalOutCluster), 5*np.min(intervalOutCluster))
     pdf, edges = np.histogram(intervalOutCluster, bins=bins, density=True)
     centers = (edges[1:] + edges[:-1])/2
-    print("average collision time in cluster:", np.mean(intervalOutCluster), " standard deviation: ", np.std(intervalOutCluster))
+    print("average collision time out of cluster:", np.mean(intervalOutCluster), " standard deviation: ", np.std(intervalOutCluster))
     np.savetxt(dirName + os.sep + "outClusterCollision.dat", np.column_stack((centers, pdf)))
 
 ##################### Velocity Correlation in/out Cluster ######################
@@ -823,6 +853,11 @@ if __name__ == '__main__':
         check = sys.argv[3]
         numBins = int(sys.argv[4])
         getContactCollisionIntervalPDF(dirName, check, numBins)
+
+    elif(whichCorr == "riorient"):
+        check = sys.argv[3]
+        numBins = int(sys.argv[4])
+        getRiorientationIntervalPDF(dirName, check, numBins)
 
     elif(whichCorr == "corrsingle"):
         startBlock = int(sys.argv[3])
