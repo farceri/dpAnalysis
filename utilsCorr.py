@@ -206,8 +206,10 @@ def computeLocalTempGrid(pos, vel, xbin, ybin, localTemp): #this works only for 
                         counts[x, y] += 1
     localTemp[localTemp>0] /= counts[localTemp>0]*2
 
-def computeTau(data, index=2, threshold=np.exp(-1)):
-    relStep = np.argwhere(data[:,2]>threshold)[-1,0]
+def computeTau(data, index=2, threshold=np.exp(-1), normalized=False):
+    if(normalized == True):
+        data[:,index] /= data[0,index]
+    relStep = np.argwhere(data[:,index]>threshold)[-1,0]
     if(relStep + 1 < data.shape[0]):
         t1 = data[relStep,0]
         t2 = data[relStep+1,0]

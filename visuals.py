@@ -146,7 +146,9 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
             labels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")[:,2]
             #labels[labels!=0] = -1
         else:
-            _,_, labels = spCorr.searchDBClusters(dirName)
+            if(eps == 0):
+                eps = 2 * np.max(rad)
+            _,_, labels = spCorr.searchDBClusters(dirName, eps, min_samples)
         contacts = np.loadtxt(dirName + os.sep + "particleContacts.dat")
         for i in range(labels.shape[0]):
             if(np.sum(contacts[i]!=-1)>2):
@@ -180,7 +182,7 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
         figureName = "/home/francesco/Pictures/soft/packings/velmap-" + figureName + ".png"
     else:
         figureName = "/home/francesco/Pictures/soft/packings/" + figureName + ".png"
-    plt.savefig(figureName, transparent=False, format = "png")
+    plt.savefig(figureName, transparent=True, format = "png")
     plt.show()
 
 def plotSoftParticles(ax, pos, rad, alpha = 0.4, colorMap = True, lw = 0.5):
