@@ -962,7 +962,7 @@ if __name__ == '__main__':
         averageLocalDensityAndNumberFluctuations(dirName)
 
     elif(whichCorr == "clusterpt"):
-        computeClusterPT(dirName)
+        computeClusterPressure(dirName)
 
     else:
         print("Please specify the correlation you want to compute")
