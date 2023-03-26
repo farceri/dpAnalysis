@@ -692,8 +692,8 @@ def averageParticleVelSpaceCorrCluster(dirName, dirSpacing=10000):
         distance = ucorr.computeDistances(pos, boxSize)
         vel = np.array(np.loadtxt(dirSample + os.sep + "particleVel.dat"))
         velNorm = np.linalg.norm(vel, axis=1)
-        velNormSquaredInCluster = np.mean(velNorm[clusterLabels!=-1]**2)
-        velNormSquaredOutCluster = np.mean(velNorm[clusterLabels==-1]**2)
+        velNormSquaredInCluster = np.mean(velNorm[clusterLabels==1]**2)
+        velNormSquaredOutCluster = np.mean(velNorm[noClusterLabels==1]**2)
         for i in range(distance.shape[0]):
             for j in range(i):
                     for k in range(bins.shape[0]-1):
@@ -804,7 +804,7 @@ def averageLocalDensityAndNumberFluctuations(dirName, dirSpacing=10000):
     stdDeltaPhi = np.std(deltaPhiList, axis=0)
     np.savetxt(dirName + os.sep + "averageLocalNumberDensity.dat", np.column_stack((numBins, meanNum, stdMeanNum, deltaNum, stdDeltaNum, meanPhi, stdMeanPhi, deltaPhi, stdDeltaPhi)))
 
-def computeClusterPressure(dirName, dirSpacing=10000):
+def computeClusterPT(dirName, dirSpacing=10000):
     driving = float(ucorr.readFromDynParams(dirName, "f0"))
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
@@ -852,6 +852,35 @@ def computeClusterPressure(dirName, dirSpacing=10000):
     np.savetxt(dirName + os.sep + "clusterPT.dat", np.column_stack((timeList, pressure, activePressure)))
     print("Pressure - in: ", np.mean(pressure[:,0]), " +/- ", np.std(pressure[:,0]), " out: ", np.mean(pressure[:,1]), " +/- ", np.std(pressure[:,1]))
     print("Active pressure - in: ", np.mean(activePressure[:,0]), " +/- ", np.std(activePressure[:,0]), " out: ", np.mean(activePressure[:,1]), " +/- ", np.std(activePressure[:,1]))
+
+def computeClusterFV(dirName, dirSpacing=10000):
+    damping = float(ucorr.readFromDynParams(dirName, "damping"))
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    forceMagnitude = np.zeros((dirList.shape[0], 2))
+    velMagnitude = np.zeros((dirList.shape[0], 2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + "/particleForces.dat")):
+            pos = np.loadtxt(dirSample + "/particlePos.dat")
+            vel = np.loadtxt(dirSample + "/particleVel.dat")
+            force = np.loadtxt(dirSample + "/particleForces.dat") / damping
+            if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
+                clusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,0]
+            else:
+                clusterLabels, _,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
+            forceMagnitude[d,0] = np.mean(np.linalg.norm(force[clusterLabels==1], axis=1))
+            forceMagnitude[d,1] = np.mean(np.linalg.norm(force[clusterLabels!=1], axis=1))
+            velMagnitude[d,0] = np.mean(np.linalg.norm(vel[clusterLabels==1], axis=1))
+            velMagnitude[d,1] = np.mean(np.linalg.norm(vel[clusterLabels!=1], axis=1))
+    np.savetxt(dirName + os.sep + "clusterFV.dat", np.column_stack((timeList, forceMagnitude, velMagnitude)))
+    print("Force magnitude - in: ", np.mean(forceMagnitude[:,0]), " +/- ", np.std(forceMagnitude[:,0]), " out: ", np.mean(forceMagnitude[:,1]), " +/- ", np.std(forceMagnitude[:,1]))
+    print("Velocity magnitude - in: ", np.mean(velMagnitude[:,0]), " +/- ", np.std(velMagnitude[:,0]), " out: ", np.mean(velMagnitude[:,1]), " +/- ", np.std(velMagnitude[:,1]))
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -962,7 +991,10 @@ if __name__ == '__main__':
         averageLocalDensityAndNumberFluctuations(dirName)
 
     elif(whichCorr == "clusterpt"):
-        computeClusterPressure(dirName)
+        computeClusterPT(dirName)
+
+    elif(whichCorr == "clusterfv"):
+        computeClusterFV(dirName)
 
     else:
         print("Please specify the correlation you want to compute")

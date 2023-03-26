@@ -10,6 +10,8 @@ from matplotlib import animation
 from matplotlib import cm
 from sklearn.cluster import KMeans
 from sklearn.cluster import DBSCAN
+from scipy.spatial import Voronoi, voronoi_plot_2d
+import pyvoro
 import itertools
 import sys
 import os
@@ -114,6 +116,16 @@ def getEkinColorList(vel):
         count += 1
     return colorId
 
+def getPressureColorList(pressure):
+    colorList = cm.get_cmap('coolwarm', pressure.shape[0])
+    colorId = np.zeros((pressure.shape[0], 4))
+    count = 0
+    p = pressure[:,2]
+    for particleId in np.argsort(p):
+        colorId[particleId] = colorList(count/p.shape[0])
+        count += 1
+    return colorId
+
 def getColorListFromLabels(labels):
     numLabels = np.unique(labels).shape[0]-1
     colorList = cm.get_cmap('tab20', numLabels)
@@ -125,7 +137,7 @@ def getColorListFromLabels(labels):
             colorId[particleId] = colorList(labels[particleId]/numLabels)
     return colorId
 
-def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_samples=10, cluster=False, alpha = 0.6):
+def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_samples=10, pmap=False, cluster=False, alpha = 0.6):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
@@ -142,21 +154,25 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
     setPackingAxes(boxSize, ax)
     #setBigBoxAxes(boxSize, ax, 0.05)
     if(cluster==True):
-        if(os.path.exists(dirName + os.sep + "dbClusterLabels.dat")):
+        if(os.path.exists(dirName + os.sep + "dbClusterLabels!.dat")):
             labels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")[:,2]
             #labels[labels!=0] = -1
         else:
             if(eps == 0):
                 eps = 2 * np.max(rad)
             _,_, labels = spCorr.searchDBClusters(dirName, eps, min_samples)
-        contacts = np.loadtxt(dirName + os.sep + "particleContacts.dat")
-        for i in range(labels.shape[0]):
-            if(np.sum(contacts[i]!=-1)>2):
-                labels[i] = -1
+        #contacts = np.loadtxt(dirName + os.sep + "particleContacts.dat")
+        #for i in range(labels.shape[0]):
+        #    if(np.sum(contacts[i]!=-1)>2):
+        #        labels[i] = -1
         colorId = getColorListFromLabels(labels)
+        print("cluster area: ", np.sum(np.pi*rad[labels!=-1]**2))
     elif(ekmap==True):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
         colorId = getEkinColorList(vel)
+    elif(pmap==True):
+        pressure = np.array(np.loadtxt(dirName + os.sep + "pressure.dat"))
+        colorId = getPressureColorList(pressure)
     else:
         colorId = getRadColorList(rad)
     if(quiver==True):
@@ -178,11 +194,55 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
         figureName = "/home/francesco/Pictures/soft/packings/cluster-" + figureName + ".png"
     elif(ekmap==True):
         figureName = "/home/francesco/Pictures/soft/packings/ekmap-" + figureName + ".png"
+    elif(pmap==True):
+        colorBar = cm.ScalarMappable(cmap='coolwarm')
+        cb = plt.colorbar(colorBar)
+        label = "$p_{Active}$"
+        cb.set_ticks([0, 1])
+        cb.ax.tick_params(labelsize=14)
+        ticklabels = [0, np.format_float_positional(np.max(pressure[:,2]), 2)]
+        cb.set_ticklabels(ticklabels)
+        cb.set_label(label=label, fontsize=18, labelpad=-20, rotation='horizontal')
+        figureName = "/home/francesco/Pictures/soft/packings/pmap-" + figureName + ".png"
     elif(quiver==True):
         figureName = "/home/francesco/Pictures/soft/packings/velmap-" + figureName + ".png"
     else:
         figureName = "/home/francesco/Pictures/soft/packings/" + figureName + ".png"
     plt.savefig(figureName, transparent=True, format = "png")
+    plt.show()
+
+def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    xBounds = np.array([0, boxSize[0]])
+    yBounds = np.array([0, boxSize[1]])
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    # compute voronoi tessellation of particle positions
+    #vor = Voronoi(pos)
+    #fig = voronoi_plot_2d(vor, show_points=False, show_vertices=False, line_colors='k', line_width=0.5, line_alpha=1, point_size=2)
+    fig = plt.figure(0, dpi = 150)
+    ax = fig.gca()
+    cells = pyvoro.compute_2d_voronoi(pos, [[0, 1], [0, 1]], 1, radii=rad)
+    # colorize
+    for i, cell in enumerate(cells):
+        polygon = cell['vertices']
+        ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.5)
+    #fig.set_dpi(150)
+    ax.set_xlim(xBounds[0], xBounds[1])
+    ax.set_ylim(yBounds[0], yBounds[1])
+    ax.set_aspect('equal', adjustable='box')
+    setPackingAxes(boxSize, ax)
+    colorId = getRadColorList(rad)
+    for particleId in range(rad.shape[0]):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
+    figureName = "/home/francesco/Pictures/soft/packings/voronoi-" + figureName + ".png"
+    plt.savefig(figureName, transparent=False, format = "png")
     plt.show()
 
 def plotSoftParticles(ax, pos, rad, alpha = 0.4, colorMap = True, lw = 0.5):
@@ -724,6 +784,13 @@ if __name__ == '__main__':
         eps = float(sys.argv[4])
         min_samples = int(sys.argv[5])
         plotSPPacking(dirName, figureName, eps=eps, min_samples=min_samples, cluster=True)
+
+    elif(whichPlot == "sspressure"):
+        alpha = float(sys.argv[4])
+        plotSPPacking(dirName, figureName, pmap=True, alpha=alpha)
+
+    elif(whichPlot == "voronoi"):
+        plotSPVoronoiPacking(dirName, figureName)
 
     elif(whichPlot == "ssvideo"):
         numFrames = int(sys.argv[4])

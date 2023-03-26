@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 import utilsCorr as ucorr
 import utilsPlot as uplot
+import pyvoro
 import sys
 import os
 
@@ -1101,7 +1102,7 @@ def averageDBClusterSize(dirName, dirSpacing, eps=0.03, min_samples=10, plot=Fal
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d] + "/"
         if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
-            labels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,0]
+            labels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,2]
             if(plot=="plot"):
                 pos = ucorr.getPBCPositions(dirSample + os.sep + "particlePos.dat", boxSize)
                 uplot.plotPacking(boxSize, pos, rad, labels)
@@ -1597,7 +1598,7 @@ def computeClusterPT(dirName, plot, dirSpacing=1000):
     activePressure = np.zeros((dirList.shape[0], 2))
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
+        if(os.path.exists(dirSample + os.sep + "dbClusterLabels!.dat")):
             clusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,0]
         else:
             clusterLabels, _,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
@@ -1618,11 +1619,11 @@ def computeClusterPT(dirName, plot, dirSpacing=1000):
             if(clusterLabels[i] == 1):
                 pressure[d,0] += partPressure
                 temperature[d,0] += np.linalg.norm(vel[i]**2) * 0.5
-                activePressure[d,0] += np.dot(activeForce[i], pos[i])
+                activePressure[d,0] += np.dot(activeForce[i], pos[i]) * 0.5
             else:
                 pressure[d,1] += partPressure
                 temperature[d,1] += np.linalg.norm(vel[i]**2) * 0.5
-                activePressure[d,1] += np.dot(activeForce[i], pos[i])
+                activePressure[d,1] += np.dot(activeForce[i], pos[i]) * 0.5
         NpInCluster = clusterLabels[clusterLabels==1].shape[0]
         pressure[d,0] /= NpInCluster
         temperature[d,0] /= NpInCluster
@@ -1636,8 +1637,8 @@ def computeClusterPT(dirName, plot, dirSpacing=1000):
     print("Temperature - in: ", np.mean(temperature[:,0]), " +/- ", np.std(temperature[:,0]), " out: ", np.mean(temperature[:,1]), " +/- ", np.std(temperature[:,1]))
     print("Active pressure - in: ", np.mean(activePressure[:,0]), " +/- ", np.std(activePressure[:,0]), " out: ", np.mean(activePressure[:,1]), " +/- ", np.std(activePressure[:,1]))
     if(plot=='plot'):
-        uplot.plotCorrelation(timeList, pressure[:,0], "$Pressure$", "$Time,$ $t$", color='k')
-        uplot.plotCorrelation(timeList, activePressure[:,0], "$Pressure$", "$Time,$ $t$", color='r')
+        uplot.plotCorrelation(timeList, pressure[:,0] + temperature[:,0] + activePressure[:,0], "$Pressure$", "$Time,$ $t$", color='k')
+        uplot.plotCorrelation(timeList, pressure[:,1] + temperature[:,1] + activePressure[:,1], "$Pressure$", "$Time,$ $t$", color='r')
         plt.pause(0.5)
 
 def computeForceVelocity(dirName, plot, dirSpacing=1000):
@@ -1858,8 +1859,45 @@ def averageVelocityFieldCluster(dirName, dirSpacing=1000, numBins=100, plot=Fals
         plt.show()
     return grid, field
 
+########################### Compute voronoi density ############################
+def computeClusterVoronoiDensity(dirName, dirSpacing=10000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    #dirList = dirList[-50:]
+    voronoiVolume = np.zeros((dirList.shape[0],2))
+    volume = np.zeros((dirList.shape[0],2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "dbClusterLabels.dat")):
+            clusterLabels = np.loadtxt(dirSample + os.sep + "dbClusterLabels.dat")[:,0]
+        else:
+            clusterLabels, _,_ = searchDBClusters(dirSample, eps=0, min_samples=8)
+            #clusterLabels, _,_ = searchClusters(dirSample, numParticles)
+        pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
+        cells = pyvoro.compute_2d_voronoi(pos, [[0, 1], [0, 1]], 1, radii=rad)
+        volume[d,0] += np.sum(np.pi*rad[clusterLabels==1]**2)
+        volume[d,1] += np.sum(np.pi*rad[clusterLabels!=1]**2)
+        for i in range(numParticles):
+            if(clusterLabels[i]==1):
+                voronoiVolume[d,0] += np.abs(cells[i]['volume'])
+            else:
+                voronoiVolume[d,1] += np.abs(cells[i]['volume'])
+    # in cluster
+    np.savetxt(dirName + os.sep + "voronoiDensity.dat", np.column_stack((timeList, voronoiVolume, volume)))
+    print("Density inside cluster: ", np.mean(voronoiVolume[:,0]), " +- ", np.std(voronoiVolume[:,0]))
+    print("Density outside cluster: ", np.mean(voronoiVolume[:,1]), " +- ", np.std(voronoiVolume[:,1]))
+    uplot.plotCorrelation(timeList, volume[d,0]/voronoiVolume[:,0], "$\\varphi^{Voronoi}$", xlabel = "$Time,$ $t$", color='k')
+    uplot.plotCorrelation(timeList, volume[d,1]/voronoiVolume[:,1], "$\\varphi^{Voronoi}$", xlabel = "$Time,$ $t$", color='r')
+    #plt.show()
+
 ############################# Cluster fluctuations #############################
-def averageClusterFluctuations(dirName, dirSpacing=1000):
+def averageClusterFluctuations(dirName, dirSpacing=10000):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     phi = int(ucorr.readFromParams(dirName, "phi"))
     particleRad = np.array(np.loadtxt(dirName + "/particleRad.dat"))
@@ -2017,6 +2055,97 @@ def computeClusterMixingTime(dirName, threshold=0.5, dirSpacing=1):
             break
         d += 1
 
+def computeParticlePressureVSTime(dirName, dirSpacing=1):
+    driving = float(ucorr.readFromDynParams(dirName, "f0"))
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
+    kc = 1#/np.mean(rad)
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    for d in range(dirList.shape[0]):
+        pressure = np.zeros((numParticles,3))
+        dirSample = dirName + os.sep + dirList[d]
+        pos = np.loadtxt(dirSample + "/particlePos.dat")
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        angle = np.loadtxt(dirSample + "/particleAngles.dat")
+        activeForce = driving*np.array([np.cos(angle), np.sin(angle)]).T
+        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
+        for i in range(numParticles):
+            partPressure = 0
+            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                gradMultiple = kc * (1 - distance / radSum) / radSum
+                partPressure += 0.5 * gradMultiple * (delta[0]**2 + delta[1]**2) / distance
+            pressure[i,0] = partPressure
+            pressure[i,1] = np.linalg.norm(vel[i]**2) * 0.5
+            pressure[i,2] = np.dot(activeForce[i], pos[i]) * 0.5
+        np.savetxt(dirSample + os.sep + "pressure.dat", pressure)
+
+############################ Velocity distribution #############################
+def averageParticlePressurePDFCluster(dirName, dirSpacing=1000):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    pVirialInCluster = np.empty(0)
+    pVirialOutCluster = np.empty(0)
+    pThermalInCluster = np.empty(0)
+    pThermalOutCluster = np.empty(0)
+    pActiveInCluster = np.empty(0)
+    pActiveOutCluster = np.empty(0)
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "clusterLabels.dat")):
+            clusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,0]
+            noClusterLabels = np.loadtxt(dirSample + os.sep + "clusterLabels.dat")[:,1]
+        else:
+            #clusterLabels, noClusterLabels,_ = searchDBClusters(dirSample, eps=0, min_samples=10)
+            clusterLabels, noClusterLabels,_ = searchClusters(dirSample, numParticles)
+        pressure = np.loadtxt(dirSample + os.sep + "pressure.dat")
+        pVirialInCluster = np.append(pVirialInCluster, pressure[clusterLabels==1,0].flatten())
+        pVirialOutCluster = np.append(pVirialOutCluster, pressure[noClusterLabels==1,0].flatten())
+        pThermalInCluster = np.append(pThermalInCluster, pressure[clusterLabels==1,1].flatten())
+        pThermalOutCluster = np.append(pThermalOutCluster, pressure[noClusterLabels==1,1].flatten())
+        pActiveInCluster = np.append(pActiveInCluster, pressure[clusterLabels==1,2].flatten())
+        pActiveOutCluster = np.append(pActiveOutCluster, pressure[noClusterLabels==1,2].flatten())
+    # in cluster
+    pVirialInCluster = pVirialInCluster[pVirialInCluster>0]
+    pThermalInCluster = pThermalInCluster[pThermalInCluster>0]
+    pActiveInCluster = pActiveInCluster[pActiveInCluster>0]
+    data = pVirialInCluster
+    pdf1, edges1 = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges1 = 0.5 * (edges1[:-1] + edges1[1:])
+    data = pThermalInCluster
+    pdf2, edges2 = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges2 = 0.5 * (edges2[:-1] + edges2[1:])
+    data = pActiveInCluster
+    pdf3, edges3 = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges3 = 0.5 * (edges3[:-1] + edges3[1:])
+    print("Pressure in cluster, virial: ", np.mean(pVirialInCluster), " thermal: ", np.mean(pThermalInCluster), " active: ", np.mean(pActiveInCluster))
+    uplot.plotCorrelation(edges1, pdf1, "$Pressure$ $distribution,$ $P(p)$", xlabel = "$Pressure,$ $p$", color='g')
+    np.savetxt(dirName + os.sep + "pressurePDFInCluster.dat", np.column_stack((edges1, pdf1, edges2, pdf2, edges3, pdf3)))
+    # out of cluster
+    pVirialOutCluster = pVirialOutCluster[pVirialOutCluster>0]
+    pThermalOutCluster = pThermalOutCluster[pThermalOutCluster>0]
+    pActiveOutCluster = pActiveOutCluster[pActiveOutCluster>0]
+    data = pVirialOutCluster
+    pdf1, edges1 = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges1 = 0.5 * (edges1[:-1] + edges1[1:])
+    data = pThermalOutCluster
+    pdf2, edges2 = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges2 = 0.5 * (edges2[:-1] + edges2[1:])
+    data = pActiveOutCluster
+    pdf3, edges3 = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges3 = 0.5 * (edges3[:-1] + edges3[1:])
+    print("Pressure out cluster, virial: ", np.mean(pVirialOutCluster), " thermal: ", np.mean(pThermalOutCluster), " active: ", np.mean(pActiveOutCluster))
+    uplot.plotCorrelation(edges1, pdf1, "$Pressure$ $distribution,$ $P(p)$", xlabel = "$Pressure,$ $p$", color='k')
+    np.savetxt(dirName + os.sep + "pressurePDFOutCluster.dat", np.column_stack((edges1, pdf1, edges2, pdf2, edges3, pdf3)))
+    plt.show()
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -2214,6 +2343,9 @@ if __name__ == '__main__':
         figureName = sys.argv[5]
         averageVelocityFieldCluster(dirName, numBins=numBins, plot=plot, figureName=figureName)
 
+    elif(whichCorr == "voronoi"):
+        computeClusterVoronoiDensity(dirName)
+
     elif(whichCorr == "clusterflu"):
         averageClusterFluctuations(dirName)
 
@@ -2232,6 +2364,12 @@ if __name__ == '__main__':
     elif(whichCorr == "mixingtime"):
         threshold = float(sys.argv[3])
         computeClusterMixingTime(dirName, threshold)
+
+    elif(whichCorr == "pressure"):
+        computeParticlePressureVSTime(dirName)
+
+    elif(whichCorr == "pressurepdfcluster"):
+        averageParticlePressurePDFCluster(dirName)
 
     else:
         print("Please specify the correlation you want to compute")
