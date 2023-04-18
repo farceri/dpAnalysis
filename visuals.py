@@ -105,24 +105,12 @@ def getRadColorList(rad):
         count += 1
     return colorId
 
-def getEkinColorList(vel):
-    colorList = cm.get_cmap('Greys', vel.shape[0])
-    colorId = np.zeros((vel.shape[0], 4))
+def getEkinColorList(ekin):
+    colorList = cm.get_cmap('viridis', ekin.shape[0])
+    colorId = np.zeros((ekin.shape[0], 4))
     count = 0
-    ekin = np.linalg.norm(vel,axis=1)**2
-    print("kinetic energy: ", np.sum(ekin)/(vel.shape[0]*2))
     for particleId in np.argsort(ekin):
         colorId[particleId] = colorList(count/ekin.shape[0])
-        count += 1
-    return colorId
-
-def getPressureColorList(pressure):
-    colorList = cm.get_cmap('coolwarm', pressure.shape[0])
-    colorId = np.zeros((pressure.shape[0], 4))
-    count = 0
-    p = pressure[:,2]
-    for particleId in np.argsort(p):
-        colorId[particleId] = colorList(count/p.shape[0])
         count += 1
     return colorId
 
@@ -137,15 +125,32 @@ def getColorListFromLabels(labels):
             colorId[particleId] = colorList(labels[particleId]/numLabels)
     return colorId
 
-def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_samples=10, pmap=False, cluster=False, alpha = 0.6):
-    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+def getDenseColorList(denseList):
+    colorId = np.zeros((denseList.shape[0], 4))
+    for particleId in range(denseList.shape[0]):
+        if(denseList[particleId]==1):
+            colorId[particleId] = [0.2,0.2,0.2,0.2]
+        else:
+            colorId[particleId] = [1,1,1,1]
+    return colorId
+
+def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, border=False, alpha = 0.6):
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
+    #pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
     rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
-    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    centerOfMass = np.mean(pos, axis=0)
+    print(centerOfMass)
+    #pos = ucorr.shiftPositions(pos, boxSize, -0.65, -0.5)
+    pos = ucorr.centerPositions(pos, boxSize)
+    centerOfMass = np.mean(pos, axis=0)
+    print(centerOfMass)
+    #pos = shiftPositions(pos, boxSize, 0.22, 0.15) #8k
+    #pos = shiftPositions(pos, boxSize, -0.65, -0.5) #16k
+    #pos = shiftPositions(pos, boxSize, -0.4, -0.15) #32k
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
     ax.set_xlim(xBounds[0], xBounds[1])
@@ -153,26 +158,25 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
     ax.set_aspect('equal', adjustable='box')
     setPackingAxes(boxSize, ax)
     #setBigBoxAxes(boxSize, ax, 0.05)
-    if(cluster==True):
-        if(os.path.exists(dirName + os.sep + "dbClusterLabels!.dat")):
-            labels = np.loadtxt(dirName + os.sep + "dbClusterLabels.dat")[:,2]
-            #labels[labels!=0] = -1
+    if(dense==True):
+        if(os.path.exists(dirName + os.sep + "denseList.dat")):
+            denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
+
         else:
-            if(eps == 0):
-                eps = 2 * np.max(rad)
-            _,_, labels = spCorr.searchDBClusters(dirName, eps, min_samples)
-        #contacts = np.loadtxt(dirName + os.sep + "particleContacts.dat")
-        #for i in range(labels.shape[0]):
-        #    if(np.sum(contacts[i]!=-1)>2):
-        #        labels[i] = -1
-        colorId = getColorListFromLabels(labels)
-        print("cluster area: ", np.sum(np.pi*rad[labels!=-1]**2))
+            denseList,_ = spCorr.computeVoronoiCluster(dirName)
+        pos = ucorr.centerPositions(pos, boxSize, denseList)
+        colorId = getDenseColorList(denseList)
+    elif(border==True):
+        if(os.path.exists(dirName + os.sep + "borderList.dat")):
+            borderList = np.loadtxt(dirName + os.sep + "borderList.dat")
+        else:
+            spCorr.computeVoronoiBorder(dirName)
+            borderList = np.loadtxt(dirName + os.sep + "borderList.dat")
+        colorId = getDenseColorList(borderList)
     elif(ekmap==True):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
-        colorId = getEkinColorList(vel)
-    elif(pmap==True):
-        pressure = np.array(np.loadtxt(dirName + os.sep + "pressure.dat"))
-        colorId = getPressureColorList(pressure)
+        ekin = 0.5*np.linalg.norm(vel, axis=1)**2
+        colorId = getEkinColorList(ekin)
     else:
         colorId = getRadColorList(rad)
     if(quiver==True):
@@ -188,22 +192,31 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
             vy = vel[particleId,1]
             ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
         else:
-            ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
-        #plt.pause(1)
-    if(cluster==True):
-        figureName = "/home/francesco/Pictures/soft/packings/cluster-" + figureName + ".png"
+            ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
+    #pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    #pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    #plt.pause(1)
+    #for particleId in range(rad.shape[0]):
+    #    x = pos[particleId,0]
+    #    y = pos[particleId,1]
+    #    r = rad[particleId]
+    #    ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor='k', alpha=0.2, linewidth='0.3'))
+    #    print(particleId)
+    #    plt.pause(1)
+    if(dense==True):
+        figureName = "/home/francesco/Pictures/soft/packings/dense-" + figureName + ".png"
+    elif(border==True):
+        figureName = "/home/francesco/Pictures/soft/packings/border-" + figureName + ".png"
     elif(ekmap==True):
-        figureName = "/home/francesco/Pictures/soft/packings/ekmap-" + figureName + ".png"
-    elif(pmap==True):
-        colorBar = cm.ScalarMappable(cmap='coolwarm')
+        colorBar = cm.ScalarMappable(cmap='viridis')
         cb = plt.colorbar(colorBar)
-        label = "$p_{Active}$"
+        label = "$E_{kin}$"
         cb.set_ticks([0, 1])
-        cb.ax.tick_params(labelsize=14)
-        ticklabels = [0, np.format_float_positional(np.max(pressure[:,2]), 2)]
+        cb.ax.tick_params(labelsize=12)
+        ticklabels = [np.format_float_scientific(np.min(ekin), precision=2), np.format_float_scientific(np.max(ekin), precision=2)]
         cb.set_ticklabels(ticklabels)
-        cb.set_label(label=label, fontsize=18, labelpad=-20, rotation='horizontal')
-        figureName = "/home/francesco/Pictures/soft/packings/pmap-" + figureName + ".png"
+        cb.set_label(label=label, fontsize=14, labelpad=-20, rotation='horizontal')
+        figureName = "/home/francesco/Pictures/soft/packings/ekmap-" + figureName + ".png"
     elif(quiver==True):
         figureName = "/home/francesco/Pictures/soft/packings/velmap-" + figureName + ".png"
     else:
@@ -211,13 +224,87 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, eps=0.03, min_
     plt.savefig(figureName, transparent=True, format = "png")
     plt.show()
 
-def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
+def getPressureColorList(pressure, which='total'):
+    colorList = cm.get_cmap('viridis', pressure.shape[0])
+    colorId = np.zeros((pressure.shape[0], 4))
+    count = 0
+    if(which=='total'):
+        p = pressure[:,0] + pressure[:,1] + pressure[:,2]
+    elif(which=='virial'):
+        p = pressure[:,0]
+    elif(which=='thermal'):
+        p = pressure[:,1]
+    elif(which=='active'):
+        p = pressure[:,2]
+    for particleId in np.argsort(p):
+        colorId[particleId] = colorList(count/p.shape[0])
+        count += 1
+    return colorId
+
+def plotSPPressureMapPacking(dirName, figureName, which='total', alpha = 0.6):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
+    centerOfMass = np.mean(pos, axis=0)
+    #pos[:,0] += 0.17
+    #pos[:,1] += 0.17
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    fig = plt.figure(0, dpi = 150)
+    ax = fig.gca()
+    ax.set_xlim(xBounds[0], xBounds[1])
+    ax.set_ylim(yBounds[0], yBounds[1])
+    ax.set_aspect('equal', adjustable='box')
+    setPackingAxes(boxSize, ax)
+    if(os.path.exists(dirName + os.sep + "particlePressure!.dat")):
+        pressure = np.loadtxt(dirName + os.sep + "particlePressure.dat")
+    else:
+        pressure = spCorr.computeParticlePressure(dirName)
+    colorId = getPressureColorList(pressure, which)
+    for particleId in range(rad.shape[0]):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
+    colorBar = cm.ScalarMappable(cmap='viridis')
+    cb = plt.colorbar(colorBar)
+    cb.set_ticks([0, 1])
+    cb.ax.tick_params(labelsize=12)
+    if(which=='total'):
+        mintick = np.format_float_positional(np.min(pressure[:,0] + pressure[:,1] + pressure[:,2]), precision=2)
+        maxtick = np.format_float_positional(np.max(pressure[:,0] + pressure[:,1] + pressure[:,2]), precision=2)
+        label = "$S_{tot}$"
+    elif(which=='virial'):
+        mintick = np.format_float_positional(np.min(pressure[:,0]), precision=2)
+        maxtick = np.format_float_positional(np.max(pressure[:,0]), precision=2)
+        label = "$S_{virial}$"
+    elif(which=='thermal'):
+        mintick = np.format_float_positional(np.min(pressure[:,1]), precision=2)
+        maxtick = np.format_float_positional(np.max(pressure[:,1]), precision=2)
+        label = "$S_{thermal}$"
+    elif(which=='active'):
+        mintick = np.format_float_positional(np.min(pressure[:,2]), precision=2)
+        maxtick = np.format_float_positional(np.max(pressure[:,2]), precision=2)
+        label = "$S_{active}$"
+    ticklabels = [mintick, maxtick]
+    cb.set_ticklabels(ticklabels)
+    cb.set_label(label=label, fontsize=14, labelpad=0, rotation='horizontal')
+    figureName = "/home/francesco/Pictures/soft/packings/pmap-" + figureName + ".png"
+    plt.savefig(figureName, transparent=True, format = "png")
+    plt.show()
+
+def plotSPVoronoiPacking(dirName, figureName, alpha=0.6):
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    xBounds = np.array([0, boxSize[0]])
+    yBounds = np.array([0, boxSize[1]])
+    #pos[:,0] -= 0.65
+    #pos[:,1] -= 0.5
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     # compute voronoi tessellation of particle positions
@@ -299,6 +386,20 @@ def plotSoftParticleQuiverVel(axFrame, pos, vel, rad, alpha = 0.6, maxVelList = 
         #    if(particleId == maxVelList[j]):
         #        axFrame.quiver(x, y, vx, vy, facecolor='k', width=0.003, scale=1, headwidth=5)
 
+def plotSoftParticlePressureMap(axFrame, pos, pressure, rad, alpha = 0.6):
+    colorId = np.zeros((rad.shape[0], 4))
+    colorList = cm.get_cmap('coolwarm', rad.shape[0])
+    count = 0
+    p = pressure[:,0] + pressure[:,1] + pressure[:,2]
+    for particleId in np.argsort(p):
+        colorId[particleId] = colorList(count/p.shape[0])
+        count += 1
+    for particleId in range(pos.shape[0]):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        axFrame.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
+
 def plotSoftParticleCluster(axFrame, pos, rad, clusterList, alpha = 0.4):
     for particleId in range(pos.shape[0]):
         x = pos[particleId,0]
@@ -322,7 +423,7 @@ def makeSoftParticleClusterFrame(dirName, rad, boxSize, figFrame, frames, cluste
     axFrame.remove()
     frames.append(axFrame)
 
-def makeSPPackingClusterVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepFreq = 1e04):
+def makeSPPackingClusterMixingVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepFreq = 1e04):
     def animate(i):
         frames[i].figure=fig
         fig.axes.append(frames[i])
@@ -341,21 +442,19 @@ def makeSPPackingClusterVideo(dirName, figureName, numFrames = 20, firstStep = 0
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     setPackingAxes(boxSize, ax)
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    if(os.path.exists(dirName + os.sep + "t0/dbClusterLabels!.dat")):
-        labels = np.loadtxt(dirName + os.sep + "t0/dbClusterLabels.dat")[:,2]
+    if(os.path.exists(dirName + os.sep + "t" + str(firstStep) + "/denseList!.dat")):
+        denseList = np.loadtxt(dirName + os.sep + "t" + str(firstStep) + "/denseList.dat")
     else:
-        _,_,labels = spCorr.searchDBClusters(dirName)
-    clusterList = np.zeros(rad.shape[0])
-    clusterList[labels==0] = 1
+        denseList,_ = spCorr.computeVoronoiCluster(dirName)
     # the first configuration gets two frames for better visualization
-    makeSoftParticleClusterFrame(dirName + os.sep + "t" + str(stepList[0]), rad, boxSize, figFrame, frames, clusterList)
+    makeSoftParticleClusterFrame(dirName + os.sep + "t" + str(stepList[0]), rad, boxSize, figFrame, frames, denseList)
     for i in stepList:
         dirSample = dirName + os.sep + "t" + str(i)
-        makeSoftParticleClusterFrame(dirSample, rad, boxSize, figFrame, frames, clusterList)
+        makeSoftParticleClusterFrame(dirSample, rad, boxSize, figFrame, frames, denseList)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
-    anim.save("/home/francesco/Pictures/soft/packings/initCluster-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
+    anim.save("/home/francesco/Pictures/soft/packings/clustermix-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
-def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 10, npt = False, quiver = False, cluster = False):
+def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 10, npt = False, quiver = False, cluster = False, pmap = False):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
@@ -369,6 +468,9 @@ def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = Fals
     elif(quiver == "quiver"):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
         plotSoftParticleQuiverVel(axFrame, pos, vel, rad)
+    elif(pmap == "pmap"):
+        pressure = np.array(np.loadtxt(dirName + os.sep + "pressure.dat"))
+        plotSoftParticlePressureMap(axFrame, pos, pressure, rad)
     elif(cluster == "cluster"):
         if(os.path.exists(dirName + os.sep + "clusterLabels.dat")):
             clusterList = np.loadtxt(dirName + os.sep + "clusterLabels.dat")[:,0]
@@ -383,7 +485,7 @@ def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = Fals
     axFrame.remove()
     frames.append(axFrame)
 
-def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepFreq = 1e04, logSpaced = False, subSet = False, firstIndex = 0, npt = False, quiver = False, cluster = False):
+def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepFreq = 1e04, logSpaced = False, subSet = False, firstIndex = 0, npt = False, quiver = False, cluster = False, pmap = False):
     def animate(i):
         frames[i].figure=fig
         fig.axes.append(frames[i])
@@ -414,14 +516,16 @@ def makeSPPackingVideo(dirName, figureName, numFrames = 20, firstStep = 0, stepF
     setPackingAxes(boxSize, ax)
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     # the first configuration gets two frames for better visualization
-    makeSoftParticleFrame(dirName + os.sep + "t" + str(stepList[0]), rad, boxSize, figFrame, frames, subSet, firstIndex, npt, quiver, cluster)
+    makeSoftParticleFrame(dirName + os.sep + "t" + str(stepList[0]), rad, boxSize, figFrame, frames, subSet, firstIndex, npt, quiver, cluster, pmap)
     vel = []
     for i in stepList:
         dirSample = dirName + os.sep + "t" + str(i)
-        makeSoftParticleFrame(dirSample, rad, boxSize, figFrame, frames, subSet, firstIndex, npt, quiver, cluster)
+        makeSoftParticleFrame(dirSample, rad, boxSize, figFrame, frames, subSet, firstIndex, npt, quiver, cluster, pmap)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
     if(quiver=="quiver"):
         figureName = "velmap-" + figureName
+    if(pmap=="pmap"):
+        figureName = "pmap-" + figureName
     anim.save("/home/francesco/Pictures/soft/packings/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def makeVelFieldFrame(dirName, numBins, bins, boxSize, numParticles, figFrame, frames):
@@ -780,14 +884,19 @@ if __name__ == '__main__':
     elif(whichPlot == "ssvel"):
         plotSPPacking(dirName, figureName, quiver=True)
 
-    elif(whichPlot == "sscluster"):
-        eps = float(sys.argv[4])
-        min_samples = int(sys.argv[5])
-        plotSPPacking(dirName, figureName, eps=eps, min_samples=min_samples, cluster=True)
+    elif(whichPlot == "ssdense"):
+        plotSPPacking(dirName, figureName, dense=True)
+
+    elif(whichPlot == "ssborder"):
+        plotSPPacking(dirName, figureName, border=True)
+
+    elif(whichPlot == "ssekin"):
+        alpha = float(sys.argv[4])
+        plotSPPacking(dirName, figureName, ekmap=True, alpha=alpha)
 
     elif(whichPlot == "sspressure"):
-        alpha = float(sys.argv[4])
-        plotSPPacking(dirName, figureName, pmap=True, alpha=alpha)
+        which = sys.argv[4]
+        plotSPPressureMapPacking(dirName, figureName, which)
 
     elif(whichPlot == "voronoi"):
         plotSPVoronoiPacking(dirName, figureName)
@@ -811,17 +920,23 @@ if __name__ == '__main__':
         stepFreq = float(sys.argv[6])
         makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, quiver = "quiver")
 
+    elif(whichPlot == "pvideo"):
+        numFrames = int(sys.argv[4])
+        firstStep = float(sys.argv[5])
+        stepFreq = float(sys.argv[6])
+        makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, pmap = "pmap")
+
     elif(whichPlot == "clustervideo"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
         makeSPPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, cluster = "cluster")
 
-    elif(whichPlot == "clustertime"):
+    elif(whichPlot == "clustermix"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
-        makeSPPackingClusterVideo(dirName, figureName, numFrames, firstStep, stepFreq)
+        makeSPPackingClusterMixingVideo(dirName, figureName, numFrames, firstStep, stepFreq)
 
     elif(whichPlot == "ssvideosubset"):
         numFrames = int(sys.argv[4])

@@ -25,6 +25,12 @@ def computeDistances(pos, boxSize):
     distances = np.sqrt(np.sum(distances**2, axis=2))
     return distances
 
+def computeDistancesFromPoint(pos, point, boxSize):
+    distances = np.zeros(pos.shape[0])
+    for i in range(pos.shape[0]):
+        distances[i] = np.linalg.norm(pbcDistance(pos[i], point, boxSize))
+    return distances
+
 def computeNeighbors(pos, boxSize, cutoff, maxNeighbors=20):
     numParticles = pos.shape[0]
     neighbors = np.ones((numParticles, maxNeighbors))*-1
@@ -87,6 +93,37 @@ def computeAdjacencyMatrix(dirName, numParticles=None):
     for i in range(numParticles):
         adjacency[i,contacts[i,np.argwhere(contacts[i]!=-1)[:,0]].astype(int)] = 1
     return adjacency
+
+def computePolygonArea(vertices):
+    x = vertices[:,0]
+    y = vertices[:,1]
+    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+
+def isNearWall(pos, rad, boxSize):
+    isWall = False
+    wallPos = np.zeros(pos.shape[0])
+    if(pos[0] < rad):
+        isWall = True
+        wallPos = np.array([0, pos[1]])
+    elif(pos[0] > (boxSize[0]-rad)):
+        isWall = True
+        wallPos = np.array([boxSize[0], pos[1]])
+    if(pos[1] < rad):
+        isWall = True
+        wallPos = np.array([pos[0], 0])
+    elif(pos[1] > (boxSize[1]-rad)):
+        isWall = True
+        wallPos = np.array([pos[0], boxSize[1]])
+    return isWall, wallPos
+
+def getWallForces(pos, rad, boxSize):
+    wallForce = np.zeros((pos.shape[0], pos.shape[1]))
+    for i in range(pos.shape[0]):
+        delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+        distance = np.linalg.norm(delta)
+        overlap = (1 - distance / radSum)
+        gradMultiple = kc * (1 - distance / radSum) / radSum
+    return wallForce
 
 ############################ correlation functions #############################
 def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
@@ -185,6 +222,17 @@ def computeLocalAreaGrid(pos, rad, xbin, ybin, localArea):
                 for y in range(ybin.shape[0]-1):
                     if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
                         localArea[x, y] += np.pi*rad[pId]**2
+
+def computeWeightedLocalAreaGrid(pos, rad, xbin, ybin, localArea, boxSize, cutoff):
+    for pId in range(pos.shape[0]):
+        for x in range(xbin.shape[0]-1):
+            if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
+                for y in range(ybin.shape[0]-1):
+                    if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
+                        node = np.array([(xbin[x+1]+xbin[x])/2, (ybin[y+1]+ybin[y])/2])
+                        distance = np.linalg.norm(pbcDistance(pos[pId], node, boxSize))
+                        weight = np.exp(-cutoff**2 / (cutoff**2 - distance**2))
+                        localArea[x, y] += np.pi*rad[pId]**2 * weight
 
 def computeLocalAreaAndNumberGrid(pos, rad, xbin, ybin, localArea, localNumber):
     for pId in range(pos.shape[0]):
@@ -477,6 +525,30 @@ def getPBCPositions(fileName, boxSize):
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos
+
+def centerPositions(pos, boxSize, denseList=np.empty(0)):
+    centerOfMass = np.mean(pos, axis=0)
+    pos[:,0] += centerOfMass[0]
+    pos[:,1] += centerOfMass[1]
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    centerOfMass = np.mean(pos, axis=0)
+    pos[:,0] += (0.5 - centerOfMass[0])
+    pos[:,1] += (0.5 - centerOfMass[1])
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    return pos
+
+def shiftPositions(pos, boxSize, xshift, yshift):
+    pos[:,0] += xshift
+    pos[:,1] += yshift
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    return pos
+
+def getMOD2PIAngles(fileName):
+    angle = np.array(np.loadtxt(fileName), dtype=np.float64)
+    return np.mod(angle, 2*np.pi)
 
 if __name__ == '__main__':
     print("library for correlation function utilities")

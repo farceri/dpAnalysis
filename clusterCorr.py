@@ -853,7 +853,7 @@ def computeClusterPT(dirName, dirSpacing=10000):
     print("Pressure - in: ", np.mean(pressure[:,0]), " +/- ", np.std(pressure[:,0]), " out: ", np.mean(pressure[:,1]), " +/- ", np.std(pressure[:,1]))
     print("Active pressure - in: ", np.mean(activePressure[:,0]), " +/- ", np.std(activePressure[:,0]), " out: ", np.mean(activePressure[:,1]), " +/- ", np.std(activePressure[:,1]))
 
-def computeClusterFV(dirName, dirSpacing=10000):
+def computeClusterFV(dirName, dirSpacing=100000):
     damping = float(ucorr.readFromDynParams(dirName, "damping"))
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
