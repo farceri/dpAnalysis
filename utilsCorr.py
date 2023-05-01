@@ -223,6 +223,42 @@ def computeLocalAreaGrid(pos, rad, xbin, ybin, localArea):
                     if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
                         localArea[x, y] += np.pi*rad[pId]**2
 
+def computeOverlapArea(pos1, pos2, rad1, rad2, boxSize):
+    distance = np.linalg.norm(pbcDistance(pos1, pos2, boxSize))
+    overlap = 1 - distance / (rad1 + rad2)
+    if(overlap > 0):
+        diaSum = 2 * (rad1 + rad2)
+        halfDiaDiff = rad1 - rad2
+        return 0.5 * np.sqrt((diaSum**2 - distance**2) * (distance**2 - halfDiaDiff**2))
+    else:
+        return 0
+
+def computeCorrectedLocalVoronoiDensityGrid(pos, rad, contacts, boxSize, voroArea, xbin, ybin, localVoroDensity):
+    #counts = np.zeros((localVoroDensity.shape[0], localVoroDensity.shape[1]))
+    for pId in range(pos.shape[0]):
+        for x in range(xbin.shape[0]-1):
+            if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
+                for y in range(ybin.shape[0]-1):
+                    if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
+                        # remove the overlaps from the particle area
+                        overlapArea = 0
+                        for c in contacts[pId, np.argwhere(contacts[pId]!=-1)[:,0]]:
+                            overlapArea += computeOverlapArea(pos[pId], pos[c], rad[pId], rad[c], boxSize)
+                        localVoroDensity[x, y] += (np.pi*rad[pId]**2 - overlapArea) / voroArea[pId]
+                        #counts[x, y] += 1
+    #localVoroDensity[counts>0] /= counts[counts>0]
+
+def computeLocalVoronoiDensityGrid(pos, rad, voroArea, xbin, ybin, localVoroDensity):
+    counts = np.zeros((localVoroDensity.shape[0], localVoroDensity.shape[1]))
+    for pId in range(pos.shape[0]):
+        for x in range(xbin.shape[0]-1):
+            if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
+                for y in range(ybin.shape[0]-1):
+                    if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
+                        localVoroDensity[x, y] += np.pi*rad[pId]**2 / voroArea[pId]
+                        counts[x, y] += 1
+    localVoroDensity[counts>0] /= counts[counts>0]
+
 def computeWeightedLocalAreaGrid(pos, rad, xbin, ybin, localArea, boxSize, cutoff):
     for pId in range(pos.shape[0]):
         for x in range(xbin.shape[0]-1):
@@ -444,7 +480,7 @@ def getTimeFourierVel(dirName, dirList, dirSpacing, numParticles):
 def getDirectories(dirName):
     listDir = []
     for dir in os.listdir(dirName):
-        if(os.path.isdir(dirName + os.sep + dir) and (dir != "bab" and dir != "dynamics")):
+        if(os.path.isdir(dirName + os.sep + dir) and (dir != "short" and dir != "dynamics")):
             listDir.append(dir)
     return listDir
 
@@ -452,7 +488,7 @@ def getOrderedDirectories(dirName):
     listDir = []
     listScalar = []
     for dir in os.listdir(dirName):
-        if(os.path.isdir(dirName + os.sep + dir) and (dir != "bab" and dir != "dynamics")):
+        if(os.path.isdir(dirName + os.sep + dir) and (dir != "short" and dir != "dynamics")):
             listDir.append(dir)
             listScalar.append(dir.strip('t'))
     listScalar = np.array(listScalar, dtype=np.int64)
@@ -526,15 +562,14 @@ def getPBCPositions(fileName, boxSize):
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos
 
-def centerPositions(pos, boxSize, denseList=np.empty(0)):
-    centerOfMass = np.mean(pos, axis=0)
-    pos[:,0] += centerOfMass[0]
-    pos[:,1] += centerOfMass[1]
+def centerPositions(pos, boxSize, denseList):
+    centerOfMass = np.mean(pos[denseList==1], axis=0)
+    pos[:,0] -= centerOfMass[0]
+    pos[:,1] -= centerOfMass[1]
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
-    centerOfMass = np.mean(pos, axis=0)
-    pos[:,0] += (0.5 - centerOfMass[0])
-    pos[:,1] += (0.5 - centerOfMass[1])
+    pos[:,0] += 0.5
+    pos[:,1] += 0.5
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos

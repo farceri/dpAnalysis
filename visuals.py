@@ -11,6 +11,7 @@ from matplotlib import cm
 from sklearn.cluster import KMeans
 from sklearn.cluster import DBSCAN
 from scipy.spatial import Voronoi, voronoi_plot_2d
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pyvoro
 import itertools
 import sys
@@ -142,12 +143,10 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
     rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
-    centerOfMass = np.mean(pos, axis=0)
-    print(centerOfMass)
     #pos = ucorr.shiftPositions(pos, boxSize, -0.65, -0.5)
-    pos = ucorr.centerPositions(pos, boxSize)
-    centerOfMass = np.mean(pos, axis=0)
-    print(centerOfMass)
+    #pos = ucorr.centerPositions(pos, boxSize)
+    #centerOfMass = np.mean(pos, axis=0)
+    #print(centerOfMass)
     #pos = shiftPositions(pos, boxSize, 0.22, 0.15) #8k
     #pos = shiftPositions(pos, boxSize, -0.65, -0.5) #16k
     #pos = shiftPositions(pos, boxSize, -0.4, -0.15) #32k
@@ -224,6 +223,41 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
     plt.savefig(figureName, transparent=True, format = "png")
     plt.show()
 
+def plotSPFixedBoundaryPacking(dirName, figureName, onedim=False, quiver=False, alpha = 0.6):
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
+    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
+    #if(onedim == "onedim"):
+    #    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    xBounds = np.array([0, boxSize[0]])
+    yBounds = np.array([0, boxSize[1]])
+    fig = plt.figure(0, dpi = 150)
+    ax = fig.gca()
+    ax.set_xlim(xBounds[0], xBounds[1])
+    ax.set_ylim(yBounds[0], yBounds[1])
+    ax.set_aspect('equal', adjustable='box')
+    setPackingAxes(boxSize, ax)
+    #setBigBoxAxes(boxSize, ax, 0.05)
+    colorId = getRadColorList(rad)
+    if(quiver==True):
+        vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
+        #vel *= 5
+    for particleId in range(rad.shape[0]):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        if(quiver==True):
+            ax.add_artist(plt.Circle([x, y], r, edgecolor=colorId[particleId], facecolor='none', alpha=alpha, linewidth = 0.7))
+            vx = vel[particleId,0]
+            vy = vel[particleId,1]
+            ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
+        else:
+            ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
+    figureName = "/home/francesco/Pictures/soft/packings/fb-" + figureName + ".png"
+    plt.savefig(figureName, transparent=True, format = "png")
+    plt.show()
+
 def getPressureColorList(pressure, which='total'):
     colorList = cm.get_cmap('viridis', pressure.shape[0])
     colorId = np.zeros((pressure.shape[0], 4))
@@ -236,19 +270,23 @@ def getPressureColorList(pressure, which='total'):
         p = pressure[:,1]
     elif(which=='active'):
         p = pressure[:,2]
+    elif(which=='epot'):
+        p = pressure[:,3]
     for particleId in np.argsort(p):
         colorId[particleId] = colorList(count/p.shape[0])
         count += 1
-    return colorId
+    return colorId, colorList
 
-def plotSPPressureMapPacking(dirName, figureName, which='total', alpha = 0.6):
+def plotSPPressureMapPacking(dirName, figureName, which='total', alpha = 0.7):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
-    centerOfMass = np.mean(pos, axis=0)
+    #denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
+    #centerOfMass = np.mean(pos[denseList==1], axis=0)
+    #print(centerOfMass)
     #pos[:,0] += 0.17
     #pos[:,1] += 0.17
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
@@ -263,40 +301,47 @@ def plotSPPressureMapPacking(dirName, figureName, which='total', alpha = 0.6):
         pressure = np.loadtxt(dirName + os.sep + "particlePressure.dat")
     else:
         pressure = spCorr.computeParticlePressure(dirName)
-    colorId = getPressureColorList(pressure, which)
+    colorId, colorList = getPressureColorList(pressure, which)
     for particleId in range(rad.shape[0]):
         x = pos[particleId,0]
         y = pos[particleId,1]
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
-    colorBar = cm.ScalarMappable(cmap='viridis')
-    cb = plt.colorbar(colorBar)
+    colorBar = cm.ScalarMappable(cmap=colorList)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cb = plt.colorbar(colorBar, cax=cax)
     cb.set_ticks([0, 1])
     cb.ax.tick_params(labelsize=12)
     if(which=='total'):
         mintick = np.format_float_positional(np.min(pressure[:,0] + pressure[:,1] + pressure[:,2]), precision=2)
         maxtick = np.format_float_positional(np.max(pressure[:,0] + pressure[:,1] + pressure[:,2]), precision=2)
-        label = "$S_{tot}$"
+        label = "$W_{tot}$"
     elif(which=='virial'):
         mintick = np.format_float_positional(np.min(pressure[:,0]), precision=2)
         maxtick = np.format_float_positional(np.max(pressure[:,0]), precision=2)
-        label = "$S_{virial}$"
+        label = "$W_{virial}$"
     elif(which=='thermal'):
         mintick = np.format_float_positional(np.min(pressure[:,1]), precision=2)
         maxtick = np.format_float_positional(np.max(pressure[:,1]), precision=2)
-        label = "$S_{thermal}$"
+        label = "$W_{thermal}$"
     elif(which=='active'):
         mintick = np.format_float_positional(np.min(pressure[:,2]), precision=2)
         maxtick = np.format_float_positional(np.max(pressure[:,2]), precision=2)
-        label = "$S_{active}$"
+        label = "$W_{active}$"
+    elif(which=='epot'):
+        mintick = np.format_float_positional(np.min(pressure[:,3]), precision=2)
+        maxtick = np.format_float_positional(np.max(pressure[:,3]), precision=2)
+        label = "$E_{pot}$"
     ticklabels = [mintick, maxtick]
     cb.set_ticklabels(ticklabels)
-    cb.set_label(label=label, fontsize=14, labelpad=0, rotation='horizontal')
+    cb.set_label(label=label, fontsize=16, labelpad=-15, rotation='horizontal')
+    plt.tight_layout()
     figureName = "/home/francesco/Pictures/soft/packings/pmap-" + figureName + ".png"
     plt.savefig(figureName, transparent=True, format = "png")
     plt.show()
 
-def plotSPVoronoiPacking(dirName, figureName, alpha=0.6):
+def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
@@ -312,11 +357,11 @@ def plotSPVoronoiPacking(dirName, figureName, alpha=0.6):
     #fig = voronoi_plot_2d(vor, show_points=False, show_vertices=False, line_colors='k', line_width=0.5, line_alpha=1, point_size=2)
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
-    cells = pyvoro.compute_2d_voronoi(pos, [[0, 1], [0, 1]], 1, radii=rad)
+    cells = pyvoro.compute_2d_voronoi(pos, [[0, boxSize[0]], [0, boxSize[1]]], 1, radii=rad)
     # colorize
     for i, cell in enumerate(cells):
         polygon = cell['vertices']
-        ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.5)
+        ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.2)
     #fig.set_dpi(150)
     ax.set_xlim(xBounds[0], xBounds[1])
     ax.set_ylim(yBounds[0], yBounds[1])
@@ -327,7 +372,7 @@ def plotSPVoronoiPacking(dirName, figureName, alpha=0.6):
         x = pos[particleId,0]
         y = pos[particleId,1]
         r = rad[particleId]
-        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.5'))
+        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
     figureName = "/home/francesco/Pictures/soft/packings/voronoi-" + figureName + ".png"
     plt.savefig(figureName, transparent=False, format = "png")
     plt.show()
@@ -442,10 +487,10 @@ def makeSPPackingClusterMixingVideo(dirName, figureName, numFrames = 20, firstSt
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     setPackingAxes(boxSize, ax)
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    if(os.path.exists(dirName + os.sep + "t" + str(firstStep) + "/denseList!.dat")):
-        denseList = np.loadtxt(dirName + os.sep + "t" + str(firstStep) + "/denseList.dat")
+    if(os.path.exists(dirName + os.sep + "t" + str(stepList[0]) + "/denseList!.dat")):
+        denseList = np.loadtxt(dirName + os.sep + "t" + str(stepList[0]) + "/denseList.dat")
     else:
-        denseList,_ = spCorr.computeVoronoiCluster(dirName)
+        denseList,_ = spCorr.computeVoronoiCluster(dirName + os.sep + "t" + str(stepList[0]))
     # the first configuration gets two frames for better visualization
     makeSoftParticleClusterFrame(dirName + os.sep + "t" + str(stepList[0]), rad, boxSize, figFrame, frames, denseList)
     for i in stepList:
@@ -881,6 +926,10 @@ if __name__ == '__main__':
     elif(whichPlot == "ss3d"):
         plot3DPacking(dirName, figureName)
 
+    elif(whichPlot == "ssfixed"):
+        onedim = sys.argv[4]
+        plotSPFixedBoundaryPacking(dirName, figureName, onedim)
+
     elif(whichPlot == "ssvel"):
         plotSPPacking(dirName, figureName, quiver=True)
 
@@ -898,7 +947,7 @@ if __name__ == '__main__':
         which = sys.argv[4]
         plotSPPressureMapPacking(dirName, figureName, which)
 
-    elif(whichPlot == "voronoi"):
+    elif(whichPlot == "ssvoro"):
         plotSPVoronoiPacking(dirName, figureName)
 
     elif(whichPlot == "ssvideo"):

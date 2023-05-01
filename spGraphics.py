@@ -6,6 +6,7 @@ Created by Francesco
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.optimize import curve_fit
 from scipy.fft import fft, fftfreq
 from scipy import interpolate
@@ -155,13 +156,13 @@ def plotClusterPressureVSTime(dirName, figureName, bound=False, prop=False):
         ptot += pressure[:,4]
     ax[0].plot(pressure[:,0], ptot, linewidth=1.5, color='b', ls='dotted', label="$total$")
     # dilute particles
-    ax[1].plot(pressure[:,0], pressure[:,5], linewidth=1.5, color='k', ls='--')
-    ax[1].plot(pressure[:,0], pressure[:,6], linewidth=1.5, color='r', ls='--')
-    ptot = pressure[:,6] + pressure[:,6]
+    ax[1].plot(pressure[:,0], pressure[:,5], linewidth=1.5, color='k', ls='--', label="$virial$")
+    ax[1].plot(pressure[:,0], pressure[:,6], linewidth=1.5, color='r', ls='--', label="$thermal$")
+    ptot = pressure[:,5] + pressure[:,6]
     if(prop == "prop"):
-        ax[1].plot(pressure[:,0], pressure[:,7], linewidth=1.5, color=[1,0.5,0], ls='--')
+        ax[1].plot(pressure[:,0], pressure[:,7], linewidth=1.5, color=[1,0.5,0], ls='--', label="$active$")
         ptot += pressure[:,7]
-    ax[1].plot(pressure[:,0], ptot, linewidth=1.5, color='b', ls='dotted')
+    ax[1].plot(pressure[:,0], ptot, linewidth=1.5, color='b', ls='dotted', label="$total$")
     # plotting settings
     ax[0].tick_params(axis='both', labelsize=12)
     ax[1].tick_params(axis='both', labelsize=12)
@@ -1869,35 +1870,13 @@ def plotSPForceVelMagnitude(dirName, figureName, fixed=False):
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPClusterForceVelTradeoff(dirName, figureName):
-    fig, ax = plt.subplots(figsize=(6.5,4.5), dpi = 120)
-    dirList = np.array(['thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85',  'thermal94', 'thermal1'])
-    taupc = np.zeros(dirList.shape[0])
-    phi = np.zeros(dirList.shape[0])
-    for d in range(dirList.shape[0]):
-        dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/"
-        if(os.path.exists(dirSample + "/forceVelTradeoff.dat")):
-            data = np.loadtxt(dirSample + "/forceVelTradeoff.dat")
-            phi[d] = data[0]
-            taupc[d] = data[1]
-    ax.semilogx(taupc, phi, color='k', lw=1, marker='o', fillstyle='none')
-    np.savetxt(dirName + "/forceVelTradeoff.dat", np.column_stack((phi, taupc)))
-    figureName = "/home/francesco/Pictures/nve-nvt-nva/pForceVelTradeoff-" + figureName
-    ax.tick_params(axis='both', labelsize=14)
-    ax.tick_params(axis='both', labelsize=14)
-    ax.set_ylabel("$Density$", fontsize=18)
-    ax.set_xlabel("$Tradeoff$ $time,$ $\\tau_p^*$", fontsize=18)
-    fig.tight_layout()
-    fig.savefig(figureName + ".png", transparent=True, format = "png")
-    plt.show()
-
-def plotSPTotalPressure(dirName, figureName, fixed='Dr'):
+def plotSPTotalPressure(dirName, figureName, fixed='Dr', which='1e-03'):
     fig, ax = plt.subplots(figsize = (7,5), dpi = 120)
     if(fixed=="phi"):
-        dirList = np.array(['1e-05', '5e-05', '1e-04', '3e-04', '5e-04', '1e-03', '3e-03', '5e-03', '6e-03', '7e-03', '8e-03', '1e-02', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '2e-01', '5e-01', '1', '5'])
+        dirList = np.array(['1e-05', '5e-05', '1e-04', '3e-04', '5e-04', '1e-03', '2e-03', '3e-03', '5e-03', '6e-03', '7e-03', '8e-03', '1e-02', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '2e-01', '5e-01', '1', '5', '10', '50', '100', '1000'])
         colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
     elif(fixed=="Dr"):
-        dirList = np.array(['thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85',  'thermal94', 'thermal1'])
+        dirList = np.array(['thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85', 'thermal94'])
         colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
         phi = np.zeros(dirList.shape[0])
     else:
@@ -1908,7 +1887,7 @@ def plotSPTotalPressure(dirName, figureName, fixed='Dr'):
         if(fixed=="phi"):
             dirSample = dirName + os.sep + "iod10/active-langevin/Dr" + dirList[d] + "-f0200/dynamics/"
         elif(fixed=="Dr"):
-            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr1e-03-f0200/dynamics/"
+            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr" + which + "-f0200/dynamics/"
             phi[d] = ucorr.readFromParams(dirSample, "phi")
         if(os.path.exists(dirSample + "/pressure.dat")):
             taup[d] = 1/ucorr.readFromDynParams(dirSample, "Dr")
@@ -1931,37 +1910,40 @@ def plotSPTotalPressure(dirName, figureName, fixed='Dr'):
         x = taup
         xlabel = "$Persistence$ $time,$ $\\tau_p$"
         loc = 'upper left'
-        figureName = "/home/francesco/Pictures/nve-nvt-nva/pTotPressure-vsDr-" + figureName
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pTotPressure-vsDr-" + figureName + "-phi" + which
         ax.set_xscale('log')
         ax.set_yscale('log')
     else:
         x = phi
         xlabel = "$Density,$ $\\varphi$"
         loc = 'upper left'
-        figureName = "/home/francesco/Pictures/nve-nvt-nva/pTotPressure-vsPhi-" + figureName
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pTotPressure-vsPhi-" + figureName + "-Dr" + which
     ax.tick_params(axis='both', labelsize=14)
     # pressure components
-    ax.errorbar(x[p[:,0,0]>0], p[p[:,0,0]>0,0,0], p[p[:,0,0]>0,0,1], lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Steric$')
-    ax.errorbar(x[p[:,1,0]>0], p[p[:,1,0]>0,1,0], p[p[:,1,0]>0,1,1], lw=1.2, color='r', marker='v', markersize=8, fillstyle='none', capsize=3, label='$Thermal$')
-    ax.errorbar(x[p[:,2,0]>0], p[p[:,2,0]>0,2,0], p[p[:,2,0]>0,2,1], lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3, label='$Actve$')
-    ax.errorbar(x[p[:,3,0]>0], p[p[:,3,0]>0,3,0], p[p[:,3,0]>0,3,1], lw=1.2, color='b', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Total$')
+    ax.errorbar(x, p[:,0,0], p[:,0,1], lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Steric$')
+    ax.errorbar(x, p[:,1,0], p[:,1,1], lw=1.2, color='r', marker='v', markersize=8, fillstyle='none', capsize=3, label='$Thermal$')
+    ax.errorbar(x, p[:,2,0], p[:,2,1], lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3, label='$Actve$')
+    ax.errorbar(x, p[:,3,0], p[:,3,1], lw=1.2, color='b', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Total$')
     #ax.set_xlim(5.8e-06, 2.8e03)
     ax.set_xlabel(xlabel, fontsize=18)
     ax.set_ylabel("$Pressure,$ $P \\sigma^2$", fontsize=18)
     ax.legend(fontsize=14, loc=loc)
+    #ax.set_yscale('log')
     fig.tight_layout()
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPClusterPressure(dirName, figureName, fixed='Dr'):
-    fig1, ax1 = plt.subplots(figsize = (7,5), dpi = 120)
+def plotSPClusterPressure(dirName, figureName, fixed='Dr', inter=False, which='gasFluid'):
+    fig1, ax1 = plt.subplots(figsize = (7,4.5), dpi = 120)
     fig2, ax2 = plt.subplots(figsize = (7,4.5), dpi = 120)
     if(fixed=="phi"):
-        dirList = np.array(['1e-05', '5e-05', '1e-04', '3e-04', '5e-04', '1e-03', '3e-03', '5e-03', '6e-03', '7e-03', '8e-03', '1e-02', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '2e-01', '5e-01', '1', '5'])
-        colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
+        phi = ucorr.readFromParams(dirName, "phi")
+        if(phi == 0.45):
+            dirList = np.array(['1', '5e-01', '2e-01', '1e-01', '5e-02', '3e-02', '2e-02', '1.5e-02', '1.2e-02', '1e-02', '8e-03', '7e-03', '6e-03', '5e-03', '1.5e-03', '1e-03', '5e-04', '3e-04', '1.5e-04', '1e-04', '5e-05', '1e-05'])
+        else:
+            dirList = np.array(['1', '5e-01', '1e-01', '5e-02', '1.5e-02', '1e-02', '5e-03', '3e-03', '2e-03', '1.5e-03', '1e-03', '5e-04', '1.5e-04', '1e-04', '5e-05', '1e-05'])
     elif(fixed=="Dr"):
-        dirList = np.array(['thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85'])#,  'thermal94', 'thermal1'])
-        colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
+        dirList = np.array(['thermal30', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85', 'thermal85', 'thermal88', 'thermal94'])
         phi = np.zeros(dirList.shape[0])
     else:
         print("please specify the fixed parameter")
@@ -1974,13 +1956,15 @@ def plotSPClusterPressure(dirName, figureName, fixed='Dr'):
         if(fixed=="phi"):
             dirSample = dirName + os.sep + "iod10/active-langevin/Dr" + dirList[d] + "-f0200/dynamics/"
         elif(fixed=="Dr"):
-            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr1e-03-f0200/dynamics/"
-            phi[d] = ucorr.readFromParams(dirSample, "phi")
+            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr" + which + "-f0200/dynamics/"
+            if(os.path.exists(dirSample + "localVoroDensity-N30-stats.dat")):
+                phi[d] = np.loadtxt(dirSample + "localVoroDensity-N30-stats.dat")[3]
+            else:
+                phi[d] = spCorr.averageLocalVoronoiDensity(dirSample)
         if(os.path.exists(dirSample + "/clusterPressure.dat")):
             taup[d] = 1/ucorr.readFromDynParams(dirSample, "Dr")
             data = np.loadtxt(dirSample + "/clusterPressure.dat")
             sigma = np.mean(np.loadtxt(dirSample + "/particleRad.dat"))
-            data[:,1:] *= sigma**2
             # dense steric
             pIn[d,0,0] = np.mean(data[:,2])
             pIn[d,0,1] = np.std(data[:,2])
@@ -2005,6 +1989,35 @@ def plotSPClusterPressure(dirName, figureName, fixed='Dr'):
             # dilute total
             ptotOut[d,0] = np.mean(data[:,5] + data[:,6] + data[:,7])
             ptotOut[d,1] = np.std(data[:,5] + data[:,6] + data[:,7])
+    # interpolate to find tradeoff point
+    if(inter == 'inter'):
+        check = False
+        if(which == "gasFluid"):
+            virial = ptotIn[ptotIn[:,0]>0,0]
+            active = ptotOut[ptotIn[:,0]>0,0]
+            tau = taup[ptotIn[:,0]>0]
+        else:
+            virial = pIn[pOut[:,2,0]>0,0,0]
+            active = pIn[pOut[:,2,0]>0,2,0]
+            tau = taup[pOut[:,2,0]>0]
+        for i in range(active.shape[0]):
+            if(active[i] > virial[i]):
+                check = True
+        if(check):
+            index = np.argwhere(virial > active)[-1,0]
+            t = np.linspace(tau[index], tau[index+1],100)
+            virialSlope = (virial[index+1] - virial[index]) / (tau[index+1] - tau[index])
+            activeSlope = (active[index+1] - active[index]) / (tau[index+1] - tau[index])
+            virialInter = virial[index] + virialSlope*(t - tau[index])
+            activeInter = active[index] + activeSlope*(t - tau[index])
+            taupc = t[np.argwhere(virialInter>activeInter)[-1,0]]
+            dirSample = dirName + os.sep + "iod10/active-langevin/Dr" + dirList[index] + "-f0200/dynamics/"
+            if(os.path.exists(dirSample + "localVoroDensity-N30-stats.dat")):
+                phic = np.loadtxt(dirSample + "localVoroDensity-N30-stats.dat")[3]
+            else:
+                phic = spCorr.averageLocalVoronoiDensity(dirSample)
+            print(index-1, index, taupc, phic)
+            np.savetxt(dirName + "iod10/active-langevin/" + which + "Tradeoff.dat", np.array([phic, taupc]))
     if(fixed=="phi"):
         x = taup
         xlabel = "$Persistence$ $time,$ $\\tau_p$"
@@ -2019,22 +2032,39 @@ def plotSPClusterPressure(dirName, figureName, fixed='Dr'):
         x = phi
         xlabel = "$Density,$ $\\varphi$"
         loc = 'upper left'
-        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pGasFLuid-vsPhi-" + figureName
-        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pPressures-vsPhi-" + figureName
+        figure1Name = "/home/francesco/Pictures/nve-nvt-nva/pGasFLuid-vsPhi-" + figureName + "-Dr" + which
+        figure2Name = "/home/francesco/Pictures/nve-nvt-nva/pPressures-vsPhi-" + figureName + "-Dr" + which
+        ax1.set_yscale('log')
+        ax2.set_yscale('log')
     ax1.tick_params(axis='both', labelsize=14)
     ax2.tick_params(axis='both', labelsize=14)
     # dense and dilute pressure
-    ax1.errorbar(x[ptotIn[:,0]>0], ptotIn[ptotIn[:,0]>0,0], ptotIn[ptotIn[:,0]>0,1], color='b', marker='D', markersize=8, fillstyle='none', lw=1.2, capsize=3, label='$Fluid$')
-    ax1.errorbar(x[ptotOut[:,0]>0], ptotOut[ptotOut[:,0]>0,0], ptotOut[ptotOut[:,0]>0,1], color='g', marker='d', markersize=8, fillstyle='none', lw=1.2, capsize=3, label='$Gas$')
+    ax1.errorbar(x[ptotIn[:,0]>0], ptotIn[ptotIn[:,0]>0,0], ptotIn[ptotIn[:,0]>0,1], color='b', marker='s', markersize=8, fillstyle='none', lw=1.2, capsize=3, label='$Fluid$')
+    ax1.errorbar(x[ptotOut[:,0]>0], ptotOut[ptotOut[:,0]>0,0], ptotOut[ptotOut[:,0]>0,1], color='g', marker='o', markersize=8, fillstyle='none', lw=1.2, capsize=3, label='$Gas$')
     # pressure components
-    ax2.errorbar(x[pIn[:,0,0]>0], pIn[pIn[:,0,0]>0,0,0], pIn[pIn[:,0,0]>0,0,1], lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Steric$')
-    ax2.errorbar(x[pIn[:,1,0]>0], pIn[pIn[:,1,0]>0,1,0], pIn[pIn[:,1,0]>0,1,1], lw=1.2, color='r', marker='v', markersize=8, fillstyle='none', capsize=3, label='$Thermal$')
-    ax2.errorbar(x[pIn[:,2,0]>0], pIn[pIn[:,2,0]>0,2,0], pIn[pIn[:,2,0]>0,2,1], lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3, label='$Actve$')
-    ax2.errorbar(x[pOut[:,0,0]>0], pOut[pOut[:,0,0]>0,0,0], pOut[pOut[:,0,0]>0,0,1], ls='--', lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3)
-    ax2.errorbar(x[pOut[:,1,0]>0], pOut[pOut[:,1,0]>0,1,0], pOut[pOut[:,1,0]>0,1,1], ls='--', lw=1.2, color='r', marker='v', markersize=8, fillstyle='none', capsize=3)
-    ax2.errorbar(x[pOut[:,2,0]>0], pOut[pOut[:,2,0]>0,2,0], pOut[pOut[:,2,0]>0,2,1], ls='--', lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3)
-    #ax2.errorbar(x, pIn[:,0,0] + pOut[:,0,0], pIn[:,0,1] + pOut[:,0,1], lw=1.2, ls='dotted', color='k', marker='o', markersize=8, fillstyle='none', capsize=3)
-    #ax2.errorbar(x, pIn[:,2,0] + pOut[:,2,0], pIn[:,2,1] + pOut[:,2,1], lw=1.2, ls='dotted', color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3)
+    if(fixed=='phi'):
+        ax2.errorbar(x[pIn[:,0,0]>0], pIn[pIn[:,0,0]>0,0,0], pIn[pIn[:,0,0]>0,0,1], lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Steric$')
+        ax2.errorbar(x[pIn[:,1,0]>0], pIn[pIn[:,1,0]>0,1,0], pIn[pIn[:,1,0]>0,1,1], lw=1.2, color='r', marker='v', markersize=8, fillstyle='none', capsize=3, label='$Thermal$')
+        ax2.errorbar(x[pIn[:,2,0]>0], pIn[pIn[:,2,0]>0,2,0], pIn[pIn[:,2,0]>0,2,1], lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3, label='$Actve$')
+        ax2.errorbar(x[pOut[:,0,0]>0], pOut[pOut[:,0,0]>0,0,0], pOut[pOut[:,0,0]>0,0,1], ls='--', lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3)
+        ax2.errorbar(x[pOut[:,1,0]>0], pOut[pOut[:,1,0]>0,1,0], pOut[pOut[:,1,0]>0,1,1], ls='--', lw=1.2, color='r', marker='v', markersize=8, fillstyle='none', capsize=3)
+        ax2.errorbar(x[pOut[:,2,0]>0], pOut[pOut[:,2,0]>0,2,0], pOut[pOut[:,2,0]>0,2,1], ls='--', lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3)
+    else:
+        ax2.errorbar(x, pIn[:,0,0], pIn[:,0,1], lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Steric$')
+        ax2.errorbar(x, pIn[:,1,0], pIn[:,1,1], lw=1.2, color='r', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Thermal$')
+        ax2.errorbar(x, pIn[:,2,0], pIn[:,2,1], lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3, label='$Active$')
+        ax2.errorbar(x, pOut[:,0,0], pOut[:,0,1], ls='--', lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3)
+        ax2.errorbar(x, pOut[:,1,0], pOut[:,1,1], ls='--', lw=1.2, color='r', marker='o', markersize=8, fillstyle='none', capsize=3)
+        ax2.errorbar(x, pOut[:,2,0], pOut[:,2,1], ls='--', lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3)
+    if(inter == 'inter' and check):
+        if(which=='gasFluid'):
+            ax1.plot(np.ones(100)*taupc, np.linspace(np.min(ptotOut[:,0]), np.max(ptotIn[:,0]), 100), lw=0.7, ls='--', color='k')
+            ax1.plot(t, virialInter, lw=2, color='r')
+            ax1.plot(t, activeInter, lw=2, color='k')
+        else:
+            ax2.plot(np.ones(100)*taupc, np.linspace(np.min(pOut[:,0]), np.max(pIn[:,0]), 100), lw=0.7, ls='--', color='k')
+            ax2.plot(t, virialInter, lw=2, color='r')
+            ax2.plot(t, activeInter, lw=2, color='k')
     #ax.set_xlim(5.8e-06, 2.8e03)
     ax1.set_xlabel(xlabel, fontsize=18)
     ax1.set_ylabel("$Total$ $pressure$", fontsize=18)
@@ -2048,67 +2078,146 @@ def plotSPClusterPressure(dirName, figureName, fixed='Dr'):
     fig2.savefig(figure2Name + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPPressureProfile(dirName, figureName, fixed='Dr'):
-    fig, ax = plt.subplots(figsize = (7,5), dpi = 120)
-    if(fixed=="phi"):
-        dirList = np.array(['1e-05', '5e-05', '1e-04', '3e-04', '5e-04', '1e-03', '3e-03', '5e-03', '6e-03', '7e-03', '8e-03', '1e-02', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '2e-01', '5e-01', '1', '5'])
-        colorList = cm.get_cmap('plasma', dirList.shape[0]+1)
-    elif(fixed=="Dr"):
-        dirList = np.array(['thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85',  'thermal94', 'thermal1'])
-        colorList = cm.get_cmap('viridis', dirList.shape[0]+1)
-        phi = np.zeros(dirList.shape[0])
-    else:
-        print("please specify the fixed parameter")
-    p = np.zeros((dirList.shape[0], 4, 2))
-    taup = np.zeros(dirList.shape[0])
+def plotSPClusterTradeoff(dirName, figureName, which='gasFluid'):
+    fig, ax = plt.subplots(figsize=(6.5,4.5), dpi = 120)
+    dirList = np.array(['thermal25', 'thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal83', 'thermal88'])
+    taupc = np.zeros(dirList.shape[0])
+    phi = np.zeros(dirList.shape[0])
     for d in range(dirList.shape[0]):
-        if(fixed=="phi"):
-            dirSample = dirName + os.sep + "iod10/active-langevin/Dr" + dirList[d] + "-f0200/dynamics/"
-        elif(fixed=="Dr"):
-            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr1e-03-f0200/dynamics/"
-            phi[d] = ucorr.readFromParams(dirSample, "phi")
-        if(os.path.exists(dirSample + "/pressureProfile.dat")):
-            taup[d] = 1/ucorr.readFromDynParams(dirSample, "Dr")
-            data = np.loadtxt(dirSample + "/pressureProfile.dat")
-            sigma = np.mean(np.loadtxt(dirSample + "/particleRad.dat"))
-            data[:,1:] *= sigma**2
-            bins = data[:,0]
-            # steric
-            p[d,0,0] = np.mean(data[:,1])
-            p[d,0,1] = np.std(data[:,1])
-            # thermal
-            p[d,1,0] = np.mean(data[:,2])
-            p[d,1,1] = np.std(data[:,2])
-            # active
-            p[d,2,0] = np.mean(data[:,3])
-            p[d,2,1] = np.std(data[:,3])
-            # dense total
-            p[d,3,0] = np.mean(data[:,1] + data[:,2] + data[:,3])
-            p[d,3,1] = np.std(data[:,1] + data[:,2] + data[:,3])
-    if(fixed=="phi"):
-        x = taup
-        xlabel = "$Persistence$ $time,$ $\\tau_p$"
-        loc = 'upper left'
-        figureName = "/home/francesco/Pictures/nve-nvt-nva/pProfile-vsDr-" + figureName
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-    else:
-        x = phi
-        xlabel = "$Density,$ $\\varphi$"
-        loc = 'upper left'
-        figureName = "/home/francesco/Pictures/nve-nvt-nva/pProfile-vsPhi-" + figureName
+        dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/"
+        if(os.path.exists(dirSample + os.sep + which + "Tradeoff.dat")):
+            data = np.loadtxt(dirSample + os.sep + which + "Tradeoff.dat")
+            phi[d] = data[0]
+            taupc[d] = data[1]
+    ax.plot(taupc[taupc>0], phi[taupc>0], color='k', lw=1, marker='o', fillstyle='none')
+    np.savetxt(dirName + os.sep + which + "Tradeoff.dat", np.column_stack((phi[taupc>0], taupc[taupc>0])))
+    figureName = "/home/francesco/Pictures/nve-nvt-nva/pClusterTradeoff-" + figureName
     ax.tick_params(axis='both', labelsize=14)
-    # pressure components
-    ax.errorbar(x[p[:,0,0]>0], p[p[:,0,0]>0,0,0], p[p[:,0,0]>0,0,1], lw=1.2, color='k', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Steric$')
-    ax.errorbar(x[p[:,1,0]>0], p[p[:,1,0]>0,1,0], p[p[:,1,0]>0,1,1], lw=1.2, color='r', marker='v', markersize=8, fillstyle='none', capsize=3, label='$Thermal$')
-    ax.errorbar(x[p[:,2,0]>0], p[p[:,2,0]>0,2,0], p[p[:,2,0]>0,2,1], lw=1.2, color=[1,0.5,0], marker='s', markersize=8, fillstyle='none', capsize=3, label='$Actve$')
-    ax.errorbar(x[p[:,3,0]>0], p[p[:,3,0]>0,3,0], p[p[:,3,0]>0,3,1], lw=1.2, color='b', marker='o', markersize=8, fillstyle='none', capsize=3, label='$Total$')
-    #ax.set_xlim(5.8e-06, 2.8e03)
-    ax.set_xlabel("$Distance,$ $r/\\sigma$", fontsize=18)
-    ax.set_ylabel("$Pressure,$ $P \\sigma^2$", fontsize=18)
-    ax.legend(fontsize=14, loc=loc)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_ylabel("$Density$", fontsize=18)
+    ax.set_xlabel("$Tradeoff$ $time,$ $\\tau_p^*$", fontsize=18)
     fig.tight_layout()
     fig.savefig(figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
+def plotSPPhaseDiagram(dirName, numBins, figureName, which='16', log=False):
+    fig, ax = plt.subplots(figsize=(6.5,5), dpi = 120)
+    phi = np.array(['25', '30', '35', '40', '45', '52', '58', '62', '67', '72', '78', '83', '85', '88', '94'])#, '1'])
+    Dr = np.array(['100', '50', '10', '5', '1', '5e-01', '2e-01', '1e-01', '5e-02', '3e-02', '2e-02', '1.5e-02', '1.2e-02', '1e-02', '8e-03', '7e-03', '6e-03', '5e-03', '3e-03', '2e-03', '1.5e-03', '1e-03', '5e-04', '3e-04', '1.5e-04', '1e-04', '5e-05', '1e-05'])
+    taup = np.zeros(Dr.shape[0])
+    # load the data
+    deltaPhi = np.zeros((phi.shape[0], Dr.shape[0]))
+    voroPhi = np.zeros((phi.shape[0], Dr.shape[0]))
+    for i in range(phi.shape[0]):
+        for j in range(Dr.shape[0]):
+            dirSample = dirName + 'thermal' + phi[i] + '/langevin/T0.001/iod10/active-langevin/Dr' + Dr[j] + '-f0200/dynamics/'
+            fileName = dirSample + 'localVoroDensity-N' + which + '-stats.dat'#'localDensity-N16-stats.dat'
+            if(os.path.exists(fileName)):
+                data = np.loadtxt(fileName)
+                deltaPhi[i,j] = data[1]
+                voroPhi[i,j] = data[3]
+                taup[j] = 1/ucorr.readFromDynParams(dirSample, 'Dr')
+    # assign color based on deltaPhi
+    ax.plot(np.ones(50)*1e03, np.linspace(0,1.2,50), ls='dotted', color='k', lw=0.7)
+    colorId = np.zeros((phi.shape[0], Dr.shape[0]))
+    min = np.min(deltaPhi)
+    max = np.max(deltaPhi)
+    if(log=='log'):
+        bins = np.geomspace(min+1e-04, max+0.001, numBins)
+    else:
+        bins = np.linspace(min, max+0.001, numBins)
+    print('minimum intensity: ', min, ' maximum intensity: ', max)
+    colorMap = cm.get_cmap('inferno', numBins)
+    for i in range(phi.shape[0]):
+        for j in range(Dr.shape[0]):
+            for k in range(numBins-1):
+                if(deltaPhi[i,j] > bins[k] and deltaPhi[i,j] < bins[k+1]):
+                    ax.semilogx(taup[j], voroPhi[i,j], color=colorMap((numBins-k)/numBins), marker='s', markersize=12, lw=0)
+    data = np.loadtxt(dirName + "/gasFluidTradeoff.dat")
+    ax.plot(data[:,1], data[:,0], color='k', marker='o', markersize=6, markeredgewidth=1.2, fillstyle='none', lw=1)
+    data = np.loadtxt(dirName + "/virialActiveTradeoff.dat")
+    #ax.plot(data[:,1], data[:,0], color=[0.3,0.7,0], marker='v', markersize=8, markeredgewidth=1.2, fillstyle='none', lw=1)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_ylabel("$Density,$ $\\varphi$", fontsize=18)
+    ax.set_xlabel("$Persistence$ $time,$ $\\tau_p$", fontsize=18)
+    ax.set_ylim(0.22, 0.97)
+    colorBar = cm.ScalarMappable(cmap=colorMap)
+    cb = plt.colorbar(colorBar)
+    label = "$\\Delta \\varphi_{Voronoi}$"#"$\\Delta \\varphi^2_{16}}$"
+    cb.set_ticks([0, 1])
+    cb.ax.tick_params(labelsize=14, length=0)
+    cb.ax.invert_yaxis()
+    ticklabels = [np.format_float_positional(max, 2), str(min)]
+    cb.set_ticklabels(ticklabels)
+    cb.set_label(label=label, fontsize=14, labelpad=0, rotation='horizontal')
+    fig.tight_layout()
+    figureName = "/home/francesco/Pictures/nve-nvt-nva/pPhaseDiagram-" + figureName
+    if(log=='log'):
+        figureName += "-" + log
+    fig.savefig(figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
+def plotSPPressureProfile(dirName, figureName):
+    fig, ax = plt.subplots(figsize = (7,4.5), dpi = 120)
+    if(os.path.exists(dirName + "/pressureProfile.dat")):
+        data = np.loadtxt(dirName + "/pressureProfile.dat")
+        #peak = np.argmax(data[:,1])
+        #data[:,0] = np.roll(data[:,0], peak + data.shape[0]//2)
+        ax.plot(data[:,0], data[:,1], lw=1.5, color='k', ls='--', label='$Steric$')
+        ax.plot(data[:,0], data[:,4], lw=1.5, color='r', ls='dashdot', label='$Thermal$')
+        ax.plot(data[:,0], data[:,5], lw=1.5, color=[1,0.5,0], label='$Active$')
+        ax.plot(data[:,0], data[:,8], lw=1.5, color='b', ls='dotted', label='$Total$')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$Position,$ $x$", fontsize=18)
+    ax.set_ylabel("$Pressure,$ $p$", fontsize=18)
+    ax.legend(fontsize=10, loc='upper right', ncol=4)
+    ax.set_ylim(np.min(data[:,4])-20, np.max(data[:,8])+60)
+    fig.tight_layout()
+    fig.savefig("/home/francesco/Pictures/nve-nvt-nva/pProfile-" + figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
+def plotSPClusterMixing(dirName, figureName, fixed='Dr', which='1e-03'):
+    fig, ax = plt.subplots(figsize=(7,5), dpi = 120)
+    if(fixed=="phi"):
+        dirList = np.array(['5e-02', '3e-02', '2e-02', '1.5e-02', '1.2e-02', '1e-02', '8e-03', '7e-03', '6e-03', '5e-03', '3e-03', '2e-03', '1e-03', '5e-04', '3e-04', '1e-04', '5e-05', '1e-05'])
+        colorList = cm.get_cmap('plasma', dirList.shape[0])
+    elif(fixed=="Dr"):
+        dirList = np.array(['thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal83', 'thermal85', 'thermal88', 'thermal94'])
+        labelList = np.array(['$\\varphi = 0.30$', '$\\varphi = 0.35$', '$\\varphi = 0.40$', '$\\varphi = 0.45$', '$\\varphi = 0.52$', '$\\varphi = 0.58$', '$\\varphi = 0.62$', '$\\varphi = 0.67$', '$\\varphi = 0.72$', '$\\varphi = 0.78$', '$\\varphi = 0.83$', '$\\varphi = 0.85$', '$\\varphi = 0.88$', '$\\varphi = 0.94$'])
+        colorList = cm.get_cmap('viridis', dirList.shape[0])
+    else:
+        print("please specify the fixed parameter")
+    phi = np.zeros(dirList.shape[0])
+    for d in range(dirList.shape[0]):
+        if(fixed=="phi"):
+            dirSample = dirName + os.sep + "iod10/active-langevin/Dr" + dirList[d] + "-f0200/dynamics/short/"
+        elif(fixed=="Dr"):
+            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr" + which + "-f0200/dynamics/short/"
+        if(os.path.exists(dirSample + "clusterMixing-block.dat")):
+            data = np.loadtxt(dirSample + "clusterMixing-block.dat")
+            timeStep = ucorr.readFromParams(dirSample, "dt")
+            sigma = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
+            phi[d] = ucorr.readFromParams(dirSample, "phi")
+            ax.plot(data[:,0]*timeStep/sigma, data[:,1], lw=1.2, color=colorList(d/dirList.shape[0]), marker='o', markersize=4, fillstyle='none')
+    ax.tick_params(axis='both', labelsize=14)
+    ax.set_xlabel("$Simulation$ $time,$ $t/\\sigma$", fontsize=18)
+    ax.set_ylabel("$N_{dense}(t) / N_{dense}(0)$", fontsize=18)
+    colorBar = cm.ScalarMappable(cmap=colorList)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cb = plt.colorbar(colorBar, cax=cax)
+    cb.ax.tick_params(labelsize=12)
+    cb.set_ticks((0.5/dirList.shape[0],1-0.5/dirList.shape[0]))
+    if(fixed=='phi'):
+        cb.set_ticklabels(("$5 \\times 10^{-2}$", "$5 \\times 10^{-5}$"))
+        cb.set_label(label="$D_r$", fontsize=16, labelpad=-30, rotation='horizontal')
+        fig.savefig("/home/francesco/Pictures/nve-nvt-nva/pMixing-vsDr-" + figureName + "-Dr" + which + ".png", transparent=True, format = "png")
+    elif(fixed=='Dr'):
+        cb.set_ticklabels(("$0.30$", "$0.88$"))
+        cb.set_label(label="$phi$", fontsize=16, labelpad=-30, rotation='horizontal')
+        fig.savefig("/home/francesco/Pictures/nve-nvt-nva/pMixing-vsPhi-" + figureName + "-Dr" + which + ".png", transparent=True, format = "png")
+    #ax.legend(fontsize=10, loc="upper right")
+    fig.tight_layout()
     plt.show()
 
 def plotSPClusterVoronoiDensity(dirName, figureName, fixed=False, which='10'):
@@ -2393,27 +2502,6 @@ def plotSPClusterSurfaceTension(dirName, figureName):
     fig2.tight_layout()
     figureName = "/home/francesco/Pictures/nve-nvt-nva/pSurfaceTension-" + figureName
     fig2.savefig(figureName + ".png", transparent=True, format = "png")
-    plt.show()
-
-def plotSPClusterMixing(dirName, figureName):
-    fig, ax = plt.subplots(figsize=(7,5), dpi = 120)
-    dirList = np.array(['thermal30', 'thermal45', 'thermal52', 'thermal62', 'thermal78'])
-    labelList = np.array(['$\\varphi = 0.30$', '$\\varphi = 0.45$', '$\\varphi = 0.52$', '$\\varphi = 0.62$', '$\\varphi = 0.78$'])
-    colorList = cm.get_cmap('viridis', dirList.shape[0])
-    phi = np.zeros(dirList.shape[0])
-    for d in range(dirList.shape[0]):
-        dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr1e-03-f0200/dynamics-fb/"
-        if(os.path.exists(dirSample + "clusterMixing.dat")):
-            data = np.loadtxt(dirSample + "clusterMixing.dat")
-            timeStep = ucorr.readFromParams(dirSample, "dt")
-            sigma = np.mean(np.loadtxt(dirSample + "particleRad.dat"))
-            ax.plot(data[:,0]*timeStep/sigma, data[:,1], lw=1.2, color=colorList(d/dirList.shape[0]), marker='o', markersize=4, fillstyle='none', label=labelList[d])
-    ax.tick_params(axis='both', labelsize=14)
-    ax.set_xlabel("$Simulation$ $time,$ $t/\\sigma$", fontsize=18)
-    ax.set_ylabel("$N_{dense}(t) / N_{dense}(0)$", fontsize=18)
-    ax.legend(fontsize=12, loc="lower left")
-    fig.tight_layout()
-    fig.savefig("/home/francesco/Pictures/nve-nvt-nva/pMixing-" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
 def plotSPClusterFluctuations(dirName, figureName, fixed=False, which='10'):
@@ -2764,51 +2852,36 @@ def plotSPDensityProfile(dirName, figureName, weight=False):
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPDensity2D(dirName, numBins, figureName):
-    fig, ax = plt.subplots(figsize=(6.5,5), dpi = 120)
-    phi = np.array(['25', '30', '35', '40', '45', '52', '58', '62', '67', '72', '78', '80', '83', '85', '88', '94', '1'])
-    Dr = np.array(['1e-06', '1e-05', '5e-05', '1e-04', '3e-04', '5e-04', '1e-03', '3e-03', '5e-03', '6e-03', '7e-03', '8e-03', '1e-02', '1.2e-02', '1.5e-02', '2e-02', '3e-02', '5e-02', '1e-01', '5e-01', '1', '5', '10', '50', '100', '1000', '10000'])
-    y = phi.astype(float)/100
-    x = 1/Dr.astype(float)
-    taup = np.zeros(Dr.shape[0])
-    # load the data
-    deltaPhi = np.zeros((phi.shape[0], Dr.shape[0]))
-    for i in range(phi.shape[0]):
-        for j in range(Dr.shape[0]):
-            dirSample = dirName + 'thermal' + phi[i] + '/langevin/T0.001/iod10/active-langevin/Dr' + Dr[j] + '-f0200/dynamics/'
-            fileName = dirSample + 'localDensity-N16-stats.dat'
-            if(os.path.exists(fileName)):
-                deltaPhi[i,j] = np.loadtxt(fileName)[1]
-                taup[j] = 1/ucorr.readFromDynParams(dirSample, 'Dr')
-    # assign color based on deltaPhi
-    ax.plot(np.ones(50)*1e03, np.linspace(0,1.2,50), ls='dotted', color='k', lw=0.7)
-    colorId = np.zeros((phi.shape[0], Dr.shape[0]))
-    min = np.min(deltaPhi)
-    max = np.max(deltaPhi)
-    bins = np.linspace(min, max+0.001, numBins)
-    print('minimum intensity: ', min, ' maximum intensity: ', max)
-    colorMap = cm.get_cmap('inferno', numBins)
-    for i in range(phi.shape[0]):
-        for j in range(Dr.shape[0]):
-            for k in range(numBins-1):
-                if(deltaPhi[i,j] > bins[k] and deltaPhi[i,j] < bins[k+1]):
-                    ax.semilogx(taup[j], y[i], color=colorMap((numBins-k)/numBins), marker='s', markersize=12, lw=0)
-    data = np.loadtxt(dirName + "/forceVelTradeoff.dat")
-    #ax.plot(data[data[:,1]>0,1], data[data[:,1]>0,0], color='k', marker='o', markersize=3, lw=1)
+def plotSPLocalDensity(dirName, figureName, fixed='phi', which='30'):
+    fig, ax = plt.subplots(figsize=(8,4), dpi = 120)
+    if(fixed=="phi"):
+        dirList = np.array(['1', '1e-01', '1e-02', '1e-03', '1e-04', '1e-05'])
+        labelList = np.array(['$D_r = 1$', '$D_r = 0.1$', '$D_r = 0.01$', '$D_r = 0.001$', '$D_r = 10^{-4}$', '$D_r = 10^{-5}$'])
+        colorList = cm.get_cmap('plasma', dirList.shape[0])
+    elif(fixed=="Dr"):
+        dirList = np.array(['thermal25', 'thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85', 'thermal85', 'thermal88', 'thermal94', 'thermal1'])
+        labelList = np.array(['$\\varphi = 0.25$', '$\\varphi = 0.30$', '$\\varphi = 0.35$', '$\\varphi = 0.40$', '$\\varphi = 0.45$', '$\\varphi = 0.52$', '$\\varphi = 0.58$', '$\\varphi = 0.62$', '$\\varphi = 0.67$', '$\\varphi = 0.72$', '$\\varphi = 0.78$', '$\\varphi = 0.83$', '$\\varphi = 0.85$', '$\\varphi = 0.88$', '$\\varphi = 0.94$', '$\\varphi = 1.00$'])
+        colorList = cm.get_cmap('viridis', dirList.shape[0])
+    else:
+        print("please specify the fixed parameter")
+    for d in range(dirList.shape[0]):
+        if(fixed=="phi"):
+            dirSample = dirName + os.sep + "iod10/active-langevin/Dr" + dirList[d] + "-f0200/dynamics/"
+        elif(fixed=="Dr"):
+            dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr1e-03-f0200/dynamics/"
+        if(os.path.exists(dirSample + "/localVoroDensity-N" + which + ".dat")):
+            data = np.loadtxt(dirSample + os.sep + "localVoroDensity-N" + which + ".dat")
+            plt.plot(data[:,0], data[:,1], lw=1.2, color=colorList(d/dirList.shape[0]), label=labelList[d])
     ax.tick_params(axis='both', labelsize=14)
-    ax.set_ylabel("$Density,$ $\\varphi$", fontsize=18)
-    ax.set_xlabel("$Persistence$ $time,$ $\\tau_p$", fontsize=18)
-    ax.set_ylim(0.22, 0.98)
-    colorBar = cm.ScalarMappable(cmap=colorMap)
-    cb = plt.colorbar(colorBar)
-    label = "$\\Delta \\varphi^2_{16}}$"
-    cb.set_ticks([0, 1])
-    cb.ax.tick_params(labelsize=14, length=0)
-    ticklabels = [np.format_float_positional(max, 2), str(min)]
-    cb.set_ticklabels(ticklabels)
-    cb.set_label(label=label, fontsize=18, labelpad=0, rotation='horizontal')
+    ax.set_xlabel("$Local$ $density,$ $\\varphi_l$", fontsize=18)
+    ax.set_ylabel("$PDF(\\varphi_l)$", fontsize=18)
+    ax.set_xlim(-0.05, 1.55)
+    ax.legend(loc='upper left', fontsize=12)
     fig.tight_layout()
-    figureName = "/home/francesco/Pictures/nve-nvt-nva/pPhaseDiagram-" + figureName
+    if(fixed=="phi"):
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pLocalPhi-vsDr-" + figureName
+    else:
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pLocalPhi-vsPhi-" + figureName
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
@@ -4224,9 +4297,15 @@ if __name__ == '__main__':
         figureName = sys.argv[3]
         plotSPClusterSurfaceTension(dirName, figureName)
 
+    elif(whichPlot == "pprofile"):
+        figureName = sys.argv[3]
+        plotSPPressureProfile(dirName, figureName)
+
     elif(whichPlot == "mixing"):
         figureName = sys.argv[3]
-        plotSPClusterMixing(dirName, figureName)
+        fixed = sys.argv[4]
+        which = sys.argv[5]
+        plotSPClusterMixing(dirName, figureName, fixed, which)
 
     elif(whichPlot == "clusterl"):
         figureName = sys.argv[3]
@@ -4266,17 +4345,22 @@ if __name__ == '__main__':
 
     elif(whichPlot == "tradeoff"):
         figureName = sys.argv[3]
-        plotSPClusterForceVelTradeoff(dirName, figureName)
+        which = sys.argv[4]
+        plotSPClusterTradeoff(dirName, figureName, which)
 
     elif(whichPlot == "totalp"):
         figureName = sys.argv[3]
         fixed = sys.argv[4]
-        plotSPTotalPressure(dirName, figureName, fixed)
+        which = sys.argv[5]
+        plotSPTotalPressure(dirName, figureName, fixed, which)
 
     elif(whichPlot == "clusterp"):
         figureName = sys.argv[3]
         fixed = sys.argv[4]
-        plotSPClusterPressure(dirName, figureName, fixed)
+        inter = sys.argv[5]
+        which = sys.argv[6]
+        plotSPClusterPressure(dirName, figureName, fixed, inter, which)
+
     elif(whichPlot == "clustersize"):
         figureName = sys.argv[3]
         which = sys.argv[4]
@@ -4286,6 +4370,12 @@ if __name__ == '__main__':
         figureName = sys.argv[3]
         weight = sys.argv[4]
         plotSPDensityProfile(dirName, figureName, weight)
+
+    elif(whichPlot == "localphi"):
+        figureName = sys.argv[3]
+        fixed = sys.argv[4]
+        which = sys.argv[5]
+        plotSPLocalDensity(dirName, figureName, fixed, which)
 
 ########################### check and plot compression #########################
     elif(whichPlot == "comp"):
@@ -4482,7 +4572,9 @@ if __name__ == '__main__':
     elif(whichPlot == "phased"):
         numBins = int(sys.argv[3])
         figureName = sys.argv[4]
-        plotSPDensity2D(dirName, numBins, figureName)
+        which = sys.argv[5]
+        log = sys.argv[6]
+        plotSPPhaseDiagram(dirName, numBins, figureName, which, log)
 
     else:
         print("Please specify the type of plot you want")
