@@ -75,6 +75,12 @@ def getPairCorr(pos, boxSize, bins, minRad):
     binCenter = 0.5 * (edges[:-1] + edges[1:])
     return pairCorr / (2 * np.pi * binCenter)
 
+def projectToNormalTangentialComp(vectorXY, unitVector): # only for d = 2
+    vectorNT = np.zeros((2,2))
+    vectorNT[0] = np.dot(vectorXY, unitVector) * unitVector
+    vectorNT[1] = vectorXY - vectorNT[0]
+    return vectorNT
+
 def polarPos(r, alpha):
     return r * np.array([np.cos(alpha), np.sin(alpha)])
 
@@ -215,26 +221,35 @@ def computeSusceptibility(pos1, pos2, field, waveVector, scale):
     chiq = np.mean(isf**2) - np.mean(isf)**2
     return chi / scale, np.real(chiq)
 
-def computeLocalAreaGrid(pos, rad, xbin, ybin, localArea):
+def computeOverlapArea(pos1, pos2, rad1, rad2, boxSize):
+    distance = np.linalg.norm(pbcDistance(pos1, pos2, boxSize))
+    overlap = 1 - distance / (rad1 + rad2)
+    if(overlap > 0):
+        angle = np.arccos((rad2**2 + distance**2 - rad1**2) / (2*rad2*distance))
+        return angle * rad2**2 - 0.5 * rad2**2 * np.sin(2*angle)
+        #radSum = rad1 + rad2
+        #radDiff = rad1 - rad2
+        #return 0.5 * np.sqrt((radSum**2 - distance**2) * (distance**2 - radDiff**2))
+    else:
+        return 0
+
+def computeLocalDensityGrid(pos, rad, contacts, boxSize, localSquare, xbin, ybin):
+    localArea = np.zeros((xbin.shape[0]-1, ybin.shape[0]-1))
     for pId in range(pos.shape[0]):
         for x in range(xbin.shape[0]-1):
             if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
                 for y in range(ybin.shape[0]-1):
                     if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
                         localArea[x, y] += np.pi*rad[pId]**2
+                        # remove the overlaps from the particle area
+                        overlapArea = 0
+                        for c in contacts[pId, np.argwhere(contacts[pId]!=-1)[:,0]]:
+                            overlapArea += computeOverlapArea(pos[pId], pos[c], rad[pId], rad[c], boxSize)
+                        localArea[x, y] += (np.pi * rad[pId]**2 - overlapArea)
+    return localArea / localSquare
 
-def computeOverlapArea(pos1, pos2, rad1, rad2, boxSize):
-    distance = np.linalg.norm(pbcDistance(pos1, pos2, boxSize))
-    overlap = 1 - distance / (rad1 + rad2)
-    if(overlap > 0):
-        diaSum = 2 * (rad1 + rad2)
-        halfDiaDiff = rad1 - rad2
-        return 0.5 * np.sqrt((diaSum**2 - distance**2) * (distance**2 - halfDiaDiff**2))
-    else:
-        return 0
-
-def computeCorrectedLocalVoronoiDensityGrid(pos, rad, contacts, boxSize, voroArea, xbin, ybin, localVoroDensity):
-    #counts = np.zeros((localVoroDensity.shape[0], localVoroDensity.shape[1]))
+def computeLocalAreaGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea):
+    density = 0
     for pId in range(pos.shape[0]):
         for x in range(xbin.shape[0]-1):
             if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
@@ -244,22 +259,13 @@ def computeCorrectedLocalVoronoiDensityGrid(pos, rad, contacts, boxSize, voroAre
                         overlapArea = 0
                         for c in contacts[pId, np.argwhere(contacts[pId]!=-1)[:,0]]:
                             overlapArea += computeOverlapArea(pos[pId], pos[c], rad[pId], rad[c], boxSize)
-                        localVoroDensity[x, y] += (np.pi*rad[pId]**2 - overlapArea) / voroArea[pId]
-                        #counts[x, y] += 1
-    #localVoroDensity[counts>0] /= counts[counts>0]
+                        localArea[x, y] += (np.pi*rad[pId]**2 - overlapArea)
+                        density += (np.pi*rad[pId]**2 - overlapArea)
+    return density
 
-def computeLocalVoronoiDensityGrid(pos, rad, voroArea, xbin, ybin, localVoroDensity):
-    counts = np.zeros((localVoroDensity.shape[0], localVoroDensity.shape[1]))
-    for pId in range(pos.shape[0]):
-        for x in range(xbin.shape[0]-1):
-            if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
-                for y in range(ybin.shape[0]-1):
-                    if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
-                        localVoroDensity[x, y] += np.pi*rad[pId]**2 / voroArea[pId]
-                        counts[x, y] += 1
-    localVoroDensity[counts>0] /= counts[counts>0]
-
-def computeWeightedLocalAreaGrid(pos, rad, xbin, ybin, localArea, boxSize, cutoff):
+def computeWeightedLocalAreaGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea, cutoff):
+    density = 0
+    localWeight = np.zeros((xbin.shape[0]-1, ybin.shape[0]-1))
     for pId in range(pos.shape[0]):
         for x in range(xbin.shape[0]-1):
             if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
@@ -268,15 +274,48 @@ def computeWeightedLocalAreaGrid(pos, rad, xbin, ybin, localArea, boxSize, cutof
                         node = np.array([(xbin[x+1]+xbin[x])/2, (ybin[y+1]+ybin[y])/2])
                         distance = np.linalg.norm(pbcDistance(pos[pId], node, boxSize))
                         weight = np.exp(-cutoff**2 / (cutoff**2 - distance**2))
-                        localArea[x, y] += np.pi*rad[pId]**2 * weight
+                        # remove the overlaps from the particle area
+                        overlapArea = 0
+                        for c in contacts[pId, np.argwhere(contacts[pId]!=-1)[:,0]]:
+                            overlapArea += computeOverlapArea(pos[pId], pos[c], rad[pId], rad[c], boxSize)
+                        localArea[x, y] += (np.pi*rad[pId]**2 - overlapArea) * weight
+                        localWeight[x, y] += weight
+                        density += (np.pi*rad[pId]**2 - overlapArea)
+    localArea /= localWeight
+    return density
 
-def computeLocalAreaAndNumberGrid(pos, rad, xbin, ybin, localArea, localNumber):
+def computeLocalVoronoiDensityGrid(pos, rad, contacts, boxSize, voroArea, xbin, ybin):
+    density = 0
+    localArea = np.zeros((xbin.shape[0]-1, ybin.shape[0]-1, 2))
     for pId in range(pos.shape[0]):
         for x in range(xbin.shape[0]-1):
             if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
                 for y in range(ybin.shape[0]-1):
                     if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
-                        localArea[x, y] += np.pi*rad[pId]**2
+                        # remove the overlaps from the particle area
+                        overlapArea = 0
+                        for c in contacts[pId, np.argwhere(contacts[pId]!=-1)[:,0]]:
+                            overlapArea += computeOverlapArea(pos[pId], pos[c], rad[pId], rad[c], boxSize)
+                        localArea[x, y, 0] += (np.pi * rad[pId]**2 - overlapArea)
+                        localArea[x, y, 1] += voroArea[pId]
+                        density += (np.pi * rad[pId]**2 - overlapArea)
+    for x in range(xbin.shape[0]-1):
+        for y in range(ybin.shape[0]-1):
+            if(localArea[x,y,1] != 0):
+                localArea[x,y,0] /= localArea[x,y,1]
+    return localArea[:,:,0], density
+
+def computeLocalAreaAndNumberGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea, localNumber):
+    for pId in range(pos.shape[0]):
+        for x in range(xbin.shape[0]-1):
+            if(pos[pId,0] > xbin[x] and pos[pId,0] <= xbin[x+1]):
+                for y in range(ybin.shape[0]-1):
+                    if(pos[pId,1] > ybin[y] and pos[pId,1] <= ybin[y+1]):
+                        # remove the overlaps from the particle area
+                        overlapArea = 0
+                        for c in contacts[pId, np.argwhere(contacts[pId]!=-1)[:,0]]:
+                            overlapArea += computeOverlapArea(pos[pId], pos[c], rad[pId], rad[c], boxSize)
+                        localArea[x, y] += (np.pi*rad[pId]**2 - overlapArea)
                         localNumber[x, y] += 1
 
 def computeLocalTempGrid(pos, vel, xbin, ybin, localTemp): #this works only for 2d
@@ -584,6 +623,86 @@ def shiftPositions(pos, boxSize, xshift, yshift):
 def getMOD2PIAngles(fileName):
     angle = np.array(np.loadtxt(fileName), dtype=np.float64)
     return np.mod(angle, 2*np.pi)
+
+def increaseDensity(dirName, dirSave, targetDensity):
+    # load all the packing files
+    boxSize = np.loadtxt(dirName + '/boxSize.dat')
+    pos = np.loadtxt(dirName + '/particlePos.dat')
+    vel = np.loadtxt(dirName + '/particleVel.dat')
+    angle = np.loadtxt(dirName + '/particleAngles.dat')
+    # save unchanged files to new directory
+    if(os.path.isdir(dirSave)==False):
+        os.mkdir(dirSave)
+    np.savetxt(dirSave + '/boxSize.dat', boxSize)
+    np.savetxt(dirSave + '/particlePos.dat', pos)
+    np.savetxt(dirSave + '/particleVel.dat', vel)
+    np.savetxt(dirSave + '/particleAngles.dat', angle)
+    # adjust particle radii to target density
+    rad = np.loadtxt(dirName + '/particleRad.dat')
+    currentDensity = np.sum(np.pi*rad**2)
+    print("Current density: ", currentDensity)
+    multiple = np.sqrt(targetDensity / currentDensity)
+    rad *= multiple
+    np.savetxt(dirSave + '/particleRad.dat', rad)
+    currentDensity = np.sum(np.pi*rad**2)
+    print("Current density: ", currentDensity)
+
+def initializeRectangle(dirName, dirSave):
+    # load all the packing files
+    numParticles = int(readFromParams(dirName, "numParticles"))
+    boxSize = np.loadtxt(dirName + '/boxSize.dat')
+    pos = np.loadtxt(dirName + '/particlePos.dat')
+    rad = np.loadtxt(dirName + '/particleRad.dat')
+    vel = np.loadtxt(dirName + '/particleVel.dat')
+    angle = np.loadtxt(dirName + '/particleAngles.dat')
+    density = np.sum(np.pi*rad**2)
+    # save unchanged files to new directory
+    if(os.path.isdir(dirSave)==False):
+        os.mkdir(dirSave)
+    np.savetxt(dirSave + '/particleVel.dat', vel)
+    np.savetxt(dirSave + '/particleAngles.dat', angle)
+    # increase boxsize along the x direction and pbc particles in new box
+    boxSize[0] *= 2
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    np.savetxt(dirSave + '/boxSize.dat', boxSize)
+    np.savetxt(dirSave + '/particlePos.dat', pos)
+    # increase the particle sizes such that the density stays the same
+    currentDensity = np.sum(np.pi*rad**2) / (boxSize[0] * boxSize[1]) #boxSize[0] has changed
+    print("Current density: ", currentDensity)
+    multiple = np.sqrt(density / currentDensity)
+    rad *= multiple
+    currentDensity = np.sum(np.pi*rad**2) / (boxSize[0] * boxSize[1])
+    print("Current density: ", currentDensity)
+    np.savetxt(dirSave + '/particleRad.dat', rad)
+
+def initializeDroplet(dirName, dirSave):
+    # load all the packing files
+    boxSize = np.loadtxt(dirName + '/boxSize.dat')
+    rad = np.loadtxt(dirName + '/particleRad.dat')
+    vel = np.loadtxt(dirName + '/particleVel.dat')
+    angle = np.loadtxt(dirName + '/particleAngles.dat')
+    numParticles = rad.shape[0]
+    # save unchanged files to new directory
+    if(os.path.isdir(dirSave)==False):
+        os.mkdir(dirSave)
+    np.savetxt(dirSave + '/boxSize.dat', boxSize)
+    np.savetxt(dirSave + '/particleRad.dat', rad)
+    np.savetxt(dirSave + '/particleVel.dat', vel)
+    np.savetxt(dirSave + '/particleAngles.dat', angle)
+    # initialize particles with random positions on the center of the box
+    r1 = np.random.rand(numParticles)
+    r2 = np.random.rand(numParticles)
+    x = np.sqrt(-2*np.log(r1)) * np.cos(2*np.pi*r2)
+    y = np.sqrt(-2*np.log(r1)) * np.sin(2*np.pi*r2)
+    x *= 0.05
+    y *= 0.05
+    x += 0.5
+    y += 0.5
+    pos = np.column_stack((x, y))
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    np.savetxt(dirSave + '/particlePos.dat', pos)
 
 if __name__ == '__main__':
     print("library for correlation function utilities")

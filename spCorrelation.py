@@ -595,7 +595,7 @@ def computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower):
     #pRad = np.mean(np.array(np.loadtxt(dirName + os.sep + "particleRad.dat")))
     #waveVector = np.pi / (float(radMultiple) * pRad)
     particleVelCorr = []
-    particleDirCorr = []
+    #particleDirCorr = []
     stepList = []
     freqDecade = int(10**freqPower)
     decadeSpacing = 10
@@ -606,34 +606,34 @@ def computeParticleLogVelTimeCorr(dirName, startBlock, maxPower, freqPower):
         for spacing in range(1,decadeSpacing):
             stepRange = np.arange(0,stepDecade,spacing*spacingDecade,dtype=int)
             stepParticleVelCorr = []
-            stepParticleDirCorr = []
+            #stepParticleDirCorr = []
             numPairs = 0
             for multiple in range(startBlock, numBlocks):
                 for i in range(stepRange.shape[0]-1):
                     if(ucorr.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
                         pVel1, pVel2 = ucorr.readVelPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
                         #pPos1, pPos2 = ucorr.readParticlePair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        pDir1, pDir2 = ucorr.readDirectorPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        #pDir1, pDir2 = ucorr.readDirectorPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
                         #stepParticleVelCorr.append(ucorr.computeVelCorrFunctions(pPos1, pPos2, pVel1, pVel2, pDir1, pDir2, waveVector, numParticles))
                         stepParticleVelCorr.append(np.mean(np.sum(np.multiply(pVel1,pVel2), axis=1)))
-                        stepParticleDirCorr.append(np.mean(np.sum(np.multiply(pDir1,pDir2), axis=1)))
+                        #stepParticleDirCorr.append(np.mean(np.sum(np.multiply(pDir1,pDir2), axis=1)))
                         numPairs += 1
             if(numPairs > 0):
                 stepList.append(spacing*spacingDecade)
                 particleVelCorr.append([np.mean(stepParticleVelCorr, axis=0), np.std(stepParticleVelCorr, axis=0)])
-                particleDirCorr.append([np.mean(stepParticleDirCorr, axis=0), np.std(stepParticleDirCorr, axis=0)])
+                #particleDirCorr.append([np.mean(stepParticleDirCorr, axis=0), np.std(stepParticleDirCorr, axis=0)])
         stepDecade *= 10
         spacingDecade *= 10
     stepList = np.array(stepList)
     particleVelCorr = np.array(particleVelCorr).reshape((stepList.shape[0],2))
     particleVelCorr = particleVelCorr[np.argsort(stepList)]
-    particleDirCorr = np.array(particleDirCorr).reshape((stepList.shape[0],2))
-    particleDirCorr = particleDirCorr[np.argsort(stepList)]
+    #particleDirCorr = np.array(particleDirCorr).reshape((stepList.shape[0],2))
+    #particleDirCorr = particleDirCorr[np.argsort(stepList)]
     np.savetxt(dirName + os.sep + "logVelCorr.dat", np.column_stack((stepList*timeStep, particleVelCorr)))
-    np.savetxt(dirName + os.sep + "logDirCorr.dat", np.column_stack((stepList*timeStep, particleDirCorr)))
+    #np.savetxt(dirName + os.sep + "logDirCorr.dat", np.column_stack((stepList*timeStep, particleDirCorr)))
     uplot.plotCorrWithError(stepList*timeStep, particleVelCorr[:,0], particleVelCorr[:,1], ylabel="$C_{vv}(\\Delta t)$", logx = True, color = 'k')
-    uplot.plotCorrWithError(stepList*timeStep, particleDirCorr[:,0], particleDirCorr[:,1], ylabel="$C_{nn}(\\Delta t)$", logx = True, color = 'r')
-    #plt.show()
+    #uplot.plotCorrWithError(stepList*timeStep, particleDirCorr[:,0], particleDirCorr[:,1], ylabel="$C_{nn}(\\Delta t)$", logx = True, color = 'r')
+    plt.show()
 
 ############################# Velocity Correlation #############################
 def computeParticleVelSpaceCorr(dirName):
@@ -829,11 +829,12 @@ def computeLocalDensity(dirName, numBins, plot = False):
     pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat")).astype(int)
     xbin = np.linspace(0, boxSize[0], numBins+1)
     ybin = np.linspace(0, boxSize[1], numBins+1)
     localArea = np.zeros((numBins, numBins))
     localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
-    ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
+    ucorr.computeLocalAreaGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea)
     localDensity = localArea/localSquare
     localDensity = np.sort(localDensity.flatten())
     cdf = np.arange(len(localDensity))/len(localDensity)
@@ -855,7 +856,7 @@ def computeLocalDensity(dirName, numBins, plot = False):
     else:
         return localDensity
 
-def averageLocalDensity(dirName, numBins=12, weight=False, dirSpacing=1):
+def averageLocalDensity(dirName, numBins=30, weight=False, plot=False, dirSpacing=1):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     timeStep = ucorr.readFromParams(dirName, "dt")
@@ -868,30 +869,31 @@ def averageLocalDensity(dirName, numBins=12, weight=False, dirSpacing=1):
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     localDensity = np.empty(0)
+    globalDensity = np.empty(0)
     for dir in dirList:
         localArea = np.zeros((numBins, numBins))
         pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
+        contacts = np.array(np.loadtxt(dirName + os.sep + dir + "/particleContacts.dat")).astype(int)
         if(weight == 'weight'):
-            ucorr.computeWeightedLocalAreaGrid(pos, rad, xbin, ybin, localArea, boxSize, cutoff)
+            globalDensity = np.append(globalDensity, ucorr.computeWeightedLocalAreaGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea, cutoff))
         else:
-            ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
+            globalDensity = np.append(globalDensity, ucorr.computeLocalAreaGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea))
         localDensity = np.append(localDensity, localArea/localSquare)
-    localDensity = np.sort(localDensity)
+    localDensity = np.sort(localDensity).flatten()
     localDensity = localDensity[localDensity>0]
     alpha2 = np.mean(localDensity**4)/(2*(np.mean(localDensity**2)**2)) - 1
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 80), density=True)
     edges = (edges[:-1] + edges[1:])/2
     if(weight == 'weight'):
         np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-weight.dat", np.column_stack((edges, pdf)))
-        np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-stats-wieght.dat", np.column_stack((np.mean(localDensity), np.var(localDensity), alpha2)))
+        np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-stats-weight.dat", np.column_stack((np.mean(localDensity), np.var(localDensity), np.mean(globalDensity), np.std(globalDensity))))
     else:
         np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + ".dat", np.column_stack((edges, pdf)))
-        np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-stats.dat", np.column_stack((np.mean(localDensity), np.var(localDensity), alpha2)))
-    #mean = np.mean(sampleDensity)
-    #var = np.var(sampleDensity)
-    #skewness = np.mean((sampleDensity - np.mean(sampleDensity))**4)/(3*var**2) - 1
-    #uplot.plotCorrelation(edges, pdf, "$Local$ $density$ $distribution$", "$Local$ $density$")
-    #plt.pause(0.5)
+        np.savetxt(dirName + os.sep + "localDensity-N" + str(numBins) + "-stats.dat", np.column_stack((np.mean(localDensity), np.var(localDensity), alpha2, np.mean(globalDensity), np.std(globalDensity))))
+    print("average global density: ", np.mean(globalDensity), " +- ", np.var(globalDensity))
+    if(plot == "plot"):
+        uplot.plotCorrelation(edges, pdf, "$Local$ $density$ $distribution$", "$Local$ $density$")
+        plt.show()
 
 def computeLocalDensityAndNumberVSTime(dirName, numBins=12, plot=False):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
@@ -907,7 +909,8 @@ def computeLocalDensityAndNumberVSTime(dirName, numBins=12, plot=False):
         localArea = np.zeros((numBins, numBins))
         localNumber = np.zeros((numBins, numBins))
         pos = ucorr.getPBCPositions(dirName + os.sep + dir + "/particlePos.dat", boxSize)
-        ucorr.computeLocalAreaAndNumberGrid(pos, pRad, xbin, ybin, localArea, localNumber)
+        contacts = np.array(np.loadtxt(dirName + os.sep + dir + "/particleContacts.dat"), dtype=int)
+        ucorr.computeLocalAreaAndNumberGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea, localNumber)
         localDensity = localArea/localSquare
         localDensityVar = np.append(localDensityVar, np.var(localDensity))
         localNumberVar = np.append(localNumberVar, np.var(localNumber))
@@ -1069,54 +1072,6 @@ def averageDBClusterSize(dirName, dirSpacing, eps=0.03, min_samples=10, plot=Fal
     np.savetxt(dirName + "dbAllClustersSize.dat", allClustersSize)
     print("area of all particles in a cluster: ", np.mean(allClustersSize), " += ", np.std(allClustersSize))
     print("typical cluster size: ", np.mean(clusterSize), " += ", np.std(clusterSize))
-
-############################ Velocity distribution #############################
-def averageParticleVelPDFCluster(dirName, plot=False, dirSpacing=1):
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    dirList, timeList = ucorr.getOrderedDirectories(dirName)
-    timeList = timeList.astype(int)
-    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    #dirList = dirList[-50:]
-    velInCluster = np.empty(0)
-    velOutCluster = np.empty(0)
-    for d in range(dirList.shape[0]):
-        dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "denseList.dat")):
-            denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
-        else:
-            denseList,_ = computeVoronoiCluster(dirSample)
-        vel = np.loadtxt(dirSample + os.sep + "particleVel.dat")
-        velNorm = np.linalg.norm(vel, axis=1)
-        velInCluster = np.append(velInCluster, velNorm[denseList==1].flatten())
-        velOutCluster = np.append(velOutCluster, velNorm[denseList!=1].flatten())
-    # in cluster
-    velInCluster = velInCluster[velInCluster>0]
-    mean = np.mean(velInCluster)
-    Temp = np.var(velInCluster)
-    skewness = np.mean((velInCluster - mean)**3)/Temp**(3/2)
-    kurtosis = np.mean((velInCluster - mean)**4)/Temp**2
-    data = velInCluster# / np.sqrt(2*Temp)
-    pdf, edges = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
-    edges = 0.5 * (edges[:-1] + edges[1:])
-    print("Variance of the velocity in cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
-    if(plot == "plot"):
-        uplot.plotCorrelation(edges, pdf, "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", color='b')
-    np.savetxt(dirName + os.sep + "velPDFInCluster.dat", np.column_stack((edges, pdf)))
-    # out of cluster
-    velOutCluster = velOutCluster[velOutCluster>0]
-    mean = np.mean(velOutCluster)
-    Temp = np.var(velOutCluster)
-    skewness = np.mean((velOutCluster - mean)**3)/Temp**(3/2)
-    kurtosis = np.mean((velOutCluster - mean)**4)/Temp**2
-    data = velOutCluster# / np.sqrt(2*Temp)
-    pdf, edges = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
-    edges = 0.5 * (edges[:-1] + edges[1:])
-    print("Variance of the velocity out cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
-    if(plot == "plot"):
-        uplot.plotCorrelation(edges, pdf, "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", color='g')
-    np.savetxt(dirName + os.sep + "velPDFOutCluster.dat", np.column_stack((edges, pdf)))
-    if(plot == "plot"):
-        plt.pause(0.5)
 
 ########################### Average Space Correlator ###########################
 def averagePairCorrCluster(dirName, dirSpacing=1000000):
@@ -1378,7 +1333,8 @@ def computeClusterBorder(dirName, plot='plot'):
     ybin = np.linspace(0, boxSize[1], numBins+1)
     localArea = np.zeros((numBins, numBins))
     localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
-    ucorr.computeLocalAreaGrid(pos, rad, xbin, ybin, localArea)
+    contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat")).astype(int)
+    ucorr.computeLocalAreaGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea)
     localDensity = localArea/localSquare
     ri, ci = localDensity.argmin()//localDensity.shape[1], localDensity.argmin()%localDensity.shape[1]
     probe = np.array([xbin[ri], ybin[ci]])
@@ -1717,8 +1673,9 @@ def averageClusterDistribution(dirName, numBins=40, dirSpacing=1):
 def computeLocalDensityAndNumberFluctuations(dirName, plot=False, color='k'):
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
-    pRad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
+    contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat")).astype(int)
     numBins = np.arange(2,101)
     meanNum = np.zeros(numBins.shape[0])
     deltaNum = np.zeros(numBins.shape[0])
@@ -1730,7 +1687,7 @@ def computeLocalDensityAndNumberFluctuations(dirName, plot=False, color='k'):
         localSquare = (boxSize[0]/numBins[i])*(boxSize[1]/numBins[i])
         localArea = np.zeros((numBins[i], numBins[i]))
         localNumber = np.zeros((numBins[i], numBins[i]))
-        ucorr.computeLocalAreaAndNumberGrid(pos, pRad, xbin, ybin, localArea, localNumber)
+        ucorr.computeLocalAreaAndNumberGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea, localNumber)
         localDensity = (localArea/localSquare).reshape(numBins[i]*numBins[i])
         localNumber = localNumber.reshape(numBins[i]*numBins[i])
         meanNum[i] = np.mean(localNumber)
@@ -1743,7 +1700,7 @@ def computeLocalDensityAndNumberFluctuations(dirName, plot=False, color='k'):
         plt.pause(0.5)
     return meanNum, deltaNum, meanPhi, deltaPhi
 
-def averageLocalDensityAndNumberFluctuations(dirName, plot=False, dirSpacing=10000):
+def averageLocalDensityAndNumberFluctuations(dirName, plot=False, dirSpacing=1000000):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
@@ -1823,7 +1780,7 @@ def computeClusterBlockMixingTime(dirName, numBlocks, plot=False, dirSpacing=1):
     fraction = np.zeros((blockFreq, numBlocks))
     for block in range(numBlocks):
         # first get cluster at initial condition
-        if(os.path.exists(dirName + os.sep + dirList[block*blockFreq] + "/denseList!.dat")):
+        if(os.path.exists(dirName + os.sep + dirList[block*blockFreq] + "/denseList.dat")):
             initDenseList = np.loadtxt(dirName + os.sep + dirList[block*blockFreq] + "/denseList.dat")
         else:
             initDenseList,_ = computeVoronoiCluster(dirName + os.sep + dirList[block*blockFreq])
@@ -1831,7 +1788,7 @@ def computeClusterBlockMixingTime(dirName, numBlocks, plot=False, dirSpacing=1):
         for d in range(blockFreq):
             sharedParticles = 0
             dirSample = dirName + os.sep + dirList[block*blockFreq + d]
-            if(os.path.exists(dirSample + os.sep + "denseList!.dat")):
+            if(os.path.exists(dirSample + os.sep + "denseList.dat")):
                 denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
             else:
                 denseList,_ = computeVoronoiCluster(dirSample)
@@ -1844,10 +1801,10 @@ def computeClusterBlockMixingTime(dirName, numBlocks, plot=False, dirSpacing=1):
     np.savetxt(dirName + os.sep + "clusterMixing-block.dat", np.column_stack((timeList, blockFraction)))
     if(plot=='plot'):
         uplot.plotCorrelation(timeList, blockFraction[:,0], "$N_c^0(t) / N_c^0$", xlabel = "$Simulation$ $time$", color='k')
-        plt.pause(0.5)
+        plt.show()
 
 ############################## Voronoi clustering ##############################
-def computeVoronoiCluster(dirName, threshold=0.65):
+def computeVoronoiCluster(dirName, threshold=0.65, plot=False, filter='filter'):
     sep = ucorr.getDirSep(dirName, "boxSize")
     numParticles = int(ucorr.readFromParams(dirName + sep, "numParticles"))
     boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
@@ -1873,19 +1830,20 @@ def computeVoronoiCluster(dirName, threshold=0.65):
         if(localDensity[i] > threshold):
                 denseList[i] = 1
     #print("Number of dense particles: ", denseList[denseList==1].shape[0])
-    contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat")).astype(int)
-    connectList = np.zeros(numParticles)
-    for i in range(numParticles):
-        if(np.sum(contacts[i]!=-1)>2):
-            denseContacts = 0
-            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
-                if(denseList[c] == 1):
-                    denseContacts += 1
-            if(denseContacts > 1):
-                # this is at least a four particle cluster
-                connectList[i] = 1
-    denseList[connectList==0] = 0
-    #print("Number of dense particles after contact filter: ", denseList[denseList==1].shape[0])
+    if(filter=='filter'):
+        contacts = np.array(np.loadtxt(dirName + os.sep + "particleContacts.dat")).astype(int)
+        connectList = np.zeros(numParticles)
+        for i in range(numParticles):
+            if(np.sum(contacts[i]!=-1)>2):
+                denseContacts = 0
+                for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                    if(denseList[c] == 1):
+                        denseContacts += 1
+                if(denseContacts > 1):
+                    # this is at least a four particle cluster
+                    connectList[i] = 1
+        denseList[connectList==0] = 0
+        #print("Number of dense particles after contact filter: ", denseList[denseList==1].shape[0])
     neighborCount = np.zeros(numParticles)
     denseNeighborCount = np.zeros(numParticles)
     for i in range(numParticles):
@@ -1902,12 +1860,25 @@ def computeVoronoiCluster(dirName, threshold=0.65):
                 rattlerList[i] = 1
     denseList[rattlerList==1] = 1
     #print("Number of dense particles after rattler correction: ", denseList[denseList==1].shape[0])
+    for i in range(numParticles):
+        if(denseList[i] == 1):
+            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                if(denseList[c] != 1):
+                    denseList[c] = 1 # this is to include contacts of particles belonging to the cluster
     np.savetxt(dirName + "/denseList.dat", denseList)
     np.savetxt(dirName + "/voroDensity.dat", localDensity)
+    if(plot=='plot'):
+        uplot.plotCorrelation(np.arange(1, numParticles+1, 1), np.sort(localDensity), "$\\varphi^{Voronoi}$", xlabel = "$Particle$ $index$", color='k')
+        plt.show()
+        numBins = 100
+        pdf, edges = np.histogram(localDensity, bins=np.linspace(0, 1, numBins), density=True)
+        edges = (edges[1:] + edges[:-1])/2
+        uplot.plotCorrelation(edges, pdf, "$PDF(\\varphi^{Voronoi})$", xlabel = "$\\varphi^{Voronoi}$", color='r')
+        plt.show()
     return denseList, localDensity
 
 ######################## Compute voronoi cluster border ########################
-def computeVoronoiBorder(dirName, threshold=0.65, plot=False):
+def computeVoronoiBorder(dirName, threshold=0.65, filter='filter'):
     sep = ucorr.getDirSep(dirName, "boxSize")
     numParticles = int(ucorr.readFromParams(dirName + sep, "numParticles"))
     phi = ucorr.readFromParams(dirName + sep, "phi")
@@ -1935,7 +1906,7 @@ def computeVoronoiBorder(dirName, threshold=0.65, plot=False):
         denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
 
     else:
-        denseList,_ = computeVoronoiCluster(dirName)
+        denseList,_ = computeVoronoiCluster(dirName, threshold, filter=filter)
     borderList = np.zeros(numParticles)
     borderLength = 0
     for i in range(numParticles):
@@ -1949,18 +1920,11 @@ def computeVoronoiBorder(dirName, threshold=0.65, plot=False):
     #print("Number of dense particles at the interface: ", borderList[borderList==1].shape[0])
     #print("Border length from voronoi edges: ", borderLength, " from particle size: ", np.sum(2*rad[borderList==1]))
     np.savetxt(dirName + os.sep + "borderList.dat", borderList)
-    if(plot=='plot'):
-        uplot.plotCorrelation(np.arange(1, numParticles+1, 1), np.sort(localDensity), "$\\varphi^{Voronoi}$", xlabel = "$Particle$ $index$", color='k')
-        plt.show()
-        numBins = 100
-        pdf, edges = np.histogram(localDensity, bins=np.linspace(0, 1, numBins), density=True)
-        edges = (edges[1:] + edges[:-1])/2
-        uplot.plotCorrelation(edges, pdf, "$PDF(\\varphi^{Voronoi})$", xlabel = "$\\varphi^{Voronoi}$", color='r')
-        plt.show()
+    np.savetxt(dirName + os.sep + "borderLength.dat", np.array([borderLength]))
     return borderList, borderLength
 
 ############################ Average voronoi border ############################
-def averageVoronoiBorder(dirName, threshold=0.65, plot=False, dirSpacing=1):
+def averageVoronoiBorder(dirName, threshold=0.65, droplet=False, plot=False, dirSpacing=1):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
@@ -1968,21 +1932,24 @@ def averageVoronoiBorder(dirName, threshold=0.65, plot=False, dirSpacing=1):
     borderEnergy = np.zeros((dirList.shape[0],2))
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
-        borderList, borderEnergy[d,0] = computeVoronoiBorder(dirSample, 0.65)
-        if(os.path.exists(dirName + os.sep + "particlePressure.dat")):
-            energy = np.loadtxt(dirName + os.sep + "particlePressure.dat")[:,-1]
+        borderList, borderEnergy[d,0] = computeVoronoiBorder(dirSample, threshold)
+        if(os.path.exists(dirName + os.sep + "particleStress.dat")):
+            energy = np.loadtxt(dirName + os.sep + "particleStress.dat")[:,-1]
         else:
-            energy = computeParticlePressure(dirName)[:,-1]
+            if(droplet=='droplet'):
+                energy = computeDropletParticlePressure(dirName)[:,-1]
+            else:
+                energy = computeParticlePressure(dirName)[:,-1]
         borderEnergy[d,1] = np.sum(energy[borderList==1])
     np.savetxt(dirName + "/borderEnergy.dat", np.column_stack((timeList, borderEnergy)))
     print("Average border length: ", np.mean(borderEnergy[:,0]), "+-", np.std(borderEnergy[:,0]))
     print("Average surface energy: ", np.mean(borderEnergy[:,1]/borderEnergy[:,0]), "+-", np.std(borderEnergy[:,1]/borderEnergy[:,0]))
     if(plot=='plot'):
         uplot.plotCorrelation(timeList, borderEnergy[:,1] / borderEnergy[:,0], "$Surface$ $energy$", xlabel = "$Simulation$ $time$", color='k')
-        plt.pause(0.5)
+        plt.show()
 
 ######################## Average voronoi local density #########################
-def averageLocalVoronoiDensity(dirName, numBins=30, plot=False, dirSpacing=1):
+def averageLocalVoronoiDensity(dirName, numBins=16, plot=False, dirSpacing=1):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
@@ -1992,44 +1959,38 @@ def averageLocalVoronoiDensity(dirName, numBins=30, plot=False, dirSpacing=1):
     timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     xbin = np.linspace(0, boxSize[0], numBins+1)
     ybin = np.linspace(0, boxSize[1], numBins+1)
-    cutoff = 2*xbin[1]
     localSquare = (boxSize[0]/numBins)*(boxSize[1]/numBins)
     localDensity = np.empty(0)
     globalDensity = np.empty(0)
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "voroDensity.dat")):
+        if(os.path.exists(dirSample + os.sep + "voroDensity!.dat")):
             voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
         else:
             _, voroDensity = computeVoronoiCluster(dirSample)
         voroArea = np.pi * rad**2 / voroDensity
-        #localDensity = np.append(localDensity, voroDensity)
-        globalDensity = np.append(globalDensity, np.mean(voroDensity))
-        localVoroDensity = np.zeros((numBins, numBins))
         pos = ucorr.getPBCPositions(dirSample + os.sep + "particlePos.dat", boxSize)
         contacts = np.loadtxt(dirSample + os.sep + "particleContacts.dat").astype(np.int64)
-        #ucorr.computeLocalVoronoiDensityGrid(pos, rad, voroArea, xbin, ybin, localVoroDensity)
-        ucorr.computeCorrectedLocalVoronoiDensityGrid(pos, rad, contacts, boxSize, voroArea, xbin, ybin, localVoroDensity)
-        #localDensity = np.append(localDensity, localArea/localSquare)
+        localVoroDensity, density = ucorr.computeLocalVoronoiDensityGrid(pos, rad, contacts, boxSize, voroArea, xbin, ybin)
         localDensity = np.append(localDensity, localVoroDensity)
-    localDensity = np.sort(localDensity)
+        globalDensity = np.append(globalDensity, density)
+    localDensity = np.sort(localDensity).flatten()
     localDensity = localDensity[localDensity>0]
-    #localDensity = localDensity[localDensity<1]
     alpha2 = np.mean(localDensity**4)/(2*(np.mean(localDensity**2)**2)) - 1
     pdf, edges = np.histogram(localDensity, bins=np.linspace(np.min(localDensity), np.max(localDensity), 100), density=True)
     edges = (edges[:-1] + edges[1:])/2
     np.savetxt(dirName + os.sep + "localVoroDensity-N" + str(numBins) + ".dat", np.column_stack((edges, pdf)))
     data = np.column_stack((np.mean(localDensity), np.var(localDensity), alpha2, np.mean(globalDensity), np.var(globalDensity)))
-    print("average global density: ", np.mean(globalDensity), " +- ", np.var(globalDensity))
     np.savetxt(dirName + os.sep + "localVoroDensity-N" + str(numBins) + "-stats.dat", data)
+    print("average local density: ", np.mean(localDensity), " +- ", np.var(localDensity))
     if(plot == 'plot'):
         uplot.plotCorrelation(edges, pdf, "$Local$ $density$ $distribution$", "$Local$ $density$", color='k')
-        #plt.pause(0.5)
-        plt.show()
-    return np.mean(globalDensity)
+        plt.pause(0.5)
+        #plt.show()
+    return np.mean(localDensity)
 
 ########################### Compute voronoi density ############################
-def computeClusterVoronoiDensity(dirName, dirSpacing=1):
+def computeClusterVoronoiDensity(dirName, plot=False, dirSpacing=1):
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
@@ -2038,52 +1999,149 @@ def computeClusterVoronoiDensity(dirName, dirSpacing=1):
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    #dirList = dirList[-50:]
-    voronoiDensity = np.zeros((dirList.shape[0],2))
+    voronoiDensity = np.zeros((dirList.shape[0],3))
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
         if(os.path.exists(dirSample + os.sep + "denseList.dat")):
-            clusterLabels = np.loadtxt(dirSample + os.sep + "denseList.dat")
+            clusterList = np.loadtxt(dirSample + os.sep + "denseList.dat")
             voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
         else:
-            clusterLabels, voroDensity = computeVoronoiCluster(dirSample)
+            clusterList, voroDensity = computeVoronoiCluster(dirSample)
+        voroArea = np.pi*rad**2 / voroDensity
         for i in range(numParticles):
-            #density = np.pi*rad[i]**2 / np.abs(cells[i]['volume'])
-            if(clusterLabels[i]==1):# and density[i] > 0.65):
-                voronoiDensity[d,0] += voroDensity[i]
+            # remove the overlaps from the particle area
+            overlapArea = 0
+            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                overlapArea += ucorr.computeOverlapArea(pos[i], pos[c], rad[i], rad[c], boxSize)
+            if(clusterList[i]==1):
+                voronoiDensity[d,0] += (np.pi * rad[i]**2 - overlapArea) / voroArea[i]
             else:
-                voronoiDensity[d,1] += voroDensity[i]
-        #print(dirList[d], voronoiDensity[d] / numParticles)
-    voronoiDensity /= numParticles
+                voronoiDensity[d,1] += (np.pi * rad[i]**2 - overlapArea) / voroArea[i]
+            voronoiDensity[d,2] += (np.pi * rad[i]**2 - overlapArea) / voroArea[i]
+        voronoiDensity[d,0] /= numParticles
+        voronoiDensity[d,1] /= numParticles
+        voronoiDensity[d,2] /= numParticles
     np.savetxt(dirName + os.sep + "voronoiDensity.dat", np.column_stack((timeList, voronoiDensity)))
-    print("Density inside cluster: ", np.mean(voronoiDensity[:,0]), " +- ", np.std(voronoiDensity[:,0]))
-    print("Density outside cluster: ", np.mean(voronoiDensity[:,1]), " +- ", np.std(voronoiDensity[:,1]))
-    uplot.plotCorrelation(timeList, voronoiDensity[:,0], "$\\varphi^{Voronoi}$", xlabel = "$Time,$ $t$", color='k')
-    uplot.plotCorrelation(timeList, voronoiDensity[:,1], "$\\varphi^{Voronoi}$", xlabel = "$Time,$ $t$", color='r')
-    plt.pause(0.5)
+    print("Density in the fluid: ", np.mean(voronoiDensity[:,0]), " +- ", np.std(voronoiDensity[:,0]))
+    print("Density outside the fluid: ", np.mean(voronoiDensity[:,1]), " +- ", np.std(voronoiDensity[:,1]))
+    print("Density in the whole system: ", np.mean(voronoiDensity[:,2]), " +- ", np.std(voronoiDensity[:,2]))
+    if(plot=='plot'):
+        uplot.plotCorrelation(timeList, voronoiDensity[:,0], "$\\varphi^{Voronoi}$", xlabel = "$Time,$ $t$", color='b')
+        uplot.plotCorrelation(timeList, voronoiDensity[:,1], "$\\varphi^{Voronoi}$", xlabel = "$Time,$ $t$", color='g')
+        uplot.plotCorrelation(timeList, voronoiDensity[:,2], "$\\varphi^{Voronoi}$", xlabel = "$Time,$ $t$", color='k')
+        plt.pause(0.5)
+
+########################### Compute voronoi density ############################
+def computeClusterVoronoiArea(dirName, plot=False, dirSpacing=1):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    voronoiArea = np.zeros((dirList.shape[0],3))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
+        if(os.path.exists(dirSample + os.sep + "denseList.dat")):
+            clusterList = np.loadtxt(dirSample + os.sep + "denseList.dat")
+            voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
+        else:
+            clusterList, voroDensity = computeVoronoiCluster(dirSample)
+        voroArea = np.pi*rad**2 / voroDensity
+        for i in range(numParticles):
+            # remove the overlaps from the particle area
+            if(clusterList[i]==1):
+                voronoiArea[d,0] += voroArea[i]
+            else:
+                voronoiArea[d,1] += voroArea[i]
+            voronoiArea[d,2] += voroArea[i]
+    np.savetxt(dirName + os.sep + "voronoiArea.dat", np.column_stack((timeList, voronoiArea)))
+    print("Fluid area: ", np.mean(voronoiArea[:,0]), " +- ", np.std(voronoiArea[:,0]), " fluid radius: ", np.mean(np.sqrt(voronoiArea[:,0]/np.pi)))
+    print("Gas area: ", np.mean(voronoiArea[:,1]), " +- ", np.std(voronoiArea[:,1]))
+    print("Occupied area in the whole system: ", np.mean(voronoiArea[:,2]), " +- ", np.std(voronoiArea[:,2]))
+    if(plot=='plot'):
+        uplot.plotCorrelation(timeList, voronoiArea[:,0], "$A^{Voronoi}$", xlabel = "$Time,$ $t$", color='b')
+        uplot.plotCorrelation(timeList, voronoiArea[:,1], "$A^{Voronoi}$", xlabel = "$Time,$ $t$", color='g')
+        uplot.plotCorrelation(timeList, voronoiArea[:,2], "$A^{Voronoi}$", xlabel = "$Time,$ $t$", color='k')
+        plt.pause(0.5)
+    return voronoiArea
+
+############################ Velocity distribution #############################
+def averageParticleVelPDFCluster(dirName, plot=False, dirSpacing=1):
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    #dirList = dirList[-50:]
+    velInCluster = np.empty(0)
+    velOutCluster = np.empty(0)
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "denseList!.dat")):
+            denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
+        else:
+            denseList,_ = computeVoronoiCluster(dirSample)
+        vel = np.loadtxt(dirSample + os.sep + "particleVel.dat")
+        velNorm = np.linalg.norm(vel, axis=1)
+        velInCluster = np.append(velInCluster, velNorm[denseList==1].flatten())
+        velOutCluster = np.append(velOutCluster, velNorm[denseList!=1].flatten())
+    # in cluster
+    velInCluster = velInCluster[velInCluster>0]
+    mean = np.mean(velInCluster)
+    Temp = np.var(velInCluster)
+    skewness = np.mean((velInCluster - mean)**3)/Temp**(3/2)
+    kurtosis = np.mean((velInCluster - mean)**4)/Temp**2
+    data = velInCluster# / np.sqrt(2*Temp)
+    pdf, edges = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges = 0.5 * (edges[:-1] + edges[1:])
+    print("Variance of the velocity in cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
+    if(plot == "plot"):
+        uplot.plotCorrelation(edges, pdf, "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", color='b')
+    np.savetxt(dirName + os.sep + "velPDFInCluster.dat", np.column_stack((edges, pdf)))
+    # out of cluster
+    velOutCluster = velOutCluster[velOutCluster>0]
+    mean = np.mean(velOutCluster)
+    Temp = np.var(velOutCluster)
+    skewness = np.mean((velOutCluster - mean)**3)/Temp**(3/2)
+    kurtosis = np.mean((velOutCluster - mean)**4)/Temp**2
+    data = velOutCluster# / np.sqrt(2*Temp)
+    pdf, edges = np.histogram(data, bins=np.linspace(np.min(data), np.max(data), 100), density=True)
+    edges = 0.5 * (edges[:-1] + edges[1:])
+    print("Variance of the velocity out cluster: ", Temp, " kurtosis: ", kurtosis, " skewness: ", skewness)
+    if(plot == "plot"):
+        uplot.plotCorrelation(edges, pdf, "$Velocity$ $distribution,$ $P(v)$", xlabel = "$Velocity,$ $v$", color='g')
+    np.savetxt(dirName + os.sep + "velPDFOutCluster.dat", np.column_stack((edges, pdf)))
+    if(plot == "plot"):
+        plt.pause(0.5)
 
 ############################## Particle pressure ###############################
-def computeParticlePressure(dirName):
+def computeParticleStress(dirName, prop='prop'):
     dim = 2
     sep = ucorr.getDirSep(dirName, "boxSize")
-    Dr = float(ucorr.readFromDynParams(dirName + sep, "Dr"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName + sep, "numParticles"))
     rad = np.loadtxt(dirName + sep + "particleRad.dat")
     sigma = np.mean(rad)
-    kc = 1 / sigma
-    gamma = float(ucorr.readFromDynParams(dirName + sep, "damping"))
-    driving = float(ucorr.readFromDynParams(dirName + sep, "f0"))
-    v0 = driving / gamma
-    pressure = np.zeros((numParticles,4))
+    ec = 240
+    if(prop == 'prop'):
+        Dr = float(ucorr.readFromDynParams(dirName + sep, "Dr"))
+        gamma = float(ucorr.readFromDynParams(dirName + sep, "damping"))
+        driving = float(ucorr.readFromDynParams(dirName + sep, "f0"))
+    stress = np.zeros((numParticles,4))
     #pos = np.loadtxt(dirName + "/particlePos.dat")
     pos = ucorr.getPBCPositions(dirName + "/particlePos.dat", boxSize)
     vel = np.loadtxt(dirName + "/particleVel.dat")
-    #angle = np.loadtxt(dirName + "/particleAngles.dat")
-    angle = ucorr.getMOD2PIAngles(dirName + "/particleAngles.dat")
-    director = np.array([np.cos(angle), np.sin(angle)]).T
-    #activeForce = driving * np.array([np.cos(angle), np.sin(angle)]).T
+    if(prop == 'prop'):
+        #angle = np.loadtxt(dirName + "/particleAngles.dat")
+        angle = ucorr.getMOD2PIAngles(dirName + "/particleAngles.dat")
+        director = np.array([np.cos(angle), np.sin(angle)]).T
     contacts = np.loadtxt(dirName + "/particleContacts.dat").astype(np.int64)
     for i in range(numParticles):
         virial = 0
@@ -2095,185 +2153,30 @@ def computeParticlePressure(dirName):
             distance = np.linalg.norm(delta)
             overlap = 1 - distance / radSum
             if(overlap > 0):
-                gradMultiple = kc * overlap / radSum
+                gradMultiple = ec * overlap / radSum
                 force = gradMultiple * delta / distance
                 virial += 0.5 * np.sum(force * delta) # double counting
                 #active += np.sum(force * director[i]) / gamma
-                energy += 0.5 * overlap**2 * 0.5 # double counting and e = k/2
-        pressure[i,0] = virial
-        pressure[i,1] = np.linalg.norm(vel[i])**2
-        #pressure[i,2] = driving * active / (2*Dr)
-        pressure[i,2] = driving * np.sum(vel[i] * director[i]) / (4*Dr)
-        pressure[i,3] = energy
-    np.savetxt(dirName + os.sep + "particlePressure.dat", pressure)
-    return pressure
+                energy += 0.5 * ec * overlap**2 * 0.5 # double counting and e = k/2
+        stress[i,0] = virial
+        stress[i,1] = np.linalg.norm(vel[i])**2
+        if(prop == 'prop'):
+            stress[i,2] = driving * np.sum(vel[i] * director[i]) / (2*Dr)
+        stress[i,3] = energy
+    np.savetxt(dirName + os.sep + "particleStress.dat", stress)
+    print('potential energy: ', np.mean(stress[:,3]), ' +- ', np.std(stress[:,3]))
+    print('kinetic energy: ', np.mean(stress[:,1]*0.5), ' +- ', np.std(stress[i,1]*0.5))
+    print('energy: ', np.mean(stress[:,1]*0.5 + stress[:,3]), ' +- ', np.std(stress[i,1]*0.5 + stress[:,3]))
+    return stress
 
-def computeParticlePressureVSTime(dirName, dirSpacing=1):
+def computeParticleStressVSTime(dirName, dirSpacing=1):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d]
-        computeParticlePressure(dirSample)
-
-###################### Average radial pressure profile #########################
-def averageRadialPressureProfile(dirName, dirSpacing=1):
-    dim = 2
-    Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    phi = float(ucorr.readFromParams(dirName, "phi"))
-    sigma = float(ucorr.readFromDynParams(dirName, "sigma"))
-    kc = 1 / sigma
-    driving = float(ucorr.readFromDynParams(dirName, "f0"))
-    gamma = float(ucorr.readFromDynParams(dirName, "damping"))
-    v0 = driving / gamma
-    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
-    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    dirList, timeList = ucorr.getOrderedDirectories(dirName)
-    timeList = timeList.astype(int)
-    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    # distance bins
-    bins = np.arange(0, boxSize[0]/2, 2*np.mean(rad))
-    binArea = np.pi * (bins[1:]**2 - bins[:-1]**2)
-    centers = (bins[1:] + bins[:-1])/2
-    # pressure bins
-    virial = np.zeros((bins.shape[0]-1,3))
-    thermal = np.zeros(bins.shape[0]-1)
-    active = np.zeros((bins.shape[0]-1,3))
-    total = np.zeros(bins.shape[0]-1)
-    for d in range(dirList.shape[0]):
-        dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "denseList.dat")):
-            denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
-            voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
-        else:
-            denseList, voroDensity = computeVoronoiCluster(dirSample)
-        if(os.path.exists(dirSample + os.sep + "particlePressure.dat")):
-            pressure = np.loadtxt(dirSample + os.sep + "particlePressure.dat")
-        else:
-            pressure = computeParticlePressure(dirSample)
-        # THIS ONLY WORKS IF THE CLUSTER IS NEAR THE CENTER OF THE BOX
-        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
-        pos = ucorr.centerPositions(pos, boxSize, denseList)
-        centerOfMass = np.mean(pos[denseList==1], axis=0)
-        vel = np.loadtxt(dirSample + "/particleVel.dat")
-        angle = ucorr.getMOD2PIAngles(dirSample + "/particleAngles.dat")
-        director = np.array([np.cos(angle), np.sin(angle)]).T
-        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
-        for i in range(numParticles):
-            distanceToCOM = np.linalg.norm(ucorr.pbcDistance(pos[i], centerOfMass, boxSize))
-            work = 0
-            workx = 0
-            worky = 0
-            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
-                radSum = rad[i] + rad[c]
-                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
-                distance = np.linalg.norm(delta)
-                overlap = 1 - distance / radSum
-                if(overlap > 0):
-                    gradMultiple = kc * overlap / radSum
-                    force = gradMultiple * delta / distance
-                    work += 0.5 * np.sum(force * delta)
-                    # diagonal components of work tensor
-                    workx += 0.5 * force[0] * delta[0]
-                    worky += 0.5 * force[1] * delta[1]
-            for j in range(bins.shape[0]-1):
-                if(distanceToCOM > bins[j] and distanceToCOM < bins[j+1]):
-                    virial[j,0] += work / dim
-                    virial[j,1] += workx
-                    virial[j,2] += worky
-                    thermal[j] += np.linalg.norm(vel[i])**2 / dim
-                    active[j,0] += driving * np.sum(vel[i] * director[i]) / (4*Dr * dim)
-                    # diagonal components of active work tensor
-                    active[j,1] += driving * vel[i,0] * director[i,0] / (4*Dr)
-                    active[j,2] += driving * vel[i,1] * director[i,1] / (4*Dr)
-                    total[j] += (work + np.linalg.norm(vel[i])**2 + driving * np.sum(vel[i] * director[i]) / (4*Dr)) / dim
-    thermal *= sigma**2/binArea
-    total *= sigma**2/binArea
-    for i in range(virial.shape[1]):
-        virial[:,i] *= sigma**2/binArea
-        active[:,i] *= sigma**2/binArea
-    np.savetxt(dirName + os.sep + "pressureProfile.dat", np.column_stack((centers, virial, thermal, active, total)))
-    uplot.plotCorrelation(centers, virial[:,0], "$Pressure$ $profile$", xlabel = "$Distance$", color='k', lw=1.5)
-    uplot.plotCorrelation(centers, thermal, "$Pressure$ $profile$", xlabel = "$Distance$", color='r', lw=1.5)
-    uplot.plotCorrelation(centers, active[:,0], "$Pressure$ $profile$", xlabel = "$Distance$", color=[1,0.5,0], lw=1.5)
-    uplot.plotCorrelation(centers, total, "$Pressure$ $profile$", xlabel = "$Distance$", color='b', lw=1)
-    plt.pause(0.5)
-
-####################### Average linear pressure profile ########################
-def averageLinearPressureProfile(dirName, dirSpacing=1):
-    dim = 2
-    Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
-    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
-    phi = float(ucorr.readFromParams(dirName, "phi"))
-    sigma = float(ucorr.readFromDynParams(dirName, "sigma"))
-    kc = 1 / sigma
-    driving = float(ucorr.readFromDynParams(dirName, "f0"))
-    gamma = float(ucorr.readFromDynParams(dirName, "damping"))
-    v0 = driving / gamma
-    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
-    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
-    dirList, timeList = ucorr.getOrderedDirectories(dirName)
-    timeList = timeList.astype(int)
-    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
-    # distance bins
-    bins = np.arange(0, boxSize[0], 2*np.mean(rad))
-    binArea = (bins[1] - bins[0])*boxSize[1]
-    centers = (bins[1:] + bins[:-1])/2
-    # pressure bins
-    virial = np.zeros((bins.shape[0]-1,3))
-    thermal = np.zeros(bins.shape[0]-1)
-    active = np.zeros((bins.shape[0]-1,3))
-    total = np.zeros(bins.shape[0]-1)
-    for d in range(dirList.shape[0]):
-        dirSample = dirName + os.sep + dirList[d]
-        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
-        #pos = np.loadtxt(dirSample + "/particlePos.dat")
-        vel = np.loadtxt(dirSample + "/particleVel.dat")
-        angle = ucorr.getMOD2PIAngles(dirSample + "/particleAngles.dat")
-        director = np.array([np.cos(angle), np.sin(angle)]).T
-        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
-        for i in range(numParticles):
-            work = 0
-            workx = 0
-            worky = 0
-            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
-                radSum = rad[i] + rad[c]
-                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
-                distance = np.linalg.norm(delta)
-                overlap = 1 - distance / radSum
-                if(overlap > 0):
-                    gradMultiple = kc * overlap / radSum
-                    force = gradMultiple * delta / distance
-                    work += 0.5 * np.sum(force * delta)
-                    # diagonal components of work tensor
-                    workx += 0.5 * force[0] * delta[0]
-                    worky += 0.5 * force[1] * delta[1]
-            for j in range(bins.shape[0]-1):
-                if(pos[i,0] > bins[j] and pos[i,0] < bins[j+1]):
-                    virial[j,0] += work / dim
-                    virial[j,1] += workx
-                    virial[j,2] += worky
-                    thermal[j] += np.linalg.norm(vel[i])**2 / dim
-                    active[j,0] += driving * np.sum(vel[i] * director[i]) / (4*Dr * dim)
-                    # diagonal components of active work tensor
-                    active[j,1] += driving * vel[i,0] * director[i,0] / (4*Dr)
-                    active[j,2] += driving * vel[i,1] * director[i,1] / (4*Dr)
-                    total[j] += (work + np.linalg.norm(vel[i])**2 + driving * np.sum(vel[i] * director[i]) / (4*Dr)) / dim
-    virial *= sigma**2/binArea
-    thermal *= sigma**2/binArea
-    active *= sigma**2/binArea
-    total *= sigma**2/binArea
-    np.savetxt(dirName + os.sep + "pressureProfile.dat", np.column_stack((centers, virial, thermal, active, total)))
-    uplot.plotCorrelation(centers, virial[:,0], "$Pressure$ $profile$", xlabel = "$Distance$", color='k', lw=1.5)
-    uplot.plotCorrelation(centers, thermal, "$Pressure$ $profile$", xlabel = "$Distance$", color='r', lw=1.5)
-    uplot.plotCorrelation(centers, active[:,0], "$Pressure$ $profile$", xlabel = "$Distance$", color=[1,0.5,0], lw=1.5)
-    uplot.plotCorrelation(centers, total, "$Pressure$ $profile$", xlabel = "$Distance$", color='b', lw=1)
-    #plt.yscale('log')
-    plt.show()
+        computeParticleStress(dirSample)
 
 ########################## Total pressure components ###########################
 def computePressureVSTime(dirName, bound = False, prop = False, dirSpacing=1):
@@ -2281,13 +2184,12 @@ def computePressureVSTime(dirName, bound = False, prop = False, dirSpacing=1):
     if(prop == "prop"):
         gamma = float(ucorr.readFromDynParams(dirName, "damping"))
         driving = float(ucorr.readFromDynParams(dirName, "f0"))
-        v0 = driving / gamma
         Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
     sigma = np.mean(rad)
-    kc = 1 / sigma
+    ec = 240
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
@@ -2315,7 +2217,7 @@ def computePressureVSTime(dirName, bound = False, prop = False, dirSpacing=1):
                 distance = np.linalg.norm(delta)
                 overlap = 1 - distance / rad[i]
                 if(overlap > 0):
-                    gradMultiple = kc * overlap / rad[i]
+                    gradMultiple = ec * overlap / rad[i]
                     wallForce = gradMultiple * delta / distance
                     if(bound == "bound"):
                         wall -= np.sum(wallForce * pos[i]) / dim
@@ -2334,7 +2236,7 @@ def computePressureVSTime(dirName, bound = False, prop = False, dirSpacing=1):
                 distance = np.linalg.norm(delta)
                 overlap = 1 - distance / radSum
                 if(overlap > 0):
-                    gradMultiple = kc * overlap / radSum
+                    gradMultiple = ec * overlap / radSum
                     force = gradMultiple * delta / distance
                     virial += 0.5 * np.sum(force * delta) # double counting
                     #if(prop == "prop"):
@@ -2347,7 +2249,7 @@ def computePressureVSTime(dirName, bound = False, prop = False, dirSpacing=1):
     pressure *= sigma**2
     wallPressure *= sigma**2
     np.savetxt(dirName + os.sep + "pressure.dat", np.column_stack((timeList, wallPressure, pressure)))
-    print("bulk pressure: ", np.mean(pressure[:,0] + pressure[:,1] + pressure[:,2]), " +/- ", np.std(pressure[:,0] + pressure[:,1] + pressure[:,2])/np.sqrt(pressure.shape[0]))
+    print("bulk pressure: ", np.mean(pressure[:,0] + pressure[:,1] + pressure[:,2]), " +/- ", np.std(pressure[:,0] + pressure[:,1] + pressure[:,2]))
     print("virial pressure: ", np.mean(pressure[:,0]), " +/- ", np.std(pressure[:,0]))
     print("thermal pressure: ", np.mean(pressure[:,1]), " +/- ", np.std(pressure[:,1]))
     if(prop == "prop"):
@@ -2360,13 +2262,12 @@ def computeClusterPressureVSTime(dirName, bound = False, prop = False, dirSpacin
     if(prop == "prop"):
         gamma = float(ucorr.readFromDynParams(dirName, "damping"))
         driving = float(ucorr.readFromDynParams(dirName, "f0"))
-        v0 = driving / gamma
         Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
     sigma = np.mean(rad)
-    kc = 1 / sigma
+    ec = 240
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
@@ -2382,10 +2283,10 @@ def computeClusterPressureVSTime(dirName, bound = False, prop = False, dirSpacin
             voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
         else:
             denseList, voroDensity = computeVoronoiCluster(dirSample)
-        if(os.path.exists(dirSample + os.sep + "borderList.dat")):
-            borderList = np.loadtxt(dirSample + os.sep + "borderList.dat")
-        else:
-            borderList,_ = computeVoronoiBorder(dirSample)
+        #if(os.path.exists(dirSample + os.sep + "borderList!.dat")):
+        #    borderList = np.loadtxt(dirSample + os.sep + "borderList.dat")
+        #else:
+        #    borderList,_ = computeVoronoiBorder(dirSample)
         voroVolume = np.pi*rad**2/voroDensity
         #pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
         pos = np.loadtxt(dirSample + "/particlePos.dat")
@@ -2413,7 +2314,7 @@ def computeClusterPressureVSTime(dirName, bound = False, prop = False, dirSpacin
                 distance = np.linalg.norm(delta)
                 overlap = 1 - distance / rad[i]
                 if(overlap > 0):
-                    gradMultiple = kc * overlap / rad[i]
+                    gradMultiple = ec * overlap / rad[i]
                     wallForce = gradMultiple * delta / distance
                     if(bound == "bound"):
                         wall -= np.sum(wallForce * pos[i]) / dim
@@ -2426,7 +2327,7 @@ def computeClusterPressureVSTime(dirName, bound = False, prop = False, dirSpacin
                         wall += np.linalg.norm(wallForce) / boxLength
             #if(borderList[i] == 0):
             # particle pressure components
-            if(denseList[i] == 1 or borderList[i] == 1):
+            if(denseList[i] == 1):
                 volumeIn += voroVolume[i]
                 thermalIn += np.linalg.norm(vel[i])**2
                 if(prop == "prop"):
@@ -2444,9 +2345,9 @@ def computeClusterPressureVSTime(dirName, bound = False, prop = False, dirSpacin
                 distance = np.linalg.norm(delta)
                 overlap = 1 - distance / radSum
                 if(overlap > 0):
-                    gradMultiple = kc * overlap / radSum
+                    gradMultiple = ec * overlap / radSum
                     force = gradMultiple * delta / distance
-                    if(denseList[i] == 1 or borderList[i] == 1):
+                    if(denseList[i] == 1):
                         virialIn += 0.5 * np.sum(force * delta)
                         #if(prop == "prop"):
                         #    activeIn += 0.5 * np.sum(force * director[i]) / gamma
@@ -2459,21 +2360,23 @@ def computeClusterPressureVSTime(dirName, bound = False, prop = False, dirSpacin
             pressureIn[d,0] = virialIn / (dim * volumeIn) # double counting
             pressureIn[d,1] = thermalIn / volumeIn # dim k_B T / dim, dim cancels out
             if(prop == "prop"):
-                pressureIn[d,2] = driving * activeIn / (dim * 4*Dr * volumeIn)
+                pressureIn[d,2] = driving * activeIn / (dim * 2*Dr * volumeIn)
         if(volumeOut > 0):
             pressureOut[d,0] = virialOut / (dim * volumeOut) # double counting
             pressureOut[d,1] = thermalOut / volumeOut # dim k_B T / dim, dim cancels out
             if(prop == "prop"):
-                pressureOut[d,2] = driving * activeOut / (dim * 4*Dr * volumeOut)
+                pressureOut[d,2] = driving * activeOut / (dim * 2*Dr * volumeOut)
     pressureIn *= sigma**2
     pressureOut *= sigma**2
     wallPressure *= sigma**2
     np.savetxt(dirName + os.sep + "clusterPressure.dat", np.column_stack((timeList, wallPressure, pressureIn, pressureOut)))
-    print("dense pressure: ", np.mean(pressureIn[:,0] + pressureIn[:,1] + pressureIn[:,2]), " +/- ", np.std(pressureIn[:,0] + pressureIn[:,1] + pressureIn[:,2]))
+    # pressure components in the fluid
+    print("\ndense pressure: ", np.mean(pressureIn[:,0] + pressureIn[:,1] + pressureIn[:,2]), " +/- ", np.std(pressureIn[:,0] + pressureIn[:,1] + pressureIn[:,2]))
     print("dense virial pressure: ", np.mean(pressureIn[:,0]), " +/- ", np.std(pressureIn[:,0]))
     print("dense thermal pressure: ", np.mean(pressureIn[:,1]), " +/- ", np.std(pressureIn[:,1]))
     if(prop == "prop"):
         print("dense active pressure: ", np.mean(pressureIn[:,2]), " +/- ", np.std(pressureIn[:,2]))
+    # pressure components in the gas
     print("\ndilute pressure: ", np.mean(pressureOut[:,0] + pressureOut[:,1] + pressureOut[:,2]), " +/- ", np.std(pressureOut[:,0] + pressureOut[:,1] + pressureOut[:,2]))
     print("dilute virial pressure: ", np.mean(pressureOut[:,0]), " +/- ", np.std(pressureOut[:,0]))
     print("dilute thermal pressure: ", np.mean(pressureOut[:,1]), " +/- ", np.std(pressureOut[:,1]))
@@ -2481,6 +2384,586 @@ def computeClusterPressureVSTime(dirName, bound = False, prop = False, dirSpacin
         print("dilute active pressure: ", np.mean(pressureOut[:,2]), " +/- ", np.std(pressureOut[:,2]), "\n")
     if(bound == "bound"):
         print("pressure on the wall: ", np.mean(wallPressure), " +/- ", np.std(wallPressure))
+
+###################### Average radial pressure profile #########################
+def averageRadialPressureProfile(dirName, shiftx, shifty, dirSpacing=1):
+    dim = 2
+    Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    phi = float(ucorr.readFromParams(dirName, "phi"))
+    sigma = float(ucorr.readFromDynParams(dirName, "sigma"))
+    ec = 240
+    driving = float(ucorr.readFromDynParams(dirName, "f0"))
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    # distance bins
+    bins = np.arange(0, boxSize[0]/2, 2*np.mean(rad))
+    binArea = np.pi * (bins[1:]**2 - bins[:-1]**2)
+    centers = (bins[1:] + bins[:-1])/2
+    # pressure bins
+    virial = np.zeros(bins.shape[0]-1)
+    thermal = np.zeros(bins.shape[0]-1)
+    active = np.zeros(bins.shape[0]-1)
+    total = np.zeros(bins.shape[0]-1)
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "denseList.dat")):
+            denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
+            voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
+        else:
+            denseList, voroDensity = computeVoronoiCluster(dirSample)
+        # CENTER CLUSTER BY BRUTE FORCE - NEED TO IMPLEMENT SOMETHING BETTER
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        if(shiftx != 0 or shiftx != 0):
+            pos = ucorr.shiftPositions(pos, boxSize, -shiftx, -shifty)
+        #pos = ucorr.centerPositions(pos, boxSize, denseList)
+        centerOfMass = np.mean(pos[denseList==1], axis=0)
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        angle = ucorr.getMOD2PIAngles(dirSample + "/particleAngles.dat")
+        director = np.array([np.cos(angle), np.sin(angle)]).T
+        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
+        for i in range(numParticles):
+            distanceToCOM = np.linalg.norm(ucorr.pbcDistance(pos[i], centerOfMass, boxSize))
+            work = 0
+            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(overlap > 0):
+                    gradMultiple = ec * overlap / radSum
+                    force = gradMultiple * delta / distance
+                    work += 0.5 * np.sum(force * delta)
+            for j in range(bins.shape[0]-1):
+                if(distanceToCOM > bins[j] and distanceToCOM < bins[j+1]):
+                    virial[j] += work / dim
+                    thermal[j] += np.linalg.norm(vel[i])**2 / dim
+                    active[j] += driving * np.sum(vel[i] * director[i]) / (4*Dr * dim)
+                    total[j] += (work + np.linalg.norm(vel[i])**2 + driving * np.sum(vel[i] * director[i]) / (4*Dr)) / dim
+    virial *= sigma**2/(binArea * dirList.shape[0])
+    thermal *= sigma**2/(binArea * dirList.shape[0])
+    active *= sigma**2/(binArea * dirList.shape[0])
+    total *= sigma**2/(binArea * dirList.shape[0])
+    np.savetxt(dirName + os.sep + "pressureProfile.dat", np.column_stack((centers, virial, thermal, active, total)))
+    uplot.plotCorrelation(centers, virial, "$Pressure$ $profile$", xlabel = "$Distance$", color='k', lw=1.5)
+    uplot.plotCorrelation(centers, thermal, "$Pressure$ $profile$", xlabel = "$Distance$", color='r', lw=1.5)
+    uplot.plotCorrelation(centers, active, "$Pressure$ $profile$", xlabel = "$Distance$", color=[1,0.5,0], lw=1.5)
+    uplot.plotCorrelation(centers, total, "$Pressure$ $profile$", xlabel = "$Distance$", color='b', lw=1)
+    plt.show()
+
+############################ Linear surface tension ############################
+def averageRadialTension(dirName, shiftx, shifty, dirSpacing=1):
+    dim = 2
+    Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    phi = float(ucorr.readFromParams(dirName, "phi"))
+    sigma = float(ucorr.readFromDynParams(dirName, "sigma"))
+    ec = 240
+    driving = float(ucorr.readFromDynParams(dirName, "f0"))
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    # distance bins
+    bins = np.arange(0, boxSize[0]/2, 2*np.mean(rad))
+    binArea = np.pi * (bins[1:]**2 - bins[:-1]**2)
+    binWidth = bins[1:] - bins[:-1]
+    centers = (bins[1:] + bins[:-1])/2
+    # pressure bins
+    virial = np.zeros((bins.shape[0]-1,2))
+    active = np.zeros((bins.shape[0]-1,2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "denseList.dat")):
+            denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
+            voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
+        else:
+            denseList, voroDensity = computeVoronoiCluster(dirSample)
+        # CENTER CLUSTER BY BRUTE FORCE - NEED TO IMPLEMENT SOMETHING BETTER
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        if(shiftx != 0 or shiftx != 0):
+            pos = ucorr.shiftPositions(pos, boxSize, -shiftx, -shifty)
+        #pos = ucorr.centerPositions(pos, boxSize, denseList)
+        centerOfMass = np.mean(pos[denseList==1], axis=0)
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        angle = ucorr.getMOD2PIAngles(dirSample + "/particleAngles.dat")
+        director = np.array([np.cos(angle), np.sin(angle)]).T
+        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
+        workn = 0
+        workt = 0
+        for i in range(numParticles):
+            # Convert pressure components into normal and tangential components
+            relPos = ucorr.pbcDistance(pos[i], centerOfMass, boxSize)
+            relAngle = np.arctan2(relPos[1], relPos[0])
+            unitVector = np.array([np.cos(relAngle), np.sin(relAngle)])
+            velNT = ucorr.projectToNormalTangentialComp(vel[i], unitVector)
+            directorNT = ucorr.projectToNormalTangentialComp(director[i], unitVector)
+            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(overlap > 0):
+                    gradMultiple = ec * overlap / radSum
+                    force = gradMultiple * delta / distance
+                    # normal minus tangential component
+                    forceNT = ucorr.projectToNormalTangentialComp(force, unitVector)
+                    deltaNT = ucorr.projectToNormalTangentialComp(delta, unitVector)
+                    workn += 0.5 * np.dot(forceNT[0], deltaNT[0])
+                    workt += 0.5 * np.dot(forceNT[1], deltaNT[1])
+            for j in range(bins.shape[0]-1):
+                if(pos[i,0] > bins[j] and pos[i,0] < bins[j+1]):
+                    virial[j,0] += workn * binWidth[j] / (dim * binArea[j])
+                    virial[j,1] += workt * binWidth[j] / (dim * binArea[j])
+                    active[j,0] += driving * np.dot(velNT[0], directorNT[0]) * binWidth[j] / (2*Dr * dim * binArea[j])
+                    active[j,1] += driving * np.dot(velNT[1], directorNT[1]) * binWidth[j] / (2*Dr * dim * binArea[j])
+    for i in range(virial.shape[1]):
+        virial[:,i] *= sigma/dirList.shape[0]
+        active[:,i] *= sigma/dirList.shape[0]
+    np.savetxt(dirName + os.sep + "surfaceTension.dat", np.column_stack((centers, virial, active)))
+    print("surface tension: ", np.sum(centers * (virial[:,0] + active[:,0] - virial[:,1] - active[:,1])))
+    uplot.plotCorrelation(centers, virial[:,0] - virial[:,1], "$\\Delta p$", xlabel = "$Distance$", color='k', lw=1.5)
+    uplot.plotCorrelation(centers, active[:,0] - active[:,1], "$\\Delta p$", xlabel = "$Distance$", color=[1,0.5,0], lw=1.5)
+    #plt.yscale('log')
+    plt.show()
+
+####################### Average linear pressure profile ########################
+def averageLinearPressureProfile(dirName, dirSpacing=1):
+    dim = 2
+    Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    phi = float(ucorr.readFromParams(dirName, "phi"))
+    sigma = float(ucorr.readFromDynParams(dirName, "sigma"))
+    ec = 240
+    driving = float(ucorr.readFromDynParams(dirName, "f0"))
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    # distance bins
+    bins = np.arange(0, boxSize[0], 0.01)
+    binArea = (bins[1] - bins[0])*boxSize[1]
+    centers = (bins[1:] + bins[:-1])/2
+    # pressure bins
+    thermal = np.zeros(bins.shape[0]-1)
+    virial = np.zeros((bins.shape[0]-1,3))
+    active = np.zeros((bins.shape[0]-1,3))
+    total = np.zeros(bins.shape[0]-1)
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        #pos = np.loadtxt(dirSample + "/particlePos.dat")
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        angle = ucorr.getMOD2PIAngles(dirSample + "/particleAngles.dat")
+        director = np.array([np.cos(angle), np.sin(angle)]).T
+        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
+        for i in range(numParticles):
+            work = 0
+            workx = 0
+            worky = 0
+            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(overlap > 0):
+                    gradMultiple = ec * overlap / radSum
+                    force = gradMultiple * delta / distance
+                    work += 0.5 * np.sum(force * delta)
+                    # diagonal components of work tensor
+                    workx += 0.5 * force[0] * delta[0]
+                    worky += 0.5 * force[1] * delta[1]
+            for j in range(bins.shape[0]-1):
+                if(pos[i,0] > bins[j] and pos[i,0] < bins[j+1]):
+                    thermal[j] += np.linalg.norm(vel[i])**2 / dim
+                    virial[j,0] += work / dim
+                    active[j,0] += driving * np.sum(vel[i] * director[i]) / (2*Dr * dim)
+                    # normal and tangential components
+                    virial[j,1] += workx
+                    virial[j,2] += worky
+                    active[j,1] += driving * vel[i,0] * director[i,0] / (2*Dr)
+                    active[j,2] += driving * vel[i,1] * director[i,1] / (2*Dr)
+                    total[j] += (work + np.linalg.norm(vel[i])**2 + driving * np.sum(vel[i] * director[i]) / (2*Dr)) / dim
+    virial *= sigma**2/(binArea * dirList.shape[0])
+    thermal *= sigma**2/(binArea * dirList.shape[0])
+    active *= sigma**2/(binArea * dirList.shape[0])
+    total *= sigma**2/(binArea * dirList.shape[0])
+    np.savetxt(dirName + os.sep + "pressureProfile.dat", np.column_stack((centers, virial, thermal, active, total)))
+    print("average pressure: ", np.mean(total), "+-", np.std(total))
+    print("surface tension: ", np.sum(centers * (virial[:,1] + active[:,1] - virial[:,2] - active[:,2])))
+    uplot.plotCorrelation(centers, virial[:,0], "$Pressure$ $profile$", xlabel = "$Distance$", color='k', lw=1.5)
+    uplot.plotCorrelation(centers, thermal, "$Pressure$ $profile$", xlabel = "$Distance$", color='r', lw=1.5)
+    uplot.plotCorrelation(centers, active[:,0], "$Pressure$ $profile$", xlabel = "$Distance$", color=[1,0.5,0], lw=1.5)
+    uplot.plotCorrelation(centers, total, "$Pressure$ $profile$", xlabel = "$Distance$", color='b', lw=1)
+    #plt.yscale('log')
+    plt.show()
+
+############################ Linear surface tension ############################
+def averageLinearTension(dirName, dirSpacing=1):
+    dim = 2
+    Dr = float(ucorr.readFromDynParams(dirName, "Dr"))
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    phi = float(ucorr.readFromParams(dirName, "phi"))
+    sigma = float(ucorr.readFromDynParams(dirName, "sigma"))
+    ec = 240
+    driving = float(ucorr.readFromDynParams(dirName, "f0"))
+    boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
+    rad = np.array(np.loadtxt(dirName + os.sep + "particleRad.dat"))
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    # distance bins
+    bins = np.arange(0, boxSize[0], 0.01)
+    binArea = (bins[1] - bins[0])*boxSize[1]
+    binWidth = bins[1] - bins[0]
+    centers = (bins[1:] + bins[:-1])/2
+    # pressure bins
+    virial = np.zeros((bins.shape[0]-1,2))
+    active = np.zeros((bins.shape[0]-1,2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        #pos = np.loadtxt(dirSample + "/particlePos.dat")
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        angle = ucorr.getMOD2PIAngles(dirSample + "/particleAngles.dat")
+        director = np.array([np.cos(angle), np.sin(angle)]).T
+        contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
+        for i in range(numParticles):
+            workx = 0
+            worky = 0
+            for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(overlap > 0):
+                    gradMultiple = ec * overlap / radSum
+                    force = gradMultiple * delta / distance
+                    # diagonal components of work tensor
+                    workx += 0.5 * force[0] * delta[0]
+                    worky += 0.5 * force[1] * delta[1]
+            for j in range(bins.shape[0]-1):
+                if(pos[i,0] > bins[j] and pos[i,0] < bins[j+1]):
+                    # normal and tangential components
+                    virial[j,0] += workx
+                    virial[j,1] += worky
+                    active[j,0] += driving * vel[i,0] * director[i,0] / (2*Dr)
+                    active[j,1] += driving * vel[i,1] * director[i,1] / (2*Dr)
+    virial *= sigma*binWidth/(binArea * dirList.shape[0])
+    active *= sigma*binWidth/(binArea * dirList.shape[0])
+    np.savetxt(dirName + os.sep + "surfaceTension.dat", np.column_stack((centers, virial, active)))
+    print("surface tension: ", np.sum(centers*(virial[:,0] + active[:,0] - virial[:,1] - active[:,1])))
+    uplot.plotCorrelation(centers, virial[:,0] - virial[:,1], "$\\Delta p$", xlabel = "$Distance$", color='k', lw=1.5)
+    uplot.plotCorrelation(centers, active[:,0] - active[:,1], "$\\Delta p$", xlabel = "$Distance$", color=[1,0.5,0], lw=1.5)
+    #plt.yscale('log')
+    plt.show()
+
+############################### Droplet pressure ###############################
+def computeDropletParticleStress(dirName, l1 = 0.04):
+    dim = 2
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
+    numParticles = int(ucorr.readFromParams(dirName + sep, "numParticles"))
+    rad = np.loadtxt(dirName + sep + "particleRad.dat")
+    sigma = np.mean(rad)
+    ec = 240
+    l2 = 0.2
+    stress = np.zeros((numParticles,3))
+    #pos = np.loadtxt(dirName + "/particlePos.dat")
+    pos = ucorr.getPBCPositions(dirName + "/particlePos.dat", boxSize)
+    vel = np.loadtxt(dirName + "/particleVel.dat")
+    neighbors = np.loadtxt(dirName + "/particleNeighbors.dat").astype(np.int64)
+    for i in range(numParticles):
+        virial = 0
+        energy = 0
+        for c in neighbors[i, np.argwhere(neighbors[i]!=-1)[:,0]]:
+            radSum = rad[i] + rad[c]
+            delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+            distance = np.linalg.norm(delta)
+            overlap = 1 - distance / radSum
+            if(distance < (1 + l1) * radSum):
+                gradMultiple = ec * overlap / radSum
+                energy += 0.5 * ec * overlap**2 * 0.5
+            elif((distance >= (1 + l1) * radSum) and (distance < (1 + l2) * radSum)):
+                gradMultiple = (ec * l1 / (l2 - l1)) * (overlap + l2) / radSum
+                energy += -(0.5 * (ec * l1 / (l2 - l1)) * (overlap + l2)**2) * 0.5
+            else:
+                gradMultiple = 0
+            force = gradMultiple * delta / distance
+            virial += 0.5 * np.sum(force * delta) # double counting
+        stress[i,0] = virial
+        stress[i,1] = np.linalg.norm(vel[i])**2
+        stress[i,2] = energy
+    np.savetxt(dirName + os.sep + "particleStress.dat", stress)
+    print('potential energy: ', np.mean(stress[:,2]), ' +- ', np.std(stress[:,2]))
+    print('kinetic energy: ', np.mean(stress[:,1]*0.5), ' +- ', np.std(stress[i,1]*0.5))
+    print('energy: ', np.mean(stress[:,1]*0.5 + stress[:,2]), ' +- ', np.std(stress[i,1]*0.5 + stress[:,2]))
+    return stress
+
+def computeDropletParticleStressVSTime(dirName, dirSpacing=1):
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        computeDropletParticleStress(dirSample)
+
+############################### Droplet pressure ###############################
+def computeDropletPressureVSTime(dirName, l1=0.04, dirSpacing=1):
+    dim = 2
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
+    sigma = np.mean(rad)
+    ec = 240
+    l2 = 0.2
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    pressure = np.zeros((dirList.shape[0],2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        neighbors = np.loadtxt(dirSample + "/particleNeighbors.dat").astype(np.int64)
+        virial = 0
+        thermal = 0
+        for i in range(numParticles):
+            # particle pressure components
+            thermal += np.linalg.norm(vel[i])**2
+            for c in neighbors[i, np.argwhere(neighbors[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(distance < (1 + l1) * radSum):
+                    gradMultiple = ec * overlap / radSum
+                elif((distance >= (1 + l1) * radSum) and (distance < (1 + l2) * radSum)):
+                    gradMultiple = (ec * l1 / (l2 - l1)) * (overlap + l2) / radSum
+                else:
+                    gradMultiple = 0
+                force = gradMultiple * delta / distance
+                virial += 0.5 * np.sum(force * delta) # double counting
+        pressure[d,0] = virial / dim
+        pressure[d,1] = thermal
+    pressure *= sigma**2
+    np.savetxt(dirName + os.sep + "pressure.dat", np.column_stack((timeList, pressure)))
+    print("bulk pressure: ", np.mean(pressure[:,0] + pressure[:,1]), " +/- ", np.std(pressure[:,0] + pressure[:,1]))
+    print("virial: ", np.mean(pressure[:,0]), " +/- ", np.std(pressure[:,0]))
+    print("thermal: ", np.mean(pressure[:,1]), " +/- ", np.std(pressure[:,1]))
+
+############################ Radial droplet tension ############################
+def averageDropletRadialTension(dirName, shiftx, shifty, l1=0.04, dirSpacing=1):
+    dim = 2
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
+    sigma = np.mean(rad)
+    ec = 240
+    l2 = 0.2
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    # distance bins
+    bins = np.arange(0, boxSize[0]/2, 2*np.mean(rad))
+    binArea = np.pi * (bins[1:]**2 - bins[:-1]**2)
+    binWidth = bins[1:] - bins[:-1]
+    centers = (bins[1:] + bins[:-1])/2
+    # pressure bins
+    thermal = np.zeros((bins.shape[0]-1,2))
+    virial = np.zeros((bins.shape[0]-1,2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        if(os.path.exists(dirSample + os.sep + "denseList.dat")):
+            denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
+        else:
+            denseList,_ = computeVoronoiCluster(dirSample, 0.65, 0)
+        # CENTER CLUSTER BY BRUTE FORCE - NEED TO IMPLEMENT SOMETHING BETTER
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        if(shiftx != 0 or shiftx != 0):
+            pos = ucorr.shiftPositions(pos, boxSize, -shiftx, -shifty)
+        #pos = ucorr.centerPositions(pos, boxSize, denseList)
+        centerOfMass = np.mean(pos[denseList==1], axis=0)
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        neighbors = np.loadtxt(dirSample + "/particleNeighbors.dat").astype(np.int64)
+        workn = 0
+        workt = 0
+        for i in range(numParticles):
+            # Convert pressure components into normal and tangential components
+            relPos = ucorr.pbcDistance(pos[i], centerOfMass, boxSize)
+            relAngle = np.arctan2(relPos[1], relPos[0])
+            unitVector = np.array([np.cos(relAngle), np.sin(relAngle)])
+            for c in neighbors[i, np.argwhere(neighbors[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(distance < (1 + l1) * radSum):
+                    gradMultiple = ec * overlap / radSum
+                elif((distance >= (1 + l1) * radSum) and (distance < (1 + l2) * radSum)):
+                    gradMultiple = (ec * l1 / (l2 - l1)) * (overlap + l2) / radSum
+                else:
+                    gradMultiple = 0
+                force = gradMultiple * delta / distance
+                # normal minus tangential component
+                forceNT = ucorr.projectToNormalTangentialComp(force, unitVector)
+                deltaNT = ucorr.projectToNormalTangentialComp(delta, unitVector)
+                workn += np.dot(forceNT[0], deltaNT[0])
+                workt += np.dot(forceNT[1], deltaNT[1])
+            for j in range(bins.shape[0]-1):
+                if(pos[i,0] > bins[j] and pos[i,0] < bins[j+1]):
+                    thermal[j,0] += vel[i,0]**2 * binWidth[j] / (dim * binArea[j])
+                    thermal[j,1] += vel[i,1]**2 * binWidth[j] / (dim * binArea[j])
+                    virial[j,0] = workn * binWidth[j] / (dim * binArea[j])
+                    virial[j,1] = workt * binWidth[j] / (dim * binArea[j])
+    for i in range(virial.shape[1]):
+        virial[:,i] *= sigma/dirList.shape[0]
+        thermal[:,i] *= sigma/dirList.shape[0]
+    np.savetxt(dirName + os.sep + "surfaceTension.dat", np.column_stack((centers, virial, thermal)))
+    print("surface tension: ", np.sum(centers * (virial[:,0] + thermal[:,0] - virial[:,1] - thermal[:,1])))
+    uplot.plotCorrelation(centers, virial[:,0] - virial[:,1], "$\\Delta p$", xlabel = "$Distance$", color='k', lw=1.5)
+    uplot.plotCorrelation(centers, thermal[:,0] - thermal[:,1], "$\\Delta p$", xlabel = "$Distance$", color='r', lw=1.5)
+    #plt.yscale('log')
+    plt.show()
+
+####################### Average linear pressure profile ########################
+def averageDropletLinearPressureProfile(dirName, l1 = 0.04, dirSpacing=1):
+    dim = 2
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
+    sigma = np.mean(rad)
+    ec = 240
+    l2 = 0.2
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    # distance bins
+    bins = np.arange(0, boxSize[0], 0.01)
+    binArea = (bins[1] - bins[0])*boxSize[1]
+    centers = (bins[1:] + bins[:-1])/2
+    # pressure bins
+    virial = np.zeros((bins.shape[0]-1,3))
+    thermal = np.zeros((bins.shape[0]-1,3))
+    total = np.zeros(bins.shape[0]-1)
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        neighbors = np.loadtxt(dirSample + "/particleNeighbors.dat").astype(np.int64)
+        for i in range(numParticles):
+            work = 0
+            workx = 0
+            worky = 0
+            for c in neighbors[i, np.argwhere(neighbors[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(distance < (1 + l1) * radSum):
+                    gradMultiple = ec * overlap / radSum
+                elif((distance >= (1 + l1) * radSum) and (distance < (1 + l2) * radSum)):
+                    gradMultiple = (ec * l1 / (l2 - l1)) * (overlap + l2) / radSum
+                else:
+                    gradMultiple = 0
+                force = gradMultiple * delta / distance
+                work += 0.5 * np.sum(force * delta)
+                workx += 0.5 * force[0] * delta[0]
+                worky += 0.5 * force[1] * delta[1]
+            for j in range(bins.shape[0]-1):
+                if(pos[i,0] > bins[j] and pos[i,0] < bins[j+1]):
+                    virial[j,0] += work / dim
+                    virial[j,1] += workx
+                    virial[j,2] += worky
+                    thermal[j,0] += np.linalg.norm(vel[i])**2 / dim
+                    thermal[j,1] += vel[i,0]**2
+                    thermal[j,2] += vel[i,1]**2
+                    total[j] += (work + np.linalg.norm(vel[i])**2) / dim
+    for i in range(virial.shape[1]):
+        virial[:,i] *= sigma**2/(binArea * dirList.shape[0])
+        thermal[:,i] *= sigma**2/(binArea * dirList.shape[0])
+    total *= sigma**2/(binArea * dirList.shape[0])
+    np.savetxt(dirName + os.sep + "pressureProfile.dat", np.column_stack((centers, virial, thermal, total)))
+    print("average pressure: ", np.mean(total), "+-", np.std(total))
+    uplot.plotCorrelation(centers, virial[:,0], "$Pressure$ $profile$", xlabel = "$Distance$", color='k', lw=1.5)
+    uplot.plotCorrelation(centers, thermal, "$Pressure$ $profile$", xlabel = "$Distance$", color='r', lw=1.5)
+    uplot.plotCorrelation(centers, total, "$Pressure$ $profile$", xlabel = "$Distance$", color='b', lw=1)
+    #plt.yscale('log')
+    plt.show()
+
+############################ Linear surface tension ############################
+def averageDropletLinearTension(dirName, l1=0.04, dirSpacing=1):
+    dim = 2
+    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
+    numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
+    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
+    sigma = np.mean(rad)
+    ec = 240
+    l2 = 0.2
+    dirList, timeList = ucorr.getOrderedDirectories(dirName)
+    timeList = timeList.astype(int)
+    dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
+    # distance bins
+    bins = np.arange(0, boxSize[0], 0.01)
+    binArea = (bins[1] - bins[0])*boxSize[1]
+    binWidth = bins[1] - bins[0]
+    centers = (bins[1:] + bins[:-1])/2
+    # pressure bins
+    virial = np.zeros((bins.shape[0]-1,2))
+    thermal = np.zeros((bins.shape[0]-1,2))
+    for d in range(dirList.shape[0]):
+        dirSample = dirName + os.sep + dirList[d]
+        pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
+        #pos = np.loadtxt(dirSample + "/particlePos.dat")
+        vel = np.loadtxt(dirSample + "/particleVel.dat")
+        neighbors = np.loadtxt(dirSample + "/particleNeighbors.dat").astype(np.int64)
+        workx = 0
+        worky = 0
+        for i in range(numParticles):
+            for c in neighbors[i, np.argwhere(neighbors[i]!=-1)[:,0]]:
+                radSum = rad[i] + rad[c]
+                delta = ucorr.pbcDistance(pos[i], pos[c], boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(distance < (1 + l1) * radSum):
+                    gradMultiple = ec * overlap / radSum
+                elif((distance >= (1 + l1) * radSum) and (distance < (1 + l2) * radSum)):
+                    gradMultiple = (ec * l1 / (l2 - l1)) * (overlap + l2) / radSum
+                else:
+                    gradMultiple = 0
+                force = gradMultiple * delta / distance
+                # normal minus tangential component
+                workx += 0.5 * (force[0] * delta[0])
+                worky += 0.5 * (force[1] * delta[1])
+            for j in range(bins.shape[0]-1):
+                if(pos[i,0] > bins[j] and pos[i,0] < bins[j+1]):
+                    thermal[j,0] += vel[i,0]**2
+                    thermal[j,1] += vel[i,1]**2
+                    virial[j,0] += workx
+                    virial[j,1] += worky
+    thermal *= sigma*binWidth/(binArea * dirList.shape[0])
+    virial *= sigma*binWidth/(binArea * dirList.shape[0])
+    np.savetxt(dirName + os.sep + "surfaceTension.dat", np.column_stack((centers, virial, thermal)))
+    print("surface tension: ", np.sum(centers * (virial[:,0] + thermal[:,0] - virial[:,1] - thermal[:,1])))
+    uplot.plotCorrelation(centers, virial[:,0] - virial[:,1], "$\\Delta p$", xlabel = "$Distance$", color='k', lw=1.5)
+    uplot.plotCorrelation(centers, thermal[:,0] - thermal[:,1], "$\\Delta p$", xlabel = "$Distance$", color='r', lw=1.5)
+    #plt.yscale('log')
+    plt.show()
 
 ########################## Total velocity components ###########################
 def computeVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
@@ -2491,7 +2974,7 @@ def computeVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
-    kc = 1 / np.mean(rad)
+    ec = 240
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
@@ -2508,7 +2991,7 @@ def computeVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
         thermal = 0
         active = 0
         for i in range(numParticles):
-            thermal += np.sum(vel[i] * vel[i])
+            thermal += np.linalg.norm(vel[i])
             active += driving * np.sum(director[i] * vel[i]) / gamma
             for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
                 radSum = rad[i] + rad[c]
@@ -2516,13 +2999,13 @@ def computeVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
                 distance = np.linalg.norm(delta)
                 overlap = 1 - distance / radSum
                 if(overlap > 0):
-                    gradMultiple = kc * overlap / radSum
+                    gradMultiple = ec * overlap / radSum
                     force = gradMultiple * delta / distance
-                    steric += np.sum(force * vel[i]) / gamma
-        velMagnitude[d,0] = steric / (2 * numParticles) # double counting
-        velMagnitude[d,1] = thermal / numParticles
-        velMagnitude[d,2] = active / numParticles
-        np.savetxt(dirName + os.sep + "velMagnitude.dat", np.column_stack((timeList,velMagnitude)))
+                    steric += 0.5 * np.linalg.norm(force) / gamma
+        velMagnitude[d,0] = steric
+        velMagnitude[d,1] = thermal
+        velMagnitude[d,2] = active
+        np.savetxt(dirName + os.sep + "velMagnitude.dat", np.column_stack((timeList, velMagnitude)))
     print("steric velocity: ", np.mean(velMagnitude[:,0]), " +/- ", np.std(velMagnitude[:,0]))
     print("thermal velocity: ", np.mean(velMagnitude[:,1]), " +/- ", np.std(velMagnitude[:,1]))
     print("active velocity: ", np.mean(velMagnitude[:,2]), " +/- ", np.std(velMagnitude[:,2]))
@@ -2541,7 +3024,7 @@ def computeClusterVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName, "numParticles"))
     rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
-    kc = 1 / np.mean(rad)
+    ec = 240
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     timeList = timeList.astype(int)
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
@@ -2552,29 +3035,31 @@ def computeClusterVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
         dirSample = dirName + os.sep + dirList[d]
         if(os.path.exists(dirSample + os.sep + "denseList.dat")):
             denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
+            voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
         else:
             denseList, voroDensity = computeVoronoiCluster(dirSample)
+        voroVolume = np.pi * rad**2 / voroDensity
         pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
         vel = np.loadtxt(dirSample + "/particleVel.dat")
         angle = ucorr.getMOD2PIAngles(dirSample + "/particleAngles.dat")
         director = np.array([np.cos(angle), np.sin(angle)]).T
         contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
-        numParticlesIn = 0
+        volumeIn = 0
         stericIn = 0
         thermalIn = 0
         activeIn = 0
-        numParticlesOut = 0
+        volumeOut = 0
         stericOut = 0
         thermalOut = 0
         activeOut = 0
         for i in range(numParticles):
             if(denseList[i] == 1):
-                numParticlesIn += 1
-                thermalIn += np.sum(vel[i] * vel[i])
+                volumeIn += voroVolume[i]
+                thermalIn += np.linalg.norm(vel[i])
                 activeIn += driving * np.sum(director[i] * vel[i]) / gamma
             else:
-                numParticlesOut += 1
-                thermalOut += np.sum(vel[i] * vel[i])
+                volumeOut += voroVolume[i]
+                thermalOut += np.linalg.norm(vel[i])
                 activeOut += driving * np.sum(director[i] * vel[i]) / gamma
             for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
                 radSum = rad[i] + rad[c]
@@ -2582,20 +3067,20 @@ def computeClusterVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
                 distance = np.linalg.norm(delta)
                 overlap = 1 - distance / radSum
                 if(overlap > 0):
-                    gradMultiple = kc * overlap / radSum
+                    gradMultiple = ec * overlap / radSum
                     force = gradMultiple * delta / distance
                     if(denseList[i] == 1):
-                        stericIn += np.sum(force * vel[i]) / gamma
+                        stericIn += 0.5 * np.linalg.norm(force) / gamma
                     else:
-                        stericOut += np.sum(force * vel[i]) / gamma
-        if(numParticlesIn > 0):
-            velMagnitudeIn[d,0] = stericIn / (2 * numParticlesIn) # double counting
-            velMagnitudeIn[d,1] = thermalIn / numParticlesIn
-            velMagnitudeIn[d,2] = activeIn / numParticlesIn
-        if(numParticlesOut > 0):
-            velMagnitudeOut[d,0] = stericOut / (2 * numParticlesOut) # double counting
-            velMagnitudeOut[d,1] = thermalOut / numParticlesOut
-            velMagnitudeOut[d,2] = activeOut / numParticlesOut
+                        stericOut += 0.5 * np.linalg.norm(force) / gamma
+        if(volumeIn > 0):
+            velMagnitudeIn[d,0] = stericIn / volumeIn
+            velMagnitudeIn[d,1] = thermalIn / volumeIn
+            velMagnitudeIn[d,2] = activeIn / volumeIn
+        if(volumeOut > 0):
+            velMagnitudeOut[d,0] = stericOut / volumeOut
+            velMagnitudeOut[d,1] = thermalOut / volumeOut
+            velMagnitudeOut[d,2] = activeOut / volumeOut
         np.savetxt(dirName + os.sep + "clusterVelMagnitude.dat", np.column_stack((timeList, velMagnitudeIn, velMagnitudeOut)))
     print("dense steric velocity: ", np.mean(velMagnitudeIn[:,0]), " +/- ", np.std(velMagnitudeIn[:,0]))
     print("dense thermal velocity: ", np.mean(velMagnitudeIn[:,1]), " +/- ", np.std(velMagnitudeIn[:,1]))
@@ -2611,6 +3096,7 @@ def computeClusterVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
         uplot.plotCorrelation(timeList, velMagnitudeOut[:,1], "$Steric,$ $thermal,$ $active$", "$Time,$ $t$", color='r', ls='--')
         uplot.plotCorrelation(timeList, velMagnitudeOut[:,2], "$Steric,$ $thermal,$ $active$", "$Time,$ $t$", color=[1,0.5,0], ls='--')
         plt.show()
+
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
@@ -2738,7 +3224,8 @@ if __name__ == '__main__':
     elif(whichCorr == "averageld"):
         numBins = int(sys.argv[3])
         weight = sys.argv[4]
-        averageLocalDensity(dirName, numBins, weight)
+        plot = sys.argv[5]
+        averageLocalDensity(dirName, numBins, weight, plot)
 
     elif(whichCorr == "cluster"):
         numParticles = int(sys.argv[3])
@@ -2824,38 +3311,58 @@ if __name__ == '__main__':
         computeClusterBlockMixingTime(dirName, numBlocks, plot)
 
 ############################## pressure functions ##############################
-    elif(whichCorr == "partp"):
-        computeParticlePressure(dirName)
+    elif(whichCorr == "stress"):
+        prop = sys.argv[3]
+        computeParticleStress(dirName, prop)
 
-    elif(whichCorr == "partptime"):
-        computeParticlePressureVSTime(dirName)
+    elif(whichCorr == "stresstime"):
+        computeParticleStressVSTime(dirName)
 
     elif(whichCorr == "vorocluster"):
-        computeVoronoiCluster(dirName)
+        threshold = float(sys.argv[3])
+        plot = sys.argv[4]
+        filter = sys.argv[5]
+        computeVoronoiCluster(dirName, threshold, plot, filter)
 
     elif(whichCorr == "vorodensity"):
-        computeClusterVoronoiDensity(dirName)
+        plot = sys.argv[3]
+        computeClusterVoronoiDensity(dirName, plot)
+
+    elif(whichCorr == "voroarea"):
+        plot = sys.argv[3]
+        computeClusterVoronoiArea(dirName, plot)
 
     elif(whichCorr == "vorold"):
+        np.seterr(divide='ignore', invalid='ignore')
         numBins = int(sys.argv[3])
         plot = sys.argv[4]
         averageLocalVoronoiDensity(dirName, numBins, plot)
 
     elif(whichCorr == "voroborder"):
         threshold = float(sys.argv[3])
-        plot = sys.argv[4]
-        computeVoronoiBorder(dirName, threshold, plot)
+        computeVoronoiBorder(dirName, threshold)
 
     elif(whichCorr == "averagevb"):
         threshold = float(sys.argv[3])
-        plot = sys.argv[4]
-        averageVoronoiBorder(dirName, threshold, plot)
+        droplet = sys.argv[4]
+        plot = sys.argv[5]
+        averageVoronoiBorder(dirName, threshold, droplet, plot)
 
     elif(whichCorr == "radialprofile"):
-        averageRadialPressureProfile(dirName)
+        shiftx = float(sys.argv[3])
+        shifty = float(sys.argv[4])
+        averageRadialPressureProfile(dirName, shiftx, shifty)
+
+    elif(whichCorr == "radialtension"):
+        shiftx = float(sys.argv[3])
+        shifty = float(sys.argv[4])
+        averageRadialTension(dirName, shiftx, shifty)
 
     elif(whichCorr == "linearprofile"):
         averageLinearPressureProfile(dirName)
+
+    elif(whichCorr == "lineartension"):
+        averageLinearTension(dirName)
 
     elif(whichCorr == "ptime"):
         bound = sys.argv[3]
@@ -2866,6 +3373,28 @@ if __name__ == '__main__':
         bound = sys.argv[3]
         prop = sys.argv[4]
         computeClusterPressureVSTime(dirName, bound, prop)
+
+    elif(whichCorr == "dropstress"):
+        l1 = float(sys.argv[3])
+        computeDropletParticlePressureVSTime(dirName, l1)
+
+    elif(whichCorr == "dropptime"):
+        l1 = float(sys.argv[3])
+        computeDropletPressureVSTime(dirName, l1)
+
+    elif(whichCorr == "droptension"):
+        shiftx = float(sys.argv[3])
+        shifty = float(sys.argv[4])
+        l1 = float(sys.argv[5])
+        averageDropletRadialTension(dirName, shiftx, shifty, l1)
+
+    elif(whichCorr == "slabprofile"):
+        l1 = float(sys.argv[3])
+        averageDropletLinearPressureProfile(dirName, l1)
+
+    elif(whichCorr == "slabtension"):
+        l1 = float(sys.argv[3])
+        averageDropletLinearTension(dirName, l1)
 
     elif(whichCorr == "veltime"):
         plot = sys.argv[3]
