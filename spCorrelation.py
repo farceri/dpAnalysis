@@ -1934,7 +1934,6 @@ def computeVoronoiBorder(dirName, threshold=0.65, filter='filter'):
     else:
         denseList,_ = computeVoronoiCluster(dirName, threshold, filter=filter)
     borderList = np.zeros(numParticles)
-    borderLength = 0
     for i in range(numParticles):
         if(denseList[i]==1):
             for j in range(len(cells[i]['faces'])):
@@ -1942,9 +1941,17 @@ def computeVoronoiBorder(dirName, threshold=0.65, filter='filter'):
                 edgeIndex = cells[i]['faces'][j]['vertices']
                 if(denseList[index] == 0 and index>0):
                     borderList[i] = 1
-                    borderLength += np.linalg.norm(ucorr.pbcDistance(cells[i]['vertices'][edgeIndex[0]], cells[i]['vertices'][edgeIndex[1]], boxSize))
+    # compute border length from sorted border segments
+    borderLength = 0
+    borderPos = pos[borderList==1]
+    borderPos = ucorr.sortBorderPos(borderPos, borderList, boxSize)
+    np.savetxt(dirName + os.sep + "borderPos.dat", borderPos)
+    # compute border length by summing over segments on the border
+    borderLength = 0
+    for i in range(1,borderPos.shape[0]):
+        borderLength += np.linalg.norm(ucorr.pbcDistance(borderPos[i], borderPos[i-1], boxSize))
     #print("Number of dense particles at the interface: ", borderList[borderList==1].shape[0])
-    #print("Border length from voronoi edges: ", borderLength, " from particle size: ", np.sum(2*rad[borderList==1]))
+    print("Border length from voronoi edges: ", borderLength)
     np.savetxt(dirName + os.sep + "borderList.dat", borderList)
     np.savetxt(dirName + os.sep + "borderLength.dat", np.array([borderLength]))
     return borderList, borderLength
