@@ -6,6 +6,7 @@ Created by Francesco
 import numpy as np
 from scipy.fft import fft, fftfreq, fft2
 from sklearn.cluster import DBSCAN
+from scipy.spatial import Delaunay
 import os
 
 ############################## general utilities ###############################
@@ -221,15 +222,54 @@ def computeSusceptibility(pos1, pos2, field, waveVector, scale):
     chiq = np.mean(isf**2) - np.mean(isf)**2
     return chi / scale, np.real(chiq)
 
+def getDelaunaySimplexPos(pos, boxSize):
+    delaunay = Delaunay(pos)
+    simplexPos = np.zeros((delaunay.nsimplex, 2))
+    for i in range(delaunay.nsimplex):
+        # average positions of particles / vertices of simplex i
+        simplexPos[i] = np.mean(pos[delaunay.simplices[i]], axis=0)
+    #simplexPos[:,0] -= np.floor(simplexPos[:,0]/boxSize[0]) * boxSize[0]
+    #simplexPos[:,1] -= np.floor(simplexPos[:,1]/boxSize[1]) * boxSize[1]
+    return simplexPos
+
+def computeIntersectionArea(pos0, pos1, pos2, sigma, boxSize):
+    # define reference frame to simplify projection formula
+    # full formula is:
+    #projLength = np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 + intercept**2 - 2*intercept*pos2[1] - 2*slope*pos2[0]*pos2[1] + 2*slope*intercept*pos2[1]) / (1 + slope**2))
+    pos2 = pbcDistance(pos2, pos1, boxSize)
+    pos0 = pbcDistance(pos0, pos1, boxSize)
+    pos1 = np.zeros(pos1.shape[0])
+    slope = (pos1[1] - pos0[1]) / (pos1[0] - pos0[0])
+    intercept = pos0[1] - pos0[0] * slope
+    # length of segment from point to projection
+    projLength = np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 - 2*slope*pos2[0]*pos2[1]) / (1 + slope**2))
+    theta = np.arcsin(projLength / np.linalg.norm(pos2))
+    return 0.5*sigma**2*theta
+
+def computeDelaunayDensity(simplices, pos, rad, boxSize):
+    simplexDensity = np.zeros(simplices.shape[0])
+    simplexArea = np.zeros(simplices.shape[0])
+    for sIndex in range(simplices.shape[0]):
+        pos0 = pos[simplices[sIndex,0]]
+        pos1 = pos[simplices[sIndex,1]]
+        pos2 = pos[simplices[sIndex,2]]
+        # compute area of the triangle
+        triangleArea = 0.5 * np.abs(pos0[0]*(pos1[1] - pos2[1]) + pos1[0]*(pos2[1] - pos0[1]) + pos2[0]*(pos0[1] - pos1[1]))
+        # compute the three areas of the intersecating circles
+        intersectArea = computeIntersectionArea(pos0, pos1, pos2, rad[simplices[sIndex,1]], boxSize) - 0.5 * computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize)
+        intersectArea += computeIntersectionArea(pos1, pos2, pos0, rad[simplices[sIndex,2]], boxSize) - 0.5 * computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize)
+        intersectArea += computeIntersectionArea(pos2, pos0, pos1, rad[simplices[sIndex,0]], boxSize) - 0.5 * computeOverlapArea(pos0, pos1, rad[simplices[sIndex,0]], rad[simplices[sIndex,1]], boxSize)
+        simplexDensity[sIndex] = intersectArea / triangleArea
+        simplexArea[sIndex] = triangleArea
+    # translate simplex density into local density for particles
+    return simplexDensity, simplexArea
+
 def computeOverlapArea(pos1, pos2, rad1, rad2, boxSize):
     distance = np.linalg.norm(pbcDistance(pos1, pos2, boxSize))
     overlap = 1 - distance / (rad1 + rad2)
     if(overlap > 0):
         angle = np.arccos((rad2**2 + distance**2 - rad1**2) / (2*rad2*distance))
         return angle * rad2**2 - 0.5 * rad2**2 * np.sin(2*angle)
-        #radSum = rad1 + rad2
-        #radDiff = rad1 - rad2
-        #return 0.5 * np.sqrt((radSum**2 - distance**2) * (distance**2 - radDiff**2))
     else:
         return 0
 
@@ -305,6 +345,21 @@ def computeLocalVoronoiDensityGrid(pos, rad, contacts, boxSize, voroArea, xbin, 
                 localArea[x,y,0] /= localArea[x,y,1]
     return localArea[:,:,0], density
 
+def computeLocalDelaunayDensityGrid(simplexPos, simplexDensity, xbin, ybin):
+    localDensity = np.zeros((xbin.shape[0]-1, ybin.shape[0]-1, 2))
+    for sId in range(simplexDensity.shape[0]):
+        for x in range(xbin.shape[0]-1):
+            if(simplexPos[sId,0] > xbin[x] and simplexPos[sId,0] <= xbin[x+1]):
+                for y in range(ybin.shape[0]-1):
+                    if(simplexPos[sId,1] > ybin[y] and simplexPos[sId,1] <= ybin[y+1]):
+                        localDensity[x, y, 0] += simplexDensity[sId]
+                        localDensity[x, y, 1] += 1
+    for x in range(xbin.shape[0]-1):
+        for y in range(ybin.shape[0]-1):
+            if(localDensity[x,y,1] != 0):
+                localDensity[x,y,0] /= localDensity[x,y,1]
+    return localDensity[:,:,0]
+
 def computeLocalAreaAndNumberGrid(pos, rad, contacts, boxSize, xbin, ybin, localArea, localNumber):
     for pId in range(pos.shape[0]):
         for x in range(xbin.shape[0]-1):
@@ -328,6 +383,34 @@ def computeLocalTempGrid(pos, vel, xbin, ybin, localTemp): #this works only for 
                         localTemp[x, y] += np.linalg.norm(vel[pId])**2
                         counts[x, y] += 1
     localTemp[localTemp>0] /= counts[localTemp>0]*2
+
+
+def sortBorderPos(borderPos, borderList, boxSize, checkNumber=5):
+    borderAngle = np.zeros(borderPos.shape[0])
+    centerOfMass = np.mean(borderPos, axis=0)
+    for i in range(borderPos.shape[0]):
+        delta = pbcDistance(borderPos[i], centerOfMass, boxSize)
+        borderAngle[i] = np.arctan2(delta[1], delta[0])
+    borderPos = borderPos[np.argsort(borderAngle)]
+    # swap nearest neighbor if necessary
+    checkNumber = 5
+    for i in range(borderPos.shape[0]-1):
+        # check distances with the next three border particles
+        distances = []
+        for j in range(checkNumber):
+            nextIndex = i+j+1
+            if(nextIndex > borderPos.shape[0]-1):
+                nextIndex -= borderPos.shape[0]
+            distances.append(np.linalg.norm(pbcDistance(borderPos[i], borderPos[nextIndex], boxSize)))
+        minIndex = np.argmin(distances)
+        swapIndex = i + minIndex + 1
+        if(swapIndex > borderPos.shape[0]-1):
+            swapIndex -= borderPos.shape[0]
+        if(minIndex != 0):
+            tempPos = borderPos[i+1]
+            borderPos[i+1] = borderPos[swapIndex]
+            borderPos[swapIndex] = tempPos
+    return borderPos
 
 def computeTau(data, index=2, threshold=np.exp(-1), normalized=False):
     if(normalized == True):
@@ -601,14 +684,19 @@ def getPBCPositions(fileName, boxSize):
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos
 
-def centerPositions(pos, boxSize, denseList):
-    centerOfMass = np.mean(pos[denseList==1], axis=0)
-    pos[:,0] -= centerOfMass[0]
-    pos[:,1] -= centerOfMass[1]
-    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
-    pos[:,0] += 0.5
-    pos[:,1] += 0.5
+def centerPositions(pos, boxSize, denseList=np.array([])):
+    if(denseList.shape[0] != 0):
+        centerOfMass = np.mean(pos[denseList==1], axis=0)
+    else:
+        centerOfMass = np.mean(pos, axis=0)
+    if(centerOfMass[0] < 0.5):
+        pos[:,0] += (0.5 - centerOfMass[0])
+    else:
+        pos[:,0] -= (centerOfMass[0] - 0.5)
+    if(centerOfMass[1] < 0.5):
+        pos[:,1] += (0.5 - centerOfMass[1])
+    else:
+        pos[:,1] -= (centerOfMass[1] - 0.5)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos

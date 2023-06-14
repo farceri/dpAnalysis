@@ -10,7 +10,7 @@ from matplotlib import animation
 from matplotlib import cm
 from sklearn.cluster import KMeans
 from sklearn.cluster import DBSCAN
-from scipy.spatial import Voronoi, voronoi_plot_2d
+from scipy.spatial import Voronoi, voronoi_plot_2d, Delaunay
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pyvoro
 import itertools
@@ -143,14 +143,9 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
     rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
-    #pos = ucorr.shiftPositions(pos, boxSize, -0.4, -0.15)
     #denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
-    #pos = ucorr.centerPositions(pos, boxSize, denseList)
-    #centerOfMass = np.mean(pos, axis=0)
-    #print(centerOfMass)
-    #pos = shiftPositions(pos, boxSize, 0.22, 0.15) #8k
-    #pos = shiftPositions(pos, boxSize, -0.65, -0.5) #16k
-    #pos = shiftPositions(pos, boxSize, -0.4, -0.15) #32k
+    #pos = ucorr.shiftPositions(pos, boxSize, 0.6, -0.35)
+    pos = ucorr.centerPositions(pos, boxSize)
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
     ax.set_xlim(xBounds[0], xBounds[1])
@@ -159,18 +154,25 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
     setPackingAxes(boxSize, ax)
     #setBigBoxAxes(boxSize, ax, 0.05)
     if(dense==True):
-        if(os.path.exists(dirName + os.sep + "denseList!.dat")):
-            denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
-
+        if(os.path.exists(dirName + os.sep + "delaunayList!.dat")):
+            denseList = np.loadtxt(dirName + os.sep + "delaunayList.dat")
         else:
-            denseList,_ = spCorr.computeVoronoiCluster(dirName, threshold, filter=filter)
-        pos = ucorr.centerPositions(pos, boxSize, denseList)
+            denseList,_ = spCorr.computeDelaunayCluster(dirName, threshold, filter=filter)
+        #if(os.path.exists(dirName + os.sep + "denseList!.dat")):
+        #    denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
+        #else:
+        #    denseList,_ = spCorr.computeVoronoiCluster(dirName, threshold, filter=filter)
         colorId = getDenseColorList(denseList)
     elif(border==True):
-        if(os.path.exists(dirName + os.sep + "borderList!.dat")):
-            borderList = np.loadtxt(dirName + os.sep + "borderList.dat")
+        if(os.path.exists(dirName + os.sep + "delaunayBorderList!.dat")):
+            borderList = np.loadtxt(dirName + os.sep + "delaunayBorderList.dat")
         else:
-            borderList,_ = spCorr.computeVoronoiBorder(dirName, threshold, filter=filter)
+            borderList,_ = spCorr.computeDelaunayBorder(dirName, threshold, filter=filter)
+        #if(os.path.exists(dirName + os.sep + "borderList!.dat")):
+        #    borderList = np.loadtxt(dirName + os.sep + "borderList!.dat")
+        #else:
+        #    borderList,_ = spCorr.computeVoronoiBorder(dirName, threshold, filter=filter)
+        #pos = ucorr.centerPositions(pos, boxSize, borderList)
         colorId = getDenseColorList(borderList)
     elif(ekmap==True):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
@@ -192,9 +194,16 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
             ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
         else:
             ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
-    #pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    #pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    #plt.tight_layout()
     #plt.pause(1)
+    #borderPos = np.loadtxt(dirName + os.sep + "borderPos.dat")
+    #for particleId in range(1,borderPos.shape[0]):
+    #    ax.plot(borderPos[particleId,0], borderPos[particleId,1], marker='*', markeredgecolor='k', color=[0.5,0.5,1], markersize=12, markeredgewidth=0.5)
+    #    slope = (borderPos[particleId,1] - borderPos[particleId-1,1]) / (borderPos[particleId,0] - borderPos[particleId-1,0])
+    #    intercept = borderPos[particleId-1,1] - borderPos[particleId-1,0] * slope
+    #    x = np.linspace(borderPos[particleId-1,0], borderPos[particleId,0])
+    #    ax.plot(x, slope*x+intercept, lw=0.7, ls='dashed', color='r')
+    #    plt.pause(0.05)
     #for particleId in range(rad.shape[0]):
     #    x = pos[particleId,0]
     #    y = pos[particleId,1]
@@ -280,19 +289,13 @@ def getPressureColorList(pressure, which='total'):
     return colorId, colorList
 
 def plotSPStressMapPacking(dirName, figureName, which='total', droplet=False, l1=0.035, alpha=0.7):
-    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
-    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
-    #denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
-    #centerOfMass = np.mean(pos[denseList==1], axis=0)
-    #print(centerOfMass)
-    pos[:,0] -= 0.05
-    pos[:,1] -= 0.1
-    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
+    pos = ucorr.shiftPositions(pos, boxSize, 0.2, -0.3)
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
     ax.set_xlim(xBounds[0], xBounds[1])
@@ -350,16 +353,12 @@ def plotSPStressMapPacking(dirName, figureName, which='total', droplet=False, l1
     plt.show()
 
 def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
-    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
-    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
-    #pos[:,0] -= 0.65
-    #pos[:,1] -= 0.5
-    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
     # compute voronoi tessellation of particle positions
     #vor = Voronoi(pos)
     #fig = voronoi_plot_2d(vor, show_points=False, show_vertices=False, line_colors='k', line_width=0.5, line_alpha=1, point_size=2)
@@ -376,10 +375,23 @@ def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
         y = pos[particleId,1]
         r = rad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
-    cells = pyvoro.compute_2d_voronoi(pos, [[0, boxSize[0]], [0, boxSize[1]]], 1, radii=rad)
-    for i, cell in enumerate(cells):
-        polygon = cell['vertices']
-        ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.2)
+    #cells = pyvoro.compute_2d_voronoi(pos, [[0, boxSize[0]], [0, boxSize[1]]], 1, radii=rad)
+    #for i, cell in enumerate(cells):
+    #    polygon = cell['vertices']
+    #    ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.2)
+    delaunay = Delaunay(pos)
+    plt.triplot(pos[:,0], pos[:,1], delaunay.simplices, lw=0.5, color='k')
+    plt.plot(pos[:,0], pos[:,1], 'o', markersize=0.2, markeredgecolor='k', color='r')
+    plt.plot(pos[4719,0], pos[4719,1], '*', markersize=10, markeredgecolor='k', color='b')
+    plt.plot(pos[0,0], pos[0,1], '*', markersize=10, markeredgecolor='k', color='r')
+    plt.plot(pos[7961,0], pos[7961,1], '*', markersize=10, markeredgecolor='k', color='g')
+    x = np.linspace(0,1,1000)
+    slope = -0.11838938050442274
+    intercept = 0.9852218251735015
+    plt.plot(x, slope*x + intercept, ls='dashed', color='r', lw=1.2)
+    xp = 0.41924684666399464
+    yp = 0.9355874507185185
+    plt.plot(xp, yp, marker='s', markersize=8, markeredgecolor='k', color=[1,0.5,0])
     plt.tight_layout()
     figureName = "/home/francesco/Pictures/soft/packings/voronoi-" + figureName + ".png"
     plt.savefig(figureName, transparent=False, format = "png")
@@ -508,9 +520,8 @@ def makeSPPackingClusterMixingVideo(dirName, figureName, numFrames = 20, firstSt
     anim.save("/home/francesco/Pictures/soft/packings/clustermix-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def makeSoftParticleFrame(dirName, rad, boxSize, figFrame, frames, subSet = False, firstIndex = 10, npt = False, quiver = False, cluster = False, pmap = False, droplet = False, l1=0.035):
-    pos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
+    pos = ucorr.shiftPositions(pos, boxSize, 0.6, -0.35)
     gcfFrame = plt.gcf()
     gcfFrame.clear()
     axFrame = figFrame.gca()
