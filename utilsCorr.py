@@ -7,6 +7,7 @@ import numpy as np
 from scipy.fft import fft, fftfreq, fft2
 from sklearn.cluster import DBSCAN
 from scipy.spatial import Delaunay
+import spCorrelation as spCorr
 import os
 
 ############################## general utilities ###############################
@@ -393,7 +394,6 @@ def sortBorderPos(borderPos, borderList, boxSize, checkNumber=5):
         borderAngle[i] = np.arctan2(delta[1], delta[0])
     borderPos = borderPos[np.argsort(borderAngle)]
     # swap nearest neighbor if necessary
-    checkNumber = 5
     for i in range(borderPos.shape[0]-1):
         # check distances with the next three border particles
         distances = []
@@ -403,10 +403,11 @@ def sortBorderPos(borderPos, borderList, boxSize, checkNumber=5):
                 nextIndex -= borderPos.shape[0]
             distances.append(np.linalg.norm(pbcDistance(borderPos[i], borderPos[nextIndex], boxSize)))
         minIndex = np.argmin(distances)
-        swapIndex = i + minIndex + 1
+        swapIndex = i+minIndex+1
         if(swapIndex > borderPos.shape[0]-1):
             swapIndex -= borderPos.shape[0]
         if(minIndex != 0):
+            # pair swap
             tempPos = borderPos[i+1]
             borderPos[i+1] = borderPos[swapIndex]
             borderPos[swapIndex] = tempPos
@@ -669,6 +670,17 @@ def readDirectorPair(dirName, index1, index2):
     pDir2 = np.array([np.cos(pAngle2), np.sin(pAngle2)]).T
     return pDir1, pDir2
 
+def readDenseListPair(dirName, index1, index2):
+    if(os.path.exists(dirName + os.sep + "t" + str(index1) + os.sep + "delaunayList!.dat")):
+        denseList1 = np.loadtxt(dirName + os.sep + "t" + str(index1) + os.sep + "delaunayList.dat")
+    else:
+        denseList1,_ = spCorr.computeDelaunayCluster(dirName + os.sep + "t" + str(index1))
+    if(os.path.exists(dirName + os.sep + "t" + str(index2) + os.sep + "delaunayList!.dat")):
+        denseList2 = np.loadtxt(dirName + os.sep + "t" + str(index2) + os.sep + "delaunayList.dat")
+    else:
+        denseList2,_ = spCorr.computeDelaunayCluster(dirName + os.sep + "t" + str(index2))
+    return denseList1, denseList2
+
 def computeParticleVelocities(vel, nv):
     numParticles = nv.shape[0]
     pVel = np.zeros((numParticles,2))
@@ -684,7 +696,8 @@ def getPBCPositions(fileName, boxSize):
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos
 
-def centerPositions(pos, boxSize, denseList=np.array([])):
+def centerPositions(pos, rad, boxSize, denseList=np.array([])):
+    # first check if it needs to be shifted
     if(denseList.shape[0] != 0):
         centerOfMass = np.mean(pos[denseList==1], axis=0)
     else:
@@ -699,6 +712,64 @@ def centerPositions(pos, boxSize, denseList=np.array([])):
         pos[:,1] -= (centerOfMass[1] - 0.5)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    # check if the dense region is in the center otherwise shift
+    centerRad = rad[(pos[:,0]-centerOfMass[0])<0.2]
+    centerPos = pos[(pos[:,0]-centerOfMass[0])<0.2]
+    centerRad = centerRad[(centerPos[:,0]-centerOfMass[0])>-0.2]
+    centerPos = centerPos[(centerPos[:,0]-centerOfMass[0])>-0.2]
+    centerRad = centerRad[(centerPos[:,1]-centerOfMass[1])<0.2]
+    centerPos = centerPos[(centerPos[:,1]-centerOfMass[1])<0.2]
+    centerRad = centerRad[(centerPos[:,1]-centerOfMass[1])>-0.2]
+    centerPos = centerPos[(centerPos[:,1]-centerOfMass[1])>-0.2]
+    centerPhi = np.sum(np.pi*centerRad**2)/(0.4**2)
+    phi = np.sum(np.pi*rad**2)
+    # compute density in the four sides and shift to the densest region
+    if(centerPhi < phi):
+        # left
+        leftRad = rad[pos[:,0]<0.1]
+        leftPos = pos[pos[:,0]<0.1]
+        leftPhi = np.sum(np.pi*leftRad**2)/(0.1)
+        # rigth
+        rightRad = rad[pos[:,0]>0.9]
+        rightPos = pos[pos[:,0]>0.9]
+        rightPhi = np.sum(np.pi*rightRad**2)/(0.1)
+        # top
+        topRad = rad[pos[:,1]>0.9]
+        topPos = pos[pos[:,1]>0.9]
+        topPhi = np.sum(np.pi*topRad**2)/(0.1)
+        # bottom
+        bottomRad = rad[pos[:,1]<0.1]
+        bottomPos = pos[pos[:,1]<0.1]
+        bottomPhi = np.sum(np.pi*bottomRad**2)/(0.1)
+        # now check where the densest part is
+        if((leftPhi + rightPhi) > (topPhi + bottomPhi)):
+            if(leftPhi > rightPhi):
+                if((leftPhi - rightPhi) > 0.1):
+                    pos[:,0] += boxSize[1]/4
+                else:
+                    pos[:,0] += boxSize[1]/2
+                #print("shifting to the right")
+            else:
+                if((rightPhi - leftPhi) > 0.1):
+                    pos[:,0] -= boxSize[1]/4
+                else:
+                    pos[:,0] -= boxSize[1]/2
+                #print("shifting to the left")
+            pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+        else:
+            if(bottomPhi > topPhi):
+                if((bottomPhi - topPhi) > 0.1):
+                    pos[:,1] += boxSize[1]/4
+                else:
+                    pos[:,1] += boxSize[1]/2
+                #print("shifting to the top")
+            else:
+                if((topPhi - bottomPhi) > 0.1):
+                    pos[:,1] -= boxSize[1]/4
+                else:
+                    pos[:,1] -= boxSize[1]/2
+                #print("shifting to the bottom")
+            pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos
 
 def shiftPositions(pos, boxSize, xshift, yshift):

@@ -2047,7 +2047,7 @@ def plotSPDropletPressure(dirName, figureName, fixed='temp', which='0.0023'):
     fig2.savefig(figure1Name + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPClusterVoronoiDensity(dirName, figureName, fixed=False, which='1e-03'):
+def plotSPClusterDensity(dirName, figureName, fixed=False, which='1e-03'):
     fig, ax = plt.subplots(figsize=(7,4), dpi = 120)
     if(fixed=="phi"):
         phi = ucorr.readFromParams(dirName, "phi")
@@ -2062,8 +2062,9 @@ def plotSPClusterVoronoiDensity(dirName, figureName, fixed=False, which='1e-03')
         phi = np.zeros(dirList.shape[0])
     else:
         print('please specify fixed parameter')
-    clusterDensity = np.zeros((dirList.shape[0],2))
+    fluidDensity = np.zeros((dirList.shape[0],2))
     gasDensity = np.zeros((dirList.shape[0],2))
+    density = np.zeros((dirList.shape[0],2))
     taup = np.zeros(dirList.shape[0])
     for d in range(dirList.shape[0]):
         if(fixed=="phi"):
@@ -2072,46 +2073,48 @@ def plotSPClusterVoronoiDensity(dirName, figureName, fixed=False, which='1e-03')
             #dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr" + which + "/dynamics/"
             dirSample = dirName + os.sep + dirList[d] + "/active-langevin/Dr" + which + "/dynamics/"
             #phi[d] = ucorr.readFromParams(dirSample, "phi")
-            phi[d] = np.loadtxt(dirSample + 'localVoroDensity-N16-stats.dat')[0]#'localDensity-N16-stats.dat'
-            #print(phi[d], ucorr.readFromParams(dirSample, "phi"))
+            phi[d] = np.loadtxt(dirSample + 'localDelaunayDensity-N16-stats.dat')[0]#'localDensity-N16-stats.dat'
             if(d==0):
                 numParticles = ucorr.readFromParams(dirSample, "numParticles")
-        if(os.path.exists(dirSample + "voronoiDensity.dat")):
+        if(os.path.exists(dirSample + "delaunayDensity.dat")):
             taup[d] = 1/(ucorr.readFromDynParams(dirSample, 'Dr')*ucorr.readFromDynParams(dirSample, 'sigma'))
-            data = np.loadtxt(dirSample + "voronoiDensity.dat")
-            clusterDensity[d,0] = np.mean(data[:,1])
-            clusterDensity[d,1] = np.std(data[:,1])
+            data = np.loadtxt(dirSample + "delaunayDensity.dat")
+            fluidDensity[d,0] = np.mean(data[:,1])
+            fluidDensity[d,1] = np.std(data[:,1])
             gasDensity[d,0] = np.mean(data[:,2])
             gasDensity[d,1] = np.std(data[:,2])
+            phi[d] = np.mean(data[:,3])
     if(fixed=="Dr"):
         x = phi
         xlabel = "$Density,$ $\\varphi$"
         figureName = "/home/francesco/Pictures/nve-nvt-nva/pClusterVoro-vsPhi-" + figureName
-        ax.plot(x, phi, color='k', lw=1.2, ls='--')
+        ax.plot(x, x, color='k', lw=1.2, ls='--')
         # interpolate to find upper bound
-        fluid = clusterDensity[clusterDensity[:,0]>0,0][5:]
-        phiup = phi[clusterDensity[:,0]>0][5:]
-        index = np.argwhere(fluid < phiup)[0,0]
+        fluid = fluidDensity[fluidDensity[:,0]>0,0][10:]
+        error = fluidDensity[fluidDensity[:,0]>0,1][10:]
+        phiup = phi[fluidDensity[:,0]>0][10:]
+        index = np.argwhere((fluid - error*0.5) <= phiup)[0,0]
+        error = error[index]*0.5
         p = np.linspace(phiup[index-1], phiup[index],100)
         fluidSlope = (fluid[index] - fluid[index-1]) / (phiup[index] - phiup[index-1])
         phiSlope = (phiup[index] - phiup[index-1]) / (phiup[index] - phiup[index-1])
         fluidInter = fluid[index-1] + fluidSlope*(p - phiup[index-1])
         phiInter = phiup[index-1] + phiSlope*(p - phiup[index-1])
-        phiupper = p[np.argwhere(fluidInter < phiInter)[0,0]]
+        phiupper = p[np.argwhere((fluidInter - error) <= phiInter)[0,0]]
         ax.plot(phiInter, phiInter, color='r')
         ax.plot(phiInter, fluidInter, color='r', ls='--', lw=4)
         # interpolate to find lower bound
-        fluid = clusterDensity[clusterDensity[:,0]>0,0][:5]
-        philow = phi[clusterDensity[:,0]>0][:5]
-        index = np.argwhere(fluid > philow)[0,0]
+        gas = gasDensity[gasDensity[:,0]>0,0][:10]
+        philow = phi[fluidDensity[:,0]>0][:10]
+        index = np.argwhere((gas + 1e-02) < philow)[0,-1]
         p = np.linspace(philow[index-1], philow[index],100)
-        fluidSlope = (fluid[index] - fluid[index-1]) / (philow[index] - philow[index-1])
+        gasSlope = (gas[index] - gas[index-1]) / (philow[index] - philow[index-1])
         phiSlope = (philow[index] - philow[index-1]) / (philow[index] - philow[index-1])
-        fluidInter = fluid[index-1] + fluidSlope*(p - philow[index-1])
+        gasInter = gas[index-1] + gasSlope*(p - philow[index-1])
         phiInter = philow[index-1] + phiSlope*(p - philow[index-1])
-        philower = p[np.argwhere(fluidInter > phiInter)[0,0]]
+        philower = p[np.argwhere((gasInter + 1e-02) < phiInter)[0,-1]]
         ax.plot(phiInter, phiInter, color='r')
-        ax.plot(phiInter, fluidInter, color='r', ls='--', lw=4)
+        ax.plot(phiInter, gasInter, color='r', ls='--', lw=4)
         print("phiup:", phiupper, "phidown:", philower)
         np.savetxt(dirName + "MIPSBounds.dat", np.column_stack((numParticles, philower, phiupper)))
     elif(fixed=="phi"):
@@ -2121,9 +2124,9 @@ def plotSPClusterVoronoiDensity(dirName, figureName, fixed=False, which='1e-03')
     ax.tick_params(axis='both', labelsize=14)
     ax.set_xlabel(xlabel, fontsize=18)
     ax.set_ylabel("$Area$ $fraction$", fontsize=18)
-    ax.errorbar(x[clusterDensity[:,0]>0], clusterDensity[clusterDensity[:,0]>0,0], clusterDensity[clusterDensity[:,0]>0,1], color='b', lw=1.2, marker='s', markersize = 8, fillstyle='none', elinewidth=1, capsize=4, label='$Fluid$')
+    ax.errorbar(x[fluidDensity[:,0]>0], fluidDensity[fluidDensity[:,0]>0,0], fluidDensity[fluidDensity[:,0]>0,1], color='b', lw=1.2, marker='s', markersize = 8, fillstyle='none', elinewidth=1, capsize=4, label='$Fluid$')
     ax.errorbar(x[gasDensity[:,0]>0], gasDensity[gasDensity[:,0]>0,0], gasDensity[gasDensity[:,0]>0,1], color='g', lw=1.2, marker='o', markersize = 8, fillstyle='none', elinewidth=1, capsize=4, label='$Gas$')
-    ax.legend(fontsize=14, loc='upper left')
+    ax.legend(fontsize=14, loc='best')
     if(fixed!="Dr"):
         ax.set_xscale('log')
     #ax.set_xlim(5.8e-06, 2.8e03)
@@ -2131,7 +2134,7 @@ def plotSPClusterVoronoiDensity(dirName, figureName, fixed=False, which='1e-03')
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
-def plotSPClusterVoronoiShape(dirName, figureName, fixed=False, which='1e-03'):
+def plotSPClusterShape(dirName, figureName, fixed=False, which='1e-03'):
     fig, ax = plt.subplots(figsize=(7,4), dpi = 120)
     if(fixed=="phi"):
         phi = ucorr.readFromParams(dirName, "phi")
@@ -2363,9 +2366,9 @@ def plotSPClusterPressure(dirName, figureName, fixed='Dr', inter=False, which='g
                 phi[d] = np.loadtxt(dirSample + "localVoroDensity-N16-stats.dat")[0]
             else:
                 phi[d] = spCorr.averageLocalVoronoiDensity(dirSample)
-        if(os.path.exists(dirSample + "/clusterPressure.dat")):
+        if(os.path.exists(dirSample + "/delaunayPressure.dat")):
             taup[d] = 1/(ucorr.readFromDynParams(dirSample, 'Dr')*ucorr.readFromDynParams(dirSample, 'sigma'))
-            data = np.loadtxt(dirSample + "/clusterPressure.dat")
+            data = np.loadtxt(dirSample + "/delaunayPressure.dat")
             # dense steric
             pIn[d,0,0] = np.mean(data[:,2])
             pIn[d,0,1] = np.std(data[:,2])
@@ -2510,14 +2513,15 @@ def plotSPPhaseDiagram(dirName, numBins, figureName, which='16', log=False):
     taup = np.zeros((phi.shape[0], Dr.shape[0]))
     # load the data
     deltaPhi = np.zeros((phi.shape[0], Dr.shape[0]))
-    voroPhi = np.zeros((phi.shape[0], Dr.shape[0]))
+    meanPhi = np.zeros((phi.shape[0], Dr.shape[0]))
     for i in range(phi.shape[0]):
         for j in range(Dr.shape[0]):
             dirSample = dirName + 'thermal' + phi[i] + '/langevin/T0.001/iod10/active-langevin/Dr' + Dr[j] + '/dynamics/'
-            fileName = dirSample + 'localVoroDensity-N' + which + '-stats.dat'#'localDensity-N16-stats.dat'
-            if(os.path.exists(fileName)):
-                data = np.loadtxt(fileName)
-                voroPhi[i,j] = data[0]
+            deltaFile = dirSample + 'localVoroDensity-N' + which + '-stats.dat'#'localDensity-N16-stats.dat'
+            phiFile = dirSample + 'voronoiDensity.dat'
+            if(os.path.exists(deltaFile)):
+                data = np.loadtxt(deltaFile)
+                meanPhi[i,j] = data[0]
                 deltaPhi[i,j] = data[1]
                 taup[i,j] = 1/(ucorr.readFromDynParams(dirSample, 'Dr')*ucorr.readFromDynParams(dirSample, 'sigma'))
     # assign color based on deltaPhi
@@ -2535,7 +2539,7 @@ def plotSPPhaseDiagram(dirName, numBins, figureName, which='16', log=False):
         for j in range(Dr.shape[0]):
             for k in range(numBins-1):
                 if(deltaPhi[i,j] > bins[k] and deltaPhi[i,j] < bins[k+1]):
-                    ax.semilogx(taup[i,j], voroPhi[i,j], color=colorMap((numBins-k)/numBins), marker='s', markersize=15, lw=0)
+                    ax.semilogx(taup[i,j], meanPhi[i,j], color=colorMap((numBins-k)/numBins), marker='s', markersize=15, lw=0)
     #data = np.loadtxt(dirName + "/gasFluidTradeoff.dat")
     #ax.plot(data[:,1], data[:,0], color='k', marker='o', markersize=6, markeredgewidth=1.2, fillstyle='none', lw=1)
     #data = np.loadtxt(dirName + "/stericActiveTradeoff.dat")#[0.3,0.7,0]
@@ -2698,9 +2702,9 @@ def plotSPDeltaPVSSystemSize(dirName, figureName, which='1.5e-04'):
 
 def plotSPMIPSBoundsVSSystemSize(dirName, figureName, which='up'):
     fig, ax = plt.subplots(figsize = (7,3.5), dpi = 120)
-    labelList = np.array(['$N = 4096$', '$N = 8192$', '$N = 16384$', '$N = 32768$'])
-    dirList = np.array(['4096', '8192', '16384'])#, '32768'])
-    numParticles = np.array([4096, 8192, 16384])#, 32768])
+    labelList = np.array(['$N = 1024$', '$N = 2048$', '$N = 4096$', '$N = 8192$', '$N = 16384$', '$N = 32768$'])
+    dirList = np.array(['1024', '2048', '4096', '8192', '16384'])#, '32768'])
+    numParticles = np.array([1024, 2048, 4096, 8192, 16384])#, 32768])
     bounds = np.zeros((dirList.shape[0],2))
     for d in range(dirList.shape[0]):
         dirSample = dirName + os.sep + dirList[d] + "-2d/densitySweep/"
@@ -4891,11 +4895,11 @@ if __name__ == '__main__':
         which = sys.argv[5]
         plotSPClusterFluctuations(dirName, figureName, fixed, which)
 
-    elif(whichPlot == "clustervoro"):
+    elif(whichPlot == "clusterphi"):
         figureName = sys.argv[3]
         fixed = sys.argv[4]
         which = sys.argv[5]
-        plotSPClusterVoronoiDensity(dirName, figureName, fixed, which)
+        plotSPClusterDensity(dirName, figureName, fixed, which)
 
     elif(whichPlot == "shapetime"):
         figureName = sys.argv[3]
@@ -4905,7 +4909,7 @@ if __name__ == '__main__':
         figureName = sys.argv[3]
         fixed = sys.argv[4]
         which = sys.argv[5]
-        plotSPClusterVoronoiShape(dirName, figureName, fixed, which)
+        plotSPClusterShape(dirName, figureName, fixed, which)
 
     elif(whichPlot == "gammatime"):
         figureName = sys.argv[3]

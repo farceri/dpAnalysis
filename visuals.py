@@ -145,7 +145,7 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
     yBounds = np.array([0, boxSize[1]])
     #denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
     #pos = ucorr.shiftPositions(pos, boxSize, 0.6, -0.35)
-    pos = ucorr.centerPositions(pos, boxSize)
+    pos = ucorr.centerPositions(pos, rad, boxSize)
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
     ax.set_xlim(xBounds[0], xBounds[1])
@@ -172,7 +172,6 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
         #    borderList = np.loadtxt(dirName + os.sep + "borderList!.dat")
         #else:
         #    borderList,_ = spCorr.computeVoronoiBorder(dirName, threshold, filter=filter)
-        #pos = ucorr.centerPositions(pos, boxSize, borderList)
         colorId = getDenseColorList(borderList)
     elif(ekmap==True):
         vel = np.array(np.loadtxt(dirName + os.sep + "particleVel.dat"))
@@ -194,16 +193,17 @@ def plotSPPacking(dirName, figureName, ekmap=False, quiver=False, dense=False, b
             ax.quiver(x, y, vx, vy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
         else:
             ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
-    #plt.tight_layout()
-    #plt.pause(1)
-    #borderPos = np.loadtxt(dirName + os.sep + "borderPos.dat")
-    #for particleId in range(1,borderPos.shape[0]):
-    #    ax.plot(borderPos[particleId,0], borderPos[particleId,1], marker='*', markeredgecolor='k', color=[0.5,0.5,1], markersize=12, markeredgewidth=0.5)
-    #    slope = (borderPos[particleId,1] - borderPos[particleId-1,1]) / (borderPos[particleId,0] - borderPos[particleId-1,0])
-    #    intercept = borderPos[particleId-1,1] - borderPos[particleId-1,0] * slope
-    #    x = np.linspace(borderPos[particleId-1,0], borderPos[particleId,0])
-    #    ax.plot(x, slope*x+intercept, lw=0.7, ls='dashed', color='r')
-    #    plt.pause(0.05)
+    if(border==True):
+        plt.tight_layout()
+        plt.pause(1)
+        borderPos = np.loadtxt(dirName + os.sep + "borderPos.dat")
+        for particleId in range(1,borderPos.shape[0]):
+            ax.plot(borderPos[particleId,0], borderPos[particleId,1], marker='*', markeredgecolor='k', color=[0.5,0.5,1], markersize=12, markeredgewidth=0.5)
+            #slope = (borderPos[particleId,1] - borderPos[particleId-1,1]) / (borderPos[particleId,0] - borderPos[particleId-1,0])
+            #intercept = borderPos[particleId-1,1] - borderPos[particleId-1,0] * slope
+            #x = np.linspace(borderPos[particleId-1,0], borderPos[particleId,0])
+            #ax.plot(x, slope*x+intercept, lw=0.7, ls='dashed', color='r')
+            #plt.pause(0.05)
     #for particleId in range(rad.shape[0]):
     #    x = pos[particleId,0]
     #    y = pos[particleId,1]
@@ -381,17 +381,17 @@ def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
     #    ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.2)
     delaunay = Delaunay(pos)
     plt.triplot(pos[:,0], pos[:,1], delaunay.simplices, lw=0.5, color='k')
-    plt.plot(pos[:,0], pos[:,1], 'o', markersize=0.2, markeredgecolor='k', color='r')
-    plt.plot(pos[4719,0], pos[4719,1], '*', markersize=10, markeredgecolor='k', color='b')
-    plt.plot(pos[0,0], pos[0,1], '*', markersize=10, markeredgecolor='k', color='r')
-    plt.plot(pos[7961,0], pos[7961,1], '*', markersize=10, markeredgecolor='k', color='g')
-    x = np.linspace(0,1,1000)
-    slope = -0.11838938050442274
-    intercept = 0.9852218251735015
-    plt.plot(x, slope*x + intercept, ls='dashed', color='r', lw=1.2)
-    xp = 0.41924684666399464
-    yp = 0.9355874507185185
-    plt.plot(xp, yp, marker='s', markersize=8, markeredgecolor='k', color=[1,0.5,0])
+    #plt.plot(pos[:,0], pos[:,1], 'o', markersize=0.2, markeredgecolor='k', color='r')
+    #plt.plot(pos[4719,0], pos[4719,1], '*', markersize=10, markeredgecolor='k', color='b')
+    #plt.plot(pos[0,0], pos[0,1], '*', markersize=10, markeredgecolor='k', color='r')
+    #plt.plot(pos[7961,0], pos[7961,1], '*', markersize=10, markeredgecolor='k', color='g')
+    #x = np.linspace(0,1,1000)
+    #slope = -0.11838938050442274
+    #intercept = 0.9852218251735015
+    #plt.plot(x, slope*x + intercept, ls='dashed', color='r', lw=1.2)
+    #xp = 0.41924684666399464
+    #yp = 0.9355874507185185
+    #plt.plot(xp, yp, marker='s', markersize=8, markeredgecolor='k', color=[1,0.5,0])
     plt.tight_layout()
     figureName = "/home/francesco/Pictures/soft/packings/voronoi-" + figureName + ".png"
     plt.savefig(figureName, transparent=False, format = "png")
