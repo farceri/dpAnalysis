@@ -2269,6 +2269,49 @@ def plotSPClusterSurfaceTension(dirName, figureName, fixed='Dr', which='2e-04'):
     fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
+def plotSPClusterMixingTime(dirName, figureName, fixed=False, which='1e-03'):
+    fig, ax = plt.subplots(figsize=(7,5), dpi = 120)
+    if(fixed=="phi"):
+        phi = ucorr.readFromParams(dirName, "phi")
+        if(phi == 0.45):
+            dirList = np.array(['1e-01', '5e-02', '2e-02', '1e-02', '5e-03', '3e-03', '2e-03', '1.5e-03', '1.2e-03', '1e-03', '7e-04', '5e-04', '3e-04', '2e-04', '1.5e-04', '1e-04', '7e-05', '5e-05', '3e-05', '2e-05', '1.5e-05', '1e-05', '5e-06', '2e-06', '1.5e-06', '1e-06', '5e-07', '2e-07', '1.5e-07', '1e-07'])
+        else:
+            dirList = np.array(['1e-01', '5e-02', '2e-02', '1e-02', '5e-03', '2e-03', '1e-03', '7e-04', '5e-04', '2e-04', '1e-04', '7e-05', '5e-05', '2e-05', '1e-05', '5e-06', '2e-06', '1e-06', '5e-07', '2e-07', '1e-07'])
+    elif(fixed=="Dr"):
+        dirList = np.array(['0.25', '0.28', '0.29', '0.30'])#, '0.31', '0.32', '0.35', '0.40', '0.45', '0.50', '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
+        colorList = cm.get_cmap('viridis', dirList.shape[0])
+        phi = np.zeros(dirList.shape[0])
+    else:
+        print('please specify fixed parameter')
+    mixingTime = np.zeros((dirList.shape[0],2))
+    taup = np.zeros(dirList.shape[0])
+    for d in range(dirList.shape[0]):
+        if(fixed=="phi"):
+            dirSample = dirName + os.sep + "iod10/active-langevin/Dr" + dirList[d] + "/dynamics/"
+        elif(fixed=="Dr"):
+            dirSample = dirName + os.sep + dirList[d] + "/active-langevin/Dr" + which + "/dynamics/short/"
+            #phi[d] = np.loadtxt(dirSample + 'localVoroDensity-N16-stats.dat')[0]
+        if(os.path.exists(dirSample + "logMixingTime.dat")):
+            taup[d] = 1/(ucorr.readFromDynParams(dirSample, 'Dr')*ucorr.readFromDynParams(dirSample, 'sigma'))
+            data = np.loadtxt(dirSample + "logMixingTime.dat")
+            ax.errorbar(data[:,0], data[:,1], data[:,2], color=colorList(d/dirList.shape[0]), lw=1, marker='o', capsize=3, label="$\\varphi=$" + dirList[d])
+    ax.set_xscale('log')
+    if(fixed=="Dr"):
+        #x = phi
+        #xlabel = "$Density,$ $\\varphi$"
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pMxingTime-vsPhi-" + figureName
+    elif(fixed=="phi"):
+        #x = taup
+        #xlabel = "$Persistence$ $time,$ $\\tau_p$"
+        figureName = "/home/francesco/Pictures/nve-nvt-nva/pMixingTime-vsDr-" + figureName
+    ax.tick_params(axis='both', labelsize=14)
+    ax.legend(fontsize=12, loc='best')
+    ax.set_xlabel("$Elapsed$ $time,$ $\\Delta t$", fontsize=18)
+    ax.set_ylabel("$Mixing$ $ratio$", fontsize=18)
+    fig.tight_layout()
+    fig.savefig(figureName + ".png", transparent=True, format = "png")
+    plt.show()
+
 def plotSPTotalPressure(dirName, figureName, fixed='Dr', which='2e-04'):
     fig, ax = plt.subplots(figsize = (7,4), dpi = 120)
     if(fixed=="phi"):
@@ -3478,55 +3521,50 @@ def plotSPDynamicsVSSystemSize(dirName, figureName):
     plt.show()
 
 ########################### plot and check compression #########################
-def plotSPCompression(dirName, figureName, compute = "compute"):
+def plotSPCompression(dirName, figureName):
     fig, ax = plt.subplots(2, 1, figsize = (6, 7), sharex = True, dpi = 120)
-    if(compute=="compute"):
-        phi = []
-        pressure = []
-        #hop = []
-        #zeta = []
-        for dir in os.listdir(dirName):
-            if(os.path.isdir(dirName + os.sep + dir)):
-                phi.append(ucorr.readFromParams(dirName + os.sep + dir, "phi"))
-                pressure.append(ucorr.readFromParams(dirName + os.sep + dir, "pressure"))
-                boxSize = np.loadtxt(dirName + os.sep + dir + "/boxSize.dat")
-                #psi6 = spCorr.computeHexaticOrder(dirName + os.sep + dir, boxSize)
-                #hop.append(np.mean(psi6))
-                #contacts = np.array(np.loadtxt(dirName + os.sep + dir + os.sep + "contacts.dat"))
-                #z = 0
-                #if(contacts.shape[0] != 0):
-                #    for p in range(contacts.shape[0]):
-                #        z += np.sum(contacts[p]>-1)
-                #    zeta.append(z/contacts.shape[0])
-                #else:
-                #    zeta.append(0)
-        pressure = np.array(pressure)
-        #hop = np.array(hop)
-        #zeta = np.array(zeta)
-        phi = np.array(phi)
-        pressure = pressure[np.argsort(phi)]
-        #hop = hop[np.argsort(phi)]
-        #zeta = zeta[np.argsort(phi)]
-        phi = np.sort(phi)
-        np.savetxt(dirName + os.sep + "compression.dat", np.column_stack((phi, pressure)))
-    else:
+    # check if the compression data are already saved
+    if(os.path.exists(dirName + os.sep + "compression.dat")):
         data = np.loadtxt(dirName + os.sep + "compression.dat")
         phi = data[:,0]
         pressure = data[:,1]
-        #hop = data[:,2]
-        #zeta = data[:,3]
+        numContacts = data[:,2]
+    # if not saved, computed them and save them
+    else:
+        phi = []
+        pressure = []
+        numContacts = []
+        for dir in os.listdir(dirName):
+            dirSample = dirName + os.sep + dir
+            if(os.path.isdir(dirSample)):
+                phi.append(ucorr.readFromParams(dirSample, "phi"))
+                p = ucorr.readFromParams(dirSample, "pressure")
+                if(p == None):
+                    p = ucorr.computePressure(dirSample)
+                pressure.append(p)
+                z = ucorr.readFromParams(dirSample, "numContacts")
+                if(z == None):
+                    z = ucorr.computeNumberOfContacts(dirSample)
+                numContacts.append(z)
+        pressure = np.array(pressure)
+        numContacts = np.array(numContacts)
+        phi = np.array(phi)
+        pressure = pressure[np.argsort(phi)]
+        numContacts = numContacts[np.argsort(phi)]
+        phi = np.sort(phi)
+        np.savetxt(dirName + os.sep + "compression.dat", np.column_stack((phi, pressure, numContacts)))
+    # plot compression data
     ax[0].semilogy(phi, pressure, color='k', linewidth=1.5)
-    #ax[1].plot(phi, zeta, color='k', linewidth=1.5)
+    ax[1].plot(phi, numContacts, color='k', linewidth=1.5)
     ax[0].tick_params(axis='both', labelsize=14)
     ax[1].tick_params(axis='both', labelsize=14)
-    ax[1].set_xlabel("$packing$ $fraction,$ $\\varphi$", fontsize=17)
-    ax[0].set_ylabel("$pressure,$ $p$", fontsize=17)
-    #ax[0].set_ylabel("$hexatic$ $order,$ $\\psi_6$", fontsize=17)
-    ax[1].set_ylabel("$coordination$ $number,$ $z$", fontsize=17)
+    ax[1].set_xlabel("$Packing$ $fraction,$ $\\varphi$", fontsize=17)
+    ax[0].set_ylabel("$Pressure,$ $p$", fontsize=17)
+    ax[1].set_ylabel("$Coordination$ $number,$ $z$", fontsize=17)
     plt.tight_layout()
     plt.subplots_adjust(hspace=0)
-    #plt.savefig("/home/francesco/Pictures/soft/comp-control-" + figureName + ".png", transparent=False, format = "png")
-    plt.pause(0.5)
+    plt.savefig("/home/francesco/Pictures/soft/comp-" + figureName + ".png", transparent=False, format = "png")
+    plt.show()
 
 def plotSPJamming(dirName, figureName):
     fig, ax = plt.subplots(2, 1, figsize = (6, 7), sharex = True, dpi = 120)
@@ -4911,6 +4949,12 @@ if __name__ == '__main__':
         which = sys.argv[5]
         plotSPClusterShape(dirName, figureName, fixed, which)
 
+    elif(whichPlot == "mixingtime"):
+        figureName = sys.argv[3]
+        fixed = sys.argv[4]
+        which = sys.argv[5]
+        plotSPClusterMixingTime(dirName, figureName, fixed, which)
+
     elif(whichPlot == "gammatime"):
         figureName = sys.argv[3]
         plotSPClusterSurfaceTensionVSTime(dirName, figureName)
@@ -5050,8 +5094,7 @@ if __name__ == '__main__':
 ########################### check and plot compression #########################
     elif(whichPlot == "comp"):
         figureName = sys.argv[3]
-        compute = sys.argv[4]
-        plotSPCompression(dirName, figureName, compute)
+        plotSPCompression(dirName, figureName)
 
     elif(whichPlot == "jam"):
         figureName = sys.argv[3]

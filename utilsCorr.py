@@ -133,6 +133,58 @@ def getWallForces(pos, rad, boxSize):
         gradMultiple = kc * (1 - distance / radSum) / radSum
     return wallForce
 
+def computePressure(dirName, dim=2, dynamical=False):
+    sep = getDirSep(dirName, "boxSize")
+    boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
+    numParticles = int(readFromParams(dirName + sep, "numParticles"))
+    rad = np.loadtxt(dirName + sep + "particleRad.dat")
+    sigma = np.mean(rad)
+    ec = 240
+    stress = 0
+    volume = 1
+    for i in range(dim):
+        volume *= boxSize[i]
+    pos = getPBCPositions(dirName + "/particlePos.dat", boxSize)
+    contacts = np.loadtxt(dirName + "/particleContacts.dat").astype(np.int64)
+    if(dynamical == "dynamical"):
+        vel = np.loadtxt(dirName + "/particleVel.dat")
+    for i in range(numParticles):
+        virial = 0
+        for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
+            radSum = rad[i] + rad[c]
+            delta = pbcDistance(pos[i], pos[c], boxSize)
+            distance = np.linalg.norm(delta)
+            overlap = 1 - distance / radSum
+            if(overlap > 0):
+                gradMultiple = ec * overlap / radSum
+                force = gradMultiple * delta / distance
+                virial += 0.5 * np.sum(force * delta) # double counting
+        stress += virial
+        if(dynamical == "dyn"):
+            stress += np.linalg.norm(vel[i])**2
+    pressure = stress / volume
+    # save pressure to params.dat
+    fileParams = dirName + "/params.dat"
+    if(os.path.exists(fileParams)):
+        with open(fileParams, "a") as fparams:
+            fparams.write("pressure" + "\t" + str(pressure) + "\n")
+    return stress / volume
+
+def computeNumberOfContacts(dirName):
+    nContacts = 0
+    contacts = np.loadtxt(dirName + "/particleContacts.dat").astype(np.int64)
+    numParticles = contacts.shape[0]
+    if(numParticles != 0):
+        for c in range(contacts.shape[0]):
+            nContacts += np.sum(contacts[c]>-1)
+        nContacts /= numParticles
+    # save pressure to params.dat
+    fileParams = dirName + "/params.dat"
+    if(os.path.exists(fileParams)):
+        with open(fileParams, "a") as fparams:
+            fparams.write("numContacts" + "\t" + str(nContacts) + "\n")
+    return nContacts
+
 ############################ correlation functions #############################
 def computeIsoCorrFunctions(pos1, pos2, boxSize, waveVector, scale, oneDim = False):
     #delta = pbcDistance(pos1, pos2, boxSize)
@@ -233,7 +285,113 @@ def getDelaunaySimplexPos(pos, boxSize):
     #simplexPos[:,1] -= np.floor(simplexPos[:,1]/boxSize[1]) * boxSize[1]
     return simplexPos
 
+# this functions checks for particles that intersect the edge in front of their center of mass in a Delaunay simplex
+def checkDelaunayInclusivity(simplices, pos, rad, boxSize):
+    intersectParticle = 0
+    wallParticle = 0
+    for sIndex in range(simplices.shape[0]):
+        pos0 = pos[simplices[sIndex,0]]
+        pos1 = pos[simplices[sIndex,1]]
+        pos2 = pos[simplices[sIndex,2]]
+        pos2 = pbcDistance(pos2, pos1, boxSize)
+        pos0 = pbcDistance(pos0, pos1, boxSize)
+        pos1 = np.zeros(pos1.shape[0])
+        slope = (pos1[1] - pos0[1]) / (pos1[0] - pos0[0])
+        intercept = pos0[1] - pos0[0] * slope
+        projLength = np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 - 2*slope*pos2[0]*pos2[1]) / (1 + slope**2))
+        if(rad[simplices[sIndex,2]] > projLength):
+            intersectParticle += 1
+            print("Particle", simplices[sIndex,2], "has radius", rad[simplices[sIndex,2]], "and distance from opposite edge", projLength)
+            wallCheck, _ = isNearWall(pos[simplices[sIndex,2]], 2*rad[simplices[sIndex,2]], boxSize)
+            if(wallCheck):
+                print("AND THIS PARTICLE IS NEAR THE WALL")
+                wallParticle += 1
+    print("This packing has", intersectParticle, "particles that intersect the opposite Delaunay edge")
+    print("AND", wallParticle, "OF THESE ARE NEAR A WALL")
+
 def computeIntersectionArea(pos0, pos1, pos2, sigma, boxSize):
+    # define reference frame to simplify projection formula
+    pos2 = pbcDistance(pos2, pos1, boxSize)
+    pos0 = pbcDistance(pos0, pos1, boxSize)
+    pos1 = np.zeros(pos1.shape[0])
+    # full formula is: np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 + intercept**2 - 2*intercept*pos2[1] - 2*slope*pos2[0]*pos2[1] + 2*slope*intercept*pos2[1]) / (1 + slope**2))
+    slope = (pos1[1] - pos0[1]) / (pos1[0] - pos0[0])
+    intercept = pos0[1] - pos0[0] * slope
+    # length of segment from point to projection
+    projLength = np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 - 2*slope*pos2[0]*pos2[1]) / (1 + slope**2))
+    theta = np.arcsin(projLength / np.linalg.norm(pos2))
+    intersectArea = 0.5 * sigma**2 * theta
+    return projLength, intersectArea
+
+def checkSegmentArea(projLength, sigma):
+    if(projLength < sigma):
+        smallTheta = np.arccos(projLength/sigma)
+        smallTheta /= 2
+        return smallTheta * sigma**2 - 0.5 * sigma**2 * np.sin(2*smallTheta)
+    else:
+        return 0
+
+def findOppositeSimplexIndex(simplices, sIndex, indexA, indexB):
+    # find simplex where the intersection is and add segmentArea to it
+    indexList = np.intersect1d(np.argwhere(simplices==indexA)[:,0], np.argwhere(simplices==indexB)[:,0])
+    # remove sIndex from indexList
+    oppositeIndex = np.setdiff1d(indexList, np.array([sIndex]))
+    return oppositeIndex
+
+def isSimplexNearWall(pIndexList, pos, rad, boxSize):
+    isSimplexNearWall = False
+    for pIndex in pIndexList:
+        isWall, _ = isNearWall(pos[pIndex], 2*rad[pIndex], boxSize)
+        if(isWall == True):
+            isSimplexNearWall = True
+    return isSimplexNearWall
+
+def computeDelaunayDensity(simplices, pos, rad, boxSize):
+    simplexDensity = np.zeros(simplices.shape[0])
+    simplexArea = np.zeros(simplices.shape[0])
+    occupiedArea = np.zeros(simplices.shape[0])
+    for sIndex in range(simplices.shape[0]):
+        pos0 = pos[simplices[sIndex,0]]
+        pos1 = pos[simplices[sIndex,1]]
+        pos2 = pos[simplices[sIndex,2]]
+        # compute area of the triangle
+        simplexArea[sIndex] = 0.5 * np.abs(pos0[0]*(pos1[1] - pos2[1]) + pos1[0]*(pos2[1] - pos0[1]) + pos2[0]*(pos0[1] - pos1[1]))
+        # compute the three areas of the intersecating circles
+        # first compute projection distance for each vertex in the simplex and then check if the intersection is all inside the simplex
+        # if not, remove the external segment from the intersection area and add it to the simplex where the segment is contained
+        # first vertex
+        projLength, intersectArea1 = computeIntersectionArea(pos0, pos1, pos2, rad[simplices[sIndex,1]], boxSize)
+        segmentArea2 = checkSegmentArea(projLength, rad[simplices[sIndex,2]])
+        # second vertex
+        projLength, intersectArea2 = computeIntersectionArea(pos1, pos2, pos0, rad[simplices[sIndex,2]], boxSize)
+        segmentArea0 = checkSegmentArea(projLength, rad[simplices[sIndex,0]])
+        # third vertex
+        projLength, intersectArea0 = computeIntersectionArea(pos2, pos0, pos1, rad[simplices[sIndex,0]], boxSize)
+        segmentArea1 = checkSegmentArea(projLength, rad[simplices[sIndex,1]])
+        # first correction
+        if(segmentArea2 > 0):
+            oppositeIndex = findOppositeSimplexIndex(simplices, sIndex, simplices[sIndex,0], simplices[sIndex,1])
+            if(oppositeIndex.shape[0] == 1):
+                occupiedArea[oppositeIndex[0]] += segmentArea2
+        # second correction
+        if(segmentArea0 > 0):
+            oppositeIndex = findOppositeSimplexIndex(simplices, sIndex, simplices[sIndex,1], simplices[sIndex,2])
+            if(oppositeIndex.shape[0] == 1):
+                occupiedArea[oppositeIndex[0]] += segmentArea0
+        # third correction
+        if(segmentArea1 > 0):
+            oppositeIndex = findOppositeSimplexIndex(simplices, sIndex, simplices[sIndex,2], simplices[sIndex,0])
+            if(oppositeIndex.shape[0] == 1):
+                occupiedArea[oppositeIndex[0]] += segmentArea1
+        occupiedArea[sIndex] += (intersectArea1 + intersectArea2 + intersectArea0 - segmentArea2 - segmentArea0 - segmentArea1)
+        # subtract overlapping area, there are two halves for each simplex
+        occupiedArea[sIndex] -= computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize)
+        occupiedArea[sIndex] -= computeOverlapArea(pos1, pos0, rad[simplices[sIndex,1]], rad[simplices[sIndex,0]], boxSize)
+        occupiedArea[sIndex] -= computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize)
+    simplexDensity = occupiedArea / simplexArea
+    return simplexDensity, simplexArea
+
+def computeIntersectionArea2(pos0, pos1, pos2, sigma, boxSize):
     # define reference frame to simplify projection formula
     # full formula is:
     #projLength = np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 + intercept**2 - 2*intercept*pos2[1] - 2*slope*pos2[0]*pos2[1] + 2*slope*intercept*pos2[1]) / (1 + slope**2))
@@ -247,7 +405,7 @@ def computeIntersectionArea(pos0, pos1, pos2, sigma, boxSize):
     theta = np.arcsin(projLength / np.linalg.norm(pos2))
     return 0.5*sigma**2*theta
 
-def computeDelaunayDensity(simplices, pos, rad, boxSize):
+def computeDelaunayDensity2(simplices, pos, rad, boxSize):
     simplexDensity = np.zeros(simplices.shape[0])
     simplexArea = np.zeros(simplices.shape[0])
     for sIndex in range(simplices.shape[0]):
@@ -257,9 +415,12 @@ def computeDelaunayDensity(simplices, pos, rad, boxSize):
         # compute area of the triangle
         triangleArea = 0.5 * np.abs(pos0[0]*(pos1[1] - pos2[1]) + pos1[0]*(pos2[1] - pos0[1]) + pos2[0]*(pos0[1] - pos1[1]))
         # compute the three areas of the intersecating circles
-        intersectArea = computeIntersectionArea(pos0, pos1, pos2, rad[simplices[sIndex,1]], boxSize) - 0.5 * computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize)
-        intersectArea += computeIntersectionArea(pos1, pos2, pos0, rad[simplices[sIndex,2]], boxSize) - 0.5 * computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize)
-        intersectArea += computeIntersectionArea(pos2, pos0, pos1, rad[simplices[sIndex,0]], boxSize) - 0.5 * computeOverlapArea(pos0, pos1, rad[simplices[sIndex,0]], rad[simplices[sIndex,1]], boxSize)
+        intersectArea = computeIntersectionArea2(pos0, pos1, pos2, rad[simplices[sIndex,1]], boxSize)# - 0.5 * computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize)
+        intersectArea += computeIntersectionArea2(pos1, pos2, pos0, rad[simplices[sIndex,2]], boxSize)# - 0.5 * computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize)
+        intersectArea += computeIntersectionArea2(pos2, pos0, pos1, rad[simplices[sIndex,0]], boxSize)# - 0.5 * computeOverlapArea(pos0, pos1, rad[simplices[sIndex,0]], rad[simplices[sIndex,1]], boxSize)
+        intersectArea -= computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize)
+        intersectArea -= computeOverlapArea(pos1, pos0, rad[simplices[sIndex,1]], rad[simplices[sIndex,0]], boxSize)
+        intersectArea -= computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize)
         simplexDensity[sIndex] = intersectArea / triangleArea
         simplexArea[sIndex] = triangleArea
     # translate simplex density into local density for particles
@@ -627,11 +788,15 @@ def getDirSep(dirName, fileName):
         return "/../"
 
 def readFromParams(dirName, paramName):
+    name = None
     with open(dirName + os.sep + "params.dat") as file:
         for line in file:
             name, scalarString = line.strip().split("\t")
             if(name == paramName):
                 return float(scalarString)
+    if(name == None):
+        print("The variable", paramName, "is not saved in this file")
+        return None
 
 def readFromDynParams(dirName, paramName):
     with open(dirName + os.sep + "dynParams.dat") as file:
@@ -862,6 +1027,84 @@ def initializeDroplet(dirName, dirSave):
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     np.savetxt(dirSave + '/particlePos.dat', pos)
+
+def augmentPacking(pos, rad, fraction=0.05):
+    # augment packing by copying a fraction of the particles around the walls
+    Lx = np.array([1,0])
+    Ly = np.array([0,1])
+    leftPos = pos[pos[:,0]<fraction]
+    leftRad = rad[pos[:,0]<fraction]
+    leftIndices = np.argwhere(pos[:,0]<fraction)[:,0]
+    rightPos = pos[pos[:,0]>(1-fraction)]
+    rightRad = rad[pos[:,0]>(1-fraction)]
+    rightIndices = np.argwhere(pos[:,0]>(1-fraction))[:,0]
+    bottomPos =  pos[pos[:,1]<fraction]
+    bottomRad =  rad[pos[:,1]<fraction]
+    bottomIndices = np.argwhere(pos[:,1]<fraction)[:,0]
+    topPos = pos[pos[:,1]>(1-fraction)]
+    topRad = rad[pos[:,1]>(1-fraction)]
+    topIndices = np.argwhere(pos[:,1]>(1-fraction))[:,0]
+    bottomLeftPos = leftPos[leftPos[:,1]<fraction]
+    bottomLeftRad = leftRad[leftPos[:,1]<fraction]
+    bottomLeftIndices = leftIndices[np.argwhere(leftPos[:,1]<fraction)[:,0]]
+    bottomRightPos = rightPos[rightPos[:,1]<fraction]
+    bottomRightRad = rightRad[rightPos[:,1]<fraction]
+    bottomRightIndices = rightIndices[np.argwhere(rightPos[:,1]<fraction)[:,0]]
+    topLeftPos = leftPos[leftPos[:,1]>(1-fraction)]
+    topLeftRad = leftRad[leftPos[:,1]>(1-fraction)]
+    topLeftIndices = leftIndices[np.argwhere(leftPos[:,1]>(1-fraction))[:,0]]
+    topRightPos = rightPos[rightPos[:,1]>(1-fraction)]
+    topRightRad = rightRad[rightPos[:,1]>(1-fraction)]
+    topRightIndices = rightIndices[np.argwhere(rightPos[:,1]>(1-fraction))[:,0]]
+    newPos = np.vstack([pos, leftPos + Lx, rightPos - Lx, bottomPos + Ly, topPos - Ly, bottomLeftPos + Lx + Ly, bottomRightPos - Lx + Ly, topLeftPos + Lx - Ly, topRightPos - Lx - Ly])
+    newRad = np.concatenate((rad, leftRad, rightRad, bottomRad, topRad, bottomLeftRad, bottomRightRad, topLeftRad, topRightRad))
+    newIndices = np.concatenate((np.arange(0,rad.shape[0],1), leftIndices, rightIndices, bottomIndices, topIndices, bottomLeftIndices, bottomRightIndices, topLeftIndices, topRightIndices))
+    return newPos, newRad, newIndices
+
+def isOutsideBox(pos, boxSize):
+    isOutsideWall = 0
+    if(pos[0] > boxSize[0] or pos[0] < 0):
+        isOutsideWall += 1
+    if(pos[1] > boxSize[1] or pos[1] < 0):
+        isOutsideWall += 1
+    if(isOutsideWall > 0):
+        return 1
+    else:
+        return 0
+
+def getInsideBoxDelaunaySimplices(simplices, pos, boxSize):
+    insideIndex = np.ones(simplices.shape[0])
+    for sIndex in range(simplices.shape[0]):
+        isOutside = 0
+        for i in range(simplices[sIndex].shape[0]):
+            isOutside += isOutsideBox(pos[simplices[sIndex,i]], boxSize)
+        if(isOutside == 3): # all the particles on the simplex are outside the box
+            insideIndex[sIndex] = 0
+    return insideIndex
+
+def getOnWallDelaunaySimplices(simplices, pos, boxSize):
+    onWallIndex = np.zeros(simplices.shape[0])
+    for sIndex in range(simplices.shape[0]):
+        isOutside = 0
+        for i in range(simplices[sIndex].shape[0]):
+            isOutside += isOutsideBox(pos[simplices[sIndex,i]], boxSize)
+        if(isOutside == 1 or isOutside == 2): # one or two particles on the simplex are outside the box
+            onWallIndex[sIndex] = 1
+    return onWallIndex
+
+def wrapSimplicesAroundBox(innerSimplices, augmentedIndices, numParticles):
+    for sIndex in range(innerSimplices.shape[0]):
+        for i in range(innerSimplices[sIndex].shape[0]):
+            if(innerSimplices[sIndex,i] > numParticles):
+                innerSimplices[sIndex,i] = augmentedIndices[innerSimplices[sIndex,i]]
+    return innerSimplices
+
+def getPBCDelaunay(pos, rad, boxSize):
+    newPos, newRad, newIndices = augmentPacking(pos, rad, 0.5)
+    delaunay = Delaunay(newPos)
+    insideIndex = getInsideBoxDelaunaySimplices(delaunay.simplices, newPos, boxSize)
+    return wrapSimplicesAroundBox(delaunay.simplices[insideIndex==1], newIndices, rad.shape[0])
+
 
 if __name__ == '__main__':
     print("library for correlation function utilities")

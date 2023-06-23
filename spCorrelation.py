@@ -1762,7 +1762,7 @@ def computeClusterMixingTime(dirName, plot=False, dirSpacing=1):
                 sharedParticles += 1
         fraction[d] = sharedParticles / initParticlesInCluster
         #print(timeList[d], fraction[d])
-    np.savetxt(dirName + os.sep + "clusterMixing.dat", np.column_stack((timeList, fraction)))
+    np.savetxt(dirName + os.sep + "mixingTime.dat", np.column_stack((timeList, fraction)))
     if(plot=='plot'):
         uplot.plotCorrelation(timeList, fraction, "$N_c^0(t) / N_c^0$", xlabel = "$Simulation$ $time$", color='k')
         plt.show()
@@ -1800,7 +1800,7 @@ def computeClusterBlockMixingTime(dirName, numBlocks, plot=False, dirSpacing=1):
                     sharedParticles += 1
             fraction[d, block] = sharedParticles / initParticlesInCluster
     blockFraction = np.column_stack((np.mean(fraction, axis=1), np.std(fraction, axis=1)))
-    np.savetxt(dirName + os.sep + "mixingTime.dat", np.column_stack((timeList, blockFraction)))
+    np.savetxt(dirName + os.sep + "blockMixingTime.dat", np.column_stack((timeList, blockFraction)))
     if(plot=='plot'):
         uplot.plotCorrelation(timeList, blockFraction[:,0], "$N_c^0(t) / N_c^0$", xlabel = "$Simulation$ $time$", color='k')
         plt.show()
@@ -1829,11 +1829,12 @@ def computeClusterLogMixingTime(dirName, startBlock, maxPower, freqPower):
                         denseList1, denseList2 = ucorr.readDenseListPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
                         sharedParticles = 0
                         initClusterParticles = denseList1[denseList1==1].shape[0]
-                        for i in range(numParticles):
-                            if(denseList1[i] == 1 and denseList2[i] == 1):
-                                sharedParticles += 1
-                        stepFraction.append(sharedParticles / initClusterParticles)
-                        numPairs += 1
+                        if(initClusterParticles > 0):
+                            for i in range(numParticles):
+                                if(denseList1[i] == 1 and denseList2[i] == 1):
+                                    sharedParticles += 1
+                            stepFraction.append(sharedParticles / initClusterParticles)
+                            numPairs += 1
             if(numPairs > 0):
                 stepList.append(spacing*spacingDecade)
                 fraction.append([np.mean(stepFraction), np.std(stepFraction)])
@@ -2054,14 +2055,6 @@ def computeClusterVoronoiDensity(dirName, plot=False, dirSpacing=1):
         dirSample = dirName + os.sep + dirList[d]
         pos = ucorr.getPBCPositions(dirSample + "/particlePos.dat", boxSize)
         contacts = np.loadtxt(dirSample + "/particleContacts.dat").astype(np.int64)
-        #if(os.path.exists(dirSample + os.sep + "delaunayList.dat")):
-        #    denseList = np.loadtxt(dirSample + os.sep + "delaunayList.dat")
-        #else:
-        #    denseList, _, _ = computeDelaunayCluster(dirSample)
-        #if(os.path.exists(dirSample + os.sep + "voroDensity.dat")):
-        #    voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
-        #else:
-        #    _, voroDensity = computeVoronoiCluster(dirSample)
         if(os.path.exists(dirSample + os.sep + "denseList.dat")):
             denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
             voroDensity = np.loadtxt(dirSample + os.sep + "voroDensity.dat")
@@ -2231,7 +2224,6 @@ def averageParticleVelPDFCluster(dirName, plot=False, dirSpacing=1):
 ############################## Particle pressure ###############################
 def computeParticleStress(dirName, prop='prop'):
     dim = 2
-    sep = ucorr.getDirSep(dirName, "boxSize")
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     numParticles = int(ucorr.readFromParams(dirName + sep, "numParticles"))
@@ -3292,6 +3284,18 @@ def computeClusterVelMagnitudeVSTime(dirName, plot=False, dirSpacing=1):
         uplot.plotCorrelation(timeList, velMagnitudeOut[:,2], "$Steric,$ $thermal,$ $active$", "$Time,$ $t$", color=[1,0.5,0], ls='--')
         plt.show()
 
+############################## Delaunay inclusivity ############################
+def checkDelaunay(dirName):
+    sep = ucorr.getDirSep(dirName, "boxSize")
+    numParticles = int(ucorr.readFromParams(dirName + sep, "numParticles"))
+    boxSize = np.array(np.loadtxt(dirName + sep + "boxSize.dat"))
+    rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
+    pos = ucorr.getPBCPositions(dirName + "/particlePos.dat", boxSize)
+    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
+    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
+    delaunay = Delaunay(pos)
+    checkDelaunayInclusivity(delaunay.simplices, pos, rad, boxSize)
+
 ############################## Delaunay clustering #############################
 def computeDelaunayCluster(dirName, threshold=0.85, filter='filter', plot=False):
     sep = ucorr.getDirSep(dirName, "boxSize")
@@ -3304,8 +3308,10 @@ def computeDelaunayCluster(dirName, threshold=0.85, filter='filter', plot=False)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     delaunay = Delaunay(pos)
+    simplices = delaunay.simplices
+    #simplices = ucorr.getPBCDelaunay(pos, rad, boxSize)
     # compute delaunay densities
-    simplexDensity, simplexArea = ucorr.computeDelaunayDensity(delaunay.simplices, pos, rad, boxSize)
+    simplexDensity, simplexArea = ucorr.computeDelaunayDensity(simplices, pos, rad, boxSize)
     denseSimplexList = np.zeros(simplexDensity.shape[0])
     #print("average local density:", np.mean(simplexDensity))
     # first find dense simplices
@@ -3314,9 +3320,9 @@ def computeDelaunayCluster(dirName, threshold=0.85, filter='filter', plot=False)
             denseSimplexList[i] = 1
     # if all the simplices touching a particle are dense then the particle is dense
     for i in range(numParticles):
-        indices = np.argwhere(delaunay.simplices==i)[:,0]
-        for idx in indices:
-            if(denseSimplexList[idx] == 1):
+        indices = np.argwhere(simplices==i)[:,0]
+        for sIndex in indices:
+            if(denseSimplexList[sIndex] == 1):
                 denseList[i] = 1
     #print("Number of dense particles: ", denseList[denseList==1].shape[0])
     if(filter=='filter'):
@@ -3343,8 +3349,8 @@ def computeDelaunayCluster(dirName, threshold=0.85, filter='filter', plot=False)
     denseNeighborCount = np.zeros(numParticles)
     for i in range(numParticles):
         if(denseList[i]==0):
-            for sIndex in np.argwhere(delaunay.simplices==i)[:,0]:
-                indices = np.delete(delaunay.simplices[sIndex], np.argwhere(delaunay.simplices[sIndex]==i)[0,0])
+            for sIndex in np.argwhere(simplices==i)[:,0]:
+                indices = np.delete(simplices[sIndex], np.argwhere(simplices[sIndex]==i)[0,0])
                 for index in indices:
                     neighborCount[i] += 1
                     if(denseList[index] == 1):
@@ -3357,14 +3363,14 @@ def computeDelaunayCluster(dirName, threshold=0.85, filter='filter', plot=False)
     denseList[rattlerList==1] = 1
     #print("Number of dense particles after contact filter: ", denseList[denseList==1].shape[0])
     # need to update denseSimplexList after the applied filters
-    for i in range(delaunay.nsimplex):
+    for sIndex in range(simplices.shape[0]):
         indexCount = 0
-        for pIndex in range(delaunay.simplices[i].shape[0]):
-            indexCount += denseList[delaunay.simplices[i][pIndex]]
+        for pIndex in range(simplices[sIndex].shape[0]):
+            indexCount += denseList[simplices[sIndex][pIndex]]
         if(indexCount==3):
-            denseSimplexList[i] = 1
+            denseSimplexList[sIndex] = 1
         else:
-            denseSimplexList[i] = 0
+            denseSimplexList[sIndex] = 0
     np.savetxt(dirName + "/delaunayList.dat", denseList)
     np.savetxt(dirName + "/denseSimplexList.dat", denseSimplexList)
     np.savetxt(dirName + "/simplexDensity.dat", simplexDensity)
@@ -3373,8 +3379,8 @@ def computeDelaunayCluster(dirName, threshold=0.85, filter='filter', plot=False)
     borderSimplexList = np.zeros(denseSimplexList.shape[0])
     for i in range(numParticles):
         if(denseList[i]==1):
-            for sIndex in np.argwhere(delaunay.simplices==i)[:,0]:
-                indices = np.delete(delaunay.simplices[sIndex], np.argwhere(delaunay.simplices[sIndex]==i)[0,0])
+            for sIndex in np.argwhere(simplices==i)[:,0]:
+                indices = np.delete(simplices[sIndex], np.argwhere(simplices[sIndex]==i)[0,0])
                 for index in indices:
                     if(denseList[index] == 0 and index>=0):
                         borderSimplexList[sIndex] = 1
@@ -3454,12 +3460,13 @@ def computeClusterDelaunayDensity(dirName, plot=False, dirSpacing=1):
         gasArea = 0
         occupiedGasArea = 0
         for i in range(simplexDensity.shape[0]):
-            if(denseSimplexList[i]==1):
-                fluidArea += simplexArea[i]
-                occupiedFluidArea += occupiedArea[i]
-            else:
-                gasArea += simplexArea[i]
-                occupiedGasArea += occupiedArea[i]
+            if(simplexDensity[i] > 0 and simplexDensity[i] < 1):
+                if(denseSimplexList[i]==1):
+                    fluidArea += simplexArea[i]
+                    occupiedFluidArea += occupiedArea[i]
+                else:
+                    gasArea += simplexArea[i]
+                    occupiedGasArea += occupiedArea[i]
         if(fluidArea > 0):
             delaunayDensity[d,0] = occupiedFluidArea / fluidArea
         else:
@@ -3987,6 +3994,9 @@ if __name__ == '__main__':
     elif(whichCorr == "clusterveltime"):
         plot = sys.argv[3]
         computeClusterVelMagnitudeVSTime(dirName, plot)
+
+    elif(whichCorr == "checkdelaunay"):
+        checkDelaunay(dirName)
 
     elif(whichCorr == "delcluster"):
         threshold = float(sys.argv[3])

@@ -369,19 +369,38 @@ def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
     ax.set_ylim(yBounds[0], yBounds[1])
     ax.set_aspect('equal', adjustable='box')
     setPackingAxes(boxSize, ax)
-    colorId = getRadColorList(rad)
-    for particleId in range(rad.shape[0]):
-        x = pos[particleId,0]
-        y = pos[particleId,1]
-        r = rad[particleId]
+    #setBigBoxAxes(boxSize, ax, 0.1)
+    newPos, newRad, newIndices = ucorr.augmentPacking(pos, rad)
+    colorId = getRadColorList(newRad)
+    for particleId in range(newRad.shape[0]):
+        x = newPos[particleId,0]
+        y = newPos[particleId,1]
+        r = newRad[particleId]
         ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
+        #if(particleId > rad.shape[0]):
+        #    plt.plot(pos[newIndices[particleId],0], pos[newIndices[particleId],1], '*', markersize=8, markeredgecolor='k', markeredgewidth = 0.6, color='skyblue')
     #cells = pyvoro.compute_2d_voronoi(pos, [[0, boxSize[0]], [0, boxSize[1]]], 1, radii=rad)
     #for i, cell in enumerate(cells):
     #    polygon = cell['vertices']
     #    ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.2)
-    delaunay = Delaunay(pos)
-    plt.triplot(pos[:,0], pos[:,1], delaunay.simplices, lw=0.5, color='k')
+    delaunay = Delaunay(newPos)
+    insideIndex = ucorr.getInsideBoxDelaunaySimplices(delaunay.simplices, newPos, boxSize)
+    #onWallIndex = ucorr.getOnWallDelaunaySimplices(delaunay.simplices, newPos, boxSize)
+    plt.triplot(newPos[:,0], newPos[:,1], delaunay.simplices[insideIndex==1], lw=0.5, color='k')
+    #plt.triplot(newPos[:,0], newPos[:,1], delaunay.simplices[onWallIndex==1], lw=0.5, color='g')
     #plt.plot(pos[:,0], pos[:,1], 'o', markersize=0.2, markeredgecolor='k', color='r')
+    # particles for 0.30 8k
+    #plt.plot(pos[2169,0], pos[2169,1], '*', markersize=10, markeredgecolor='k', color='b')
+    #plt.plot(pos[4153,0], pos[4153,1], '*', markersize=10, markeredgecolor='k', color='r')
+    #plt.plot(pos[1474,0], pos[1474,1], '*', markersize=10, markeredgecolor='k', color='k')
+    #plt.plot(pos[6358,0], pos[6358,1], '*', markersize=10, markeredgecolor='k', color=[0.5,0.5,0.5])
+    plt.plot(pos[3292,0], pos[3292,1], '*', markersize=10, markeredgecolor='k', color='b')
+    plt.plot(pos[2644,0], pos[2644,1], '*', markersize=10, markeredgecolor='k', color='r')
+    plt.plot(pos[5115,0], pos[5115,1], '*', markersize=10, markeredgecolor='k', color='k')
+    plt.plot(pos[3622,0], pos[3622,1], '*', markersize=10, markeredgecolor='k', color=[0.5,0.5,0.5])
+    # particle for 0.96 8k
+    #plt.plot(pos[7612,0], pos[7612,1], '*', markersize=10, markeredgecolor='k', color='b')
+    #plt.plot(pos[5307,0], pos[5307,1], '*', markersize=10, markeredgecolor='k', color='r')
     #plt.plot(pos[4719,0], pos[4719,1], '*', markersize=10, markeredgecolor='k', color='b')
     #plt.plot(pos[0,0], pos[0,1], '*', markersize=10, markeredgecolor='k', color='r')
     #plt.plot(pos[7961,0], pos[7961,1], '*', markersize=10, markeredgecolor='k', color='g')
