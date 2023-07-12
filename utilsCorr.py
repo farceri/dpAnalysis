@@ -275,12 +275,12 @@ def computeSusceptibility(pos1, pos2, field, waveVector, scale):
     chiq = np.mean(isf**2) - np.mean(isf)**2
     return chi / scale, np.real(chiq)
 
-def getDelaunaySimplexPos(pos, boxSize):
-    delaunay = Delaunay(pos)
-    simplexPos = np.zeros((delaunay.nsimplex, 2))
-    for i in range(delaunay.nsimplex):
+def getDelaunaySimplexPos(pos, rad, boxSize):
+    simplices = getPBCDelaunay(pos, rad, boxSize)
+    simplexPos = np.zeros((simplices.shape[0], 2))
+    for i in range(simplices.shape[0]):
         # average positions of particles / vertices of simplex i
-        simplexPos[i] = np.mean(pos[delaunay.simplices[i]], axis=0)
+        simplexPos[i] = np.mean(pos[simplices[i]], axis=0)
     #simplexPos[:,0] -= np.floor(simplexPos[:,0]/boxSize[0]) * boxSize[0]
     #simplexPos[:,1] -= np.floor(simplexPos[:,1]/boxSize[1]) * boxSize[1]
     return simplexPos
@@ -315,10 +315,11 @@ def computeIntersectionArea(pos0, pos1, pos2, sigma, boxSize):
     pos0 = pbcDistance(pos0, pos1, boxSize)
     pos1 = np.zeros(pos1.shape[0])
     # full formula is: np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 + intercept**2 - 2*intercept*pos2[1] - 2*slope*pos2[0]*pos2[1] + 2*slope*intercept*pos2[1]) / (1 + slope**2))
-    slope = (pos1[1] - pos0[1]) / (pos1[0] - pos0[0])
+    slope = pbcDistance(pos1[1],pos0[1],boxSize[1]) / pbcDistance(pos1[0],pos0[0],boxSize[0])
     intercept = pos0[1] - pos0[0] * slope
     # length of segment from point to projection
     projLength = np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 - 2*slope*pos2[0]*pos2[1]) / (1 + slope**2))
+    #projLength = np.sqrt((slope**2 * pos2[0]**2 + pos2[1]**2 + intercept**2 - 2*intercept*pos2[1] - 2*slope*pos2[0]*pos2[1] + 2*slope*intercept*pos2[1]) / (1 + slope**2))
     theta = np.arcsin(projLength / np.linalg.norm(pos2))
     intersectArea = 0.5 * sigma**2 * theta
     return projLength, intersectArea
@@ -346,6 +347,17 @@ def isSimplexNearWall(pIndexList, pos, rad, boxSize):
             isSimplexNearWall = True
     return isSimplexNearWall
 
+def computeTriangleArea(pos0, pos1, pos2, boxSize):
+    #pos2 = pbcDistance(pos2, pos1, boxSize)
+    #pos0 = pbcDistance(pos0, pos1, boxSize)
+    #pos1 = np.zeros(pos1.shape[0])
+    #return 0.5 * np.abs(pos0[0]*(pos1[1] - pos2[1]) + pos1[0]*(pos2[1] - pos0[1]) + pos2[0]*(pos0[1] - pos1[1]))
+    delta01 = np.linalg.norm(pbcDistance(pos0, pos1, boxSize))
+    delta12 = np.linalg.norm(pbcDistance(pos1, pos2, boxSize))
+    delta20 = np.linalg.norm(pbcDistance(pos2, pos0, boxSize))
+    semiPerimeter = 0.5 * (delta01 + delta12 + delta20)
+    return np.sqrt(semiPerimeter * (semiPerimeter - delta01) * (semiPerimeter - delta12) * (semiPerimeter - delta20))
+
 def computeDelaunayDensity(simplices, pos, rad, boxSize):
     simplexDensity = np.zeros(simplices.shape[0])
     simplexArea = np.zeros(simplices.shape[0])
@@ -355,7 +367,7 @@ def computeDelaunayDensity(simplices, pos, rad, boxSize):
         pos1 = pos[simplices[sIndex,1]]
         pos2 = pos[simplices[sIndex,2]]
         # compute area of the triangle
-        simplexArea[sIndex] = 0.5 * np.abs(pos0[0]*(pos1[1] - pos2[1]) + pos1[0]*(pos2[1] - pos0[1]) + pos2[0]*(pos0[1] - pos1[1]))
+        simplexArea[sIndex] = computeTriangleArea(pos0, pos1, pos2, boxSize)
         # compute the three areas of the intersecating circles
         # first compute projection distance for each vertex in the simplex and then check if the intersection is all inside the simplex
         # if not, remove the external segment from the intersection area and add it to the simplex where the segment is contained
@@ -385,9 +397,9 @@ def computeDelaunayDensity(simplices, pos, rad, boxSize):
                 occupiedArea[oppositeIndex[0]] += segmentArea1
         occupiedArea[sIndex] += (intersectArea1 + intersectArea2 + intersectArea0 - segmentArea2 - segmentArea0 - segmentArea1)
         # subtract overlapping area, there are two halves for each simplex
-        occupiedArea[sIndex] -= computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize)
-        occupiedArea[sIndex] -= computeOverlapArea(pos1, pos0, rad[simplices[sIndex,1]], rad[simplices[sIndex,0]], boxSize)
-        occupiedArea[sIndex] -= computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize)
+        occupiedArea[sIndex] -= 0.5*computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize) + 0.5*computeOverlapArea(pos2, pos1, rad[simplices[sIndex,2]], rad[simplices[sIndex,1]], boxSize)
+        occupiedArea[sIndex] -= 0.5*computeOverlapArea(pos1, pos0, rad[simplices[sIndex,1]], rad[simplices[sIndex,0]], boxSize) + 0.5*computeOverlapArea(pos0, pos1, rad[simplices[sIndex,0]], rad[simplices[sIndex,1]], boxSize)
+        occupiedArea[sIndex] -= 0.5*computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize) + 0.5*computeOverlapArea(pos0, pos2, rad[simplices[sIndex,0]], rad[simplices[sIndex,2]], boxSize)
     simplexDensity = occupiedArea / simplexArea
     return simplexDensity, simplexArea
 
@@ -413,7 +425,7 @@ def computeDelaunayDensity2(simplices, pos, rad, boxSize):
         pos1 = pos[simplices[sIndex,1]]
         pos2 = pos[simplices[sIndex,2]]
         # compute area of the triangle
-        triangleArea = 0.5 * np.abs(pos0[0]*(pos1[1] - pos2[1]) + pos1[0]*(pos2[1] - pos0[1]) + pos2[0]*(pos0[1] - pos1[1]))
+        triangleArea = 0.5 * np.abs(pos0[0]*pbcDistance(pos1[1],pos2[1],boxSize[1]) + pos1[0]*pbcDistance(pos2[1],pos0[1],boxSize[1]) + pos2[0]*pbcDistance(pos0[1],pos1[1],boxSize[1]))
         # compute the three areas of the intersecating circles
         intersectArea = computeIntersectionArea2(pos0, pos1, pos2, rad[simplices[sIndex,1]], boxSize)# - 0.5 * computeOverlapArea(pos1, pos2, rad[simplices[sIndex,1]], rad[simplices[sIndex,2]], boxSize)
         intersectArea += computeIntersectionArea2(pos1, pos2, pos0, rad[simplices[sIndex,2]], boxSize)# - 0.5 * computeOverlapArea(pos2, pos0, rad[simplices[sIndex,2]], rad[simplices[sIndex,0]], boxSize)
@@ -1095,7 +1107,7 @@ def getOnWallDelaunaySimplices(simplices, pos, boxSize):
 def wrapSimplicesAroundBox(innerSimplices, augmentedIndices, numParticles):
     for sIndex in range(innerSimplices.shape[0]):
         for i in range(innerSimplices[sIndex].shape[0]):
-            if(innerSimplices[sIndex,i] > numParticles):
+            if(innerSimplices[sIndex,i] > (numParticles - 1)):
                 innerSimplices[sIndex,i] = augmentedIndices[innerSimplices[sIndex,i]]
     return innerSimplices
 

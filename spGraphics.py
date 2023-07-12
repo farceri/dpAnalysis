@@ -295,6 +295,36 @@ def plotClusterPressureVSTime(dirName, figureName, bound=False, prop=False):
     #fig.savefig(figureName + ".png", transparent=True, format = "png")
     plt.show()
 
+def plotSimplexDensity(dirName, figureName, pad = 1, logy=False):
+    if(os.path.exists(dirName + os.sep + 'simplexDensity.dat')):
+        simplexDensity = np.loadtxt(dirName + os.sep + 'simplexDensity.dat')
+    else:
+        _, simplexDensity = spCorr.computeDelaunayCluster(dirName)
+    fig, ax = plt.subplots(1, 2, figsize=(9,4), dpi=150)
+    ax[0].plot(np.arange(1, simplexDensity.shape[0]+1, 1), np.sort(simplexDensity), color='k', marker='.', markersize=8, lw=0.8, fillstyle='none')
+    ax[0].tick_params(axis='both', labelsize=12)
+    ax[0].set_xlabel('$Simplex$ $index$', fontsize=16)
+    ax[0].set_ylabel('$\\varphi^{Simplex}$', fontsize=16)
+    numBins = 100
+    pdf, edges = np.histogram(simplexDensity, bins=np.linspace(0, 1, numBins), density=True)
+    edges = (edges[1:] + edges[:-1])/2
+    ax[1].plot(edges, pdf, color='k', marker='.', markersize=8, lw=0.8, fillstyle='none')
+    ax[1].plot(np.ones(100)*0.906899682, np.linspace(np.min(pdf)-pad, np.max(pdf)+pad, 100), ls='dotted', color='k', lw=1, label='$Triangular$ $lattice$')
+    ax[1].plot(np.ones(100)*0.785398163, np.linspace(np.min(pdf)-pad, np.max(pdf)+pad, 100), ls='dashdot', color='k', lw=1, label='$Square$ $lattice$')
+    ax[1].legend(fontsize=10, loc='best')
+    if(logy == 'logy'):
+        ax[1].set_yscale('log')
+        ax[1].set_ylim(np.min(pdf), np.max(pdf)+pad/2)
+    else:
+        ax[1].set_ylim(np.min(pdf)-pad/2, np.max(pdf)+pad/2)
+    ax[1].tick_params(axis='both', labelsize=12)
+    ax[1].set_ylabel('$PDF(\\varphi^{Simplex})$', fontsize=16)
+    ax[1].set_xlabel('$\\varphi^{Simplex}$', fontsize=16)
+    fig.tight_layout()
+    fig.subplots_adjust(wspace=0.2)
+    plt.savefig("/home/francesco/Pictures/soft/DelaunayDensityPDF" + figureName + ".png", transparent=True, format="png")
+    plt.show()
+
 def plotParticleForces(dirName, index0, index1, index2, dim):
     dirList, timeList = ucorr.getOrderedDirectories(dirName)
     force0 = []
@@ -2057,7 +2087,7 @@ def plotSPClusterDensity(dirName, figureName, fixed=False, which='1e-03'):
             dirList = np.array(['1e-01', '5e-02', '2e-02', '1e-02', '5e-03', '2e-03', '1e-03', '7e-04', '5e-04', '2e-04', '1e-04', '7e-05', '5e-05', '2e-05', '1e-05', '5e-06', '2e-06', '1e-06', '5e-07', '2e-07', '1e-07'])
     elif(fixed=="Dr"):
         #dirList = np.array(['thermal25', 'thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85',  'thermal94', 'thermal1'])
-        dirList = np.array(['0.25', '0.28', '0.29', '0.30', '0.31', '0.32', '0.35', '0.40', '0.45', '0.50', '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
+        dirList = np.array(['0.25', '0.26', '0.27', '0.28', '0.29', '0.30', '0.31', '0.32', '0.35', '0.40', '0.45', '0.50', '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
         colorList = cm.get_cmap('viridis', dirList.shape[0])
         phi = np.zeros(dirList.shape[0])
     else:
@@ -2278,7 +2308,7 @@ def plotSPClusterMixingTime(dirName, figureName, fixed=False, which='1e-03'):
         else:
             dirList = np.array(['1e-01', '5e-02', '2e-02', '1e-02', '5e-03', '2e-03', '1e-03', '7e-04', '5e-04', '2e-04', '1e-04', '7e-05', '5e-05', '2e-05', '1e-05', '5e-06', '2e-06', '1e-06', '5e-07', '2e-07', '1e-07'])
     elif(fixed=="Dr"):
-        dirList = np.array(['0.25', '0.28', '0.29'])#, '0.30'])#, '0.31', '0.32', '0.35', '0.40', '0.45', '0.50', '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
+        dirList = np.array(['0.25', '0.26', '0.27', '0.28', '0.29', '0.30', '0.31', '0.32', '0.35', '0.40', '0.45', '0.50'])#, '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
         colorList = cm.get_cmap('viridis', dirList.shape[0])
         phi = np.zeros(dirList.shape[0])
     else:
@@ -4791,6 +4821,12 @@ if __name__ == '__main__':
         prop = sys.argv[5]
         plotClusterPressureVSTime(dirName, figureName, bound, prop)
 
+    elif(whichPlot == "simplex"):
+        figureName = sys.argv[3]
+        pad = float(sys.argv[4])
+        logy = sys.argv[5]
+        plotSimplexDensity(dirName, figureName, pad, logy)
+
     elif(whichPlot == "forces"):
         index0 = int(sys.argv[3])
         index1 = int(sys.argv[4])
@@ -4949,7 +4985,7 @@ if __name__ == '__main__':
         which = sys.argv[5]
         plotSPClusterShape(dirName, figureName, fixed, which)
 
-    elif(whichPlot == "mixingtime"):
+    elif(whichPlot == "clustermixing"):
         figureName = sys.argv[3]
         fixed = sys.argv[4]
         which = sys.argv[5]
