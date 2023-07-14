@@ -6,11 +6,11 @@ Created by Francesco
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
-import shapeDescriptors
 from scipy.optimize import curve_fit
 import itertools
 import sys
 import os
+import utils
 import dpCorrelation as dpCorr
 
 def plotDPCorr(ax, x, y1, y2, ylabel, color, legendLabel = None, logx = True, logy = False):
@@ -27,7 +27,6 @@ def plotDPCorr(ax, x, y1, y2, ylabel, color, legendLabel = None, logx = True, lo
         ax.set_xscale('log')
     if(logy == True):
         ax.set_yscale('log')
-
 
 ############################ check energy and force ############################
 def plotEnergy(dirName):
@@ -170,16 +169,16 @@ def compareForcesVideo(dirName, fileName, figureName):
     anim.save("/home/francesco/Pictures/dpm/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def plotDPVelCorrTime(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, distTh = 0.1):
-    stepList = uplot.getStepList(numFrames, firstStep, stepFreq)
+    stepList = utils.getStepList(numFrames, firstStep, stepFreq)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     nv = np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int)
     numParticles = nv.shape[0]
     velcontact = []
     veldistance = []
     for i in stepList:
-        stepVelcorr = spCorr.computeVelCorrContact(dirName + os.sep + "t" + str(i), nv)
+        stepVelcorr = dpCorr.computeVelCorrContact(dirName + os.sep + "t" + str(i), nv)
         velcontact.append(np.mean(stepVelcorr))
-        stepVelcorr = spCorr.computeVelCorrDistance(dirName + os.sep + "t" + str(i), boxSize, nv, distTh)
+        stepVelcorr = dpCorr.computeVelCorrDistance(dirName + os.sep + "t" + str(i), boxSize, nv, distTh)
         veldistance.append(np.mean(stepVelcorr))
     stepList -= stepList[0]
     stepList = np.array(stepList-stepList[0])/np.max(stepList-stepList[0])
@@ -200,9 +199,9 @@ def plotDPVelCorrSpace(dirName, figureName):
     nv = np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int)
     numParticles = nv.shape[0]
     velcorr = []
-    velcontact = np.mean(spCorr.computeVelCorrContact(dirName + os.sep + "t100000", nv))
+    velcontact = np.mean(dpCorr.computeVelCorrContact(dirName + os.sep + "t100000", nv))
     for distTh in distThList:
-        stepVelcorr = spCorr.computeVelCorrDistance(dirName + os.sep + "t100000", boxSize, nv, distTh)
+        stepVelcorr = dpCorr.computeVelCorrDistance(dirName + os.sep + "t100000", boxSize, nv, distTh)
         velcorr.append(np.mean(stepVelcorr))
     fig = plt.subplots(dpi=150)
     ax = plt.gca()
@@ -284,11 +283,11 @@ def plotDPDynamicsVSphi(dirName, v0String, figureName, plotDiff = True, save = F
     fig, ax = plt.subplots(2, 1, sharex=True, figsize = (8, 9), dpi = 120)
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/corr-log.dat")):
-            timeStep = dpCorr.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "dt")
-            currentPhi = dpCorr.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
+            timeStep = utils.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "dt")
+            currentPhi = utils.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
             data = np.loadtxt(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/corr-log.dat")
             if(data[-1,2]<0.2):
-                Teff.append(dpCorr.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "temperature"))
+                Teff.append(utils.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "temperature"))
                 phi.append(currentPhi)
                 Deff.append(data[data[:,2]>np.exp(-1),1][-1]/(4 * data[data[:,2]>np.exp(-1),0][-1] * timeStep * D0))
                 vDeff.append(data[data[:,2]>np.exp(-1),4][-1]/(4 * data[data[:,2]>np.exp(-1),0][-1] * timeStep * D0))
@@ -341,11 +340,11 @@ def plotDPDynamicsVSactivity(dirName, figureName, plotDiff = True, save = False)
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/corr-log.dat")):
             data = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/corr-log.dat")
-            timeStep = dpCorr.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "dt")
+            timeStep = utils.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "dt")
             D0 = v0[i] * v0[i] / (2 * 1e-01)
             if(data[-1,2]<0.2):
                 speed.append(v0[i])
-                Teff.append(dpCorr.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "temperature"))
+                Teff.append(utils.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "temperature"))
                 #Deff.append(data[data[:,2]>np.exp(-1),1][-1]/(4 * data[data[:,2]>np.exp(-1),0][-1] * timeStep * D0))
                 #vDeff.append(data[data[:,2]>np.exp(-1),4][-1]/(4 * data[data[:,2]>np.exp(-1),0][-1] * timeStep * D0))
                 Deff.append(data[data[:,0]*timeStep>7e05,1][-1]/(4 * data[data[:,0]*timeStep>7e05,0][-1] * timeStep * D0))
@@ -398,15 +397,15 @@ def plotDPTauVsTeff(dirName, figureName, sampleId):
     fig, ax = plt.subplots(1, 2, figsize = (13, 5), dpi = 120)
     for i in range(dataSetList[:sampleId+1].shape[0]):
         data = np.loadtxt(dirName + os.sep + dataSetList[i] + "/ab/diff-tau-vs-activity.dat")
-        phi = dpCorr.readFromParams(dirName + os.sep + dataSetList[i] + "/ab/Dr1e-01-v03e-03/dynamics/", "phi")
+        phi = utils.readFromParams(dirName + os.sep + dataSetList[i] + "/ab/Dr1e-01-v03e-03/dynamics/", "phi")
         legendlabel = "$\\varphi=$" + str(np.format_float_positional(phi,4))
         ax[1].loglog(1/data[:,1], data[:,3], linewidth=1.2, color = colorList(i/dataSetList.shape[0]), marker='o', label = legendlabel)
         if(i == sampleId):
             for j in range(v0List.shape[0]):
                 if(os.path.exists(dirName + str(sampleId) + "/ab/Dr1e-01-v0" + v0List[j] + "/dynamics/corr-log.dat")):
                     corr = np.loadtxt(dirName + str(sampleId) + "/ab/Dr1e-01-v0" + v0List[j] + "/dynamics/corr-log.dat")
-                    timeStep = dpCorr.readFromParams(dirName + str(sampleId) + "/ab/Dr1e-01-v0" + v0List[j] + "/dynamics", "dt")
-                    Teff = dpCorr.readFromParams(dirName + str(sampleId) + "/ab/Dr1e-01-v0" + v0List[j] + "/dynamics", "temperature")
+                    timeStep = utils.readFromParams(dirName + str(sampleId) + "/ab/Dr1e-01-v0" + v0List[j] + "/dynamics", "dt")
+                    Teff = utils.readFromParams(dirName + str(sampleId) + "/ab/Dr1e-01-v0" + v0List[j] + "/dynamics", "temperature")
                     legendlabel = "$T_{eff}=$" + str(np.format_float_scientific(Teff, 2))
                     plotDPCorr(ax[0], corr[1:,0]*timeStep, corr[1:,2], corr[1:,5], "$ISF(\\Delta t)$", color = v0ColorList(j/v0List.shape[0]), legendLabel = legendlabel)
     ax[0].plot(np.linspace(1e-03,1e10,50), np.exp(-1)*np.ones(50), linestyle='--', linewidth=1.2, color=[0.5,0.5,0.5])
@@ -451,7 +450,7 @@ def plotDPTauVsPhi(dirName, figureName):
 def plotDPVelCorrelation(dirName, figureName, numBins):
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype=int)
-    bins, velcorr = dpCorr.computeVelocityHistogram(dirName, boxSize, nv, numBins)
+    bins, velcorr = utils.computeVelocityHistogram(dirName, boxSize, nv, numBins)
     fig = plt.subplots(dpi = 150)
     ax = plt.gca()
     ax.plot(bins, velcorr, linewidth=1.2, color='k')

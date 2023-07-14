@@ -8,16 +8,9 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 import sys
 import os
-import utilsCorr as ucorr 
+import utils
 
 ################################ shape reading #################################
-def readShape(dirName, boxSize, nv):
-    pos = np.array(np.loadtxt(dirName + os.sep + "positions.dat"))
-    area = np.loadtxt(dirName + os.sep + "areas.dat")
-    _, perimeter = shapeDescriptors.getAreaAndPerimeterList(pos, boxSize, nv)
-    np.savetxt(dirName + os.sep + "perimeters.dat", perimeter)
-    return perimeter**2/(4*np.pi*area)
-
 def readShapePair(dirName, index1, index2):
     perimeter1 = np.loadtxt(dirName + os.sep + "t" + str(index1) + "/perimeters.dat")
     area1 = np.loadtxt(dirName + os.sep + "t" + str(index1) + "/areas.dat")
@@ -36,15 +29,10 @@ def calcShapePair(dirName, index1, index2, boxSize, nv):
     np.savetxt(dirName + os.sep + "t" + str(index2) + os.sep + "perimeters.dat", perimeter2)
     return perimeter1**2/(4*np.pi*area1), perimeter2**2/(4*np.pi*area2)
 
-def computePDF(data, bins, density=True):
-    pdf, edges = np.histogram(data, bins=bins, density=density)
-    centers = 0.5 * (edges[:-1] + edges[1:])
-    return pdf, centers
-
 def plotDistributions(data, numBins=20, xlabel="$e_x$", ylabel="$e_y$", figureName="pdf"):
     fig, ax = plt.subplots(1, 2, figsize = (12, 5), sharey = True, dpi = 120)
     for m in range(data.shape[1]):
-        pdf, bins = computePDF(data[:,m], np.linspace(np.min(data[:,m]), np.max(data[:,m]), numBins))
+        pdf, bins = utils.computePDF(data[:,m], np.linspace(np.min(data[:,m]), np.max(data[:,m]), numBins))
         ax[m].plot(bins, pdf, linewidth=1.2, color = 'k')
         ax[m].tick_params(axis='both', labelsize=14)
     ax[0].set_xlabel(xlabel, fontsize=17)
@@ -67,7 +55,7 @@ def getAreaAndPerimeterList(pos, boxSize, nv):
             nextId = vId + 1
             if(vId == idList[-1]):
                 nextId = idList[0]
-            delta = ucorr.pbcDistance(pos[nextId,:], currentPos, boxSize)
+            delta = utils.pbcDistance(pos[nextId,:], currentPos, boxSize)
             nextPos = pos[nextId,:] + delta
             area[pId] += currentPos[0] * nextPos[1] - nextPos[0] * currentPos[1]
             perimeter[pId] += np.linalg.norm(delta)
@@ -136,7 +124,7 @@ def computeInertiaTensor(dirName, boxSize, nv, numBins = 20, plot=True):
     for pId in range(numParticles):
         idList = np.arange(firstVertex, firstVertex+nv[pId], 1)
         for vId in idList:
-            delta = ucorr.pbcDistance(pos[vId,:], pPos[pId], boxSize)
+            delta = utils.pbcDistance(pos[vId,:], pPos[pId], boxSize)
             moment[pId,0] += delta[0]**2
             moment[pId,1] += delta[0]*delta[1]
             moment[pId,2] += delta[1]*delta[0]
@@ -162,7 +150,7 @@ def computeStretchTensor(dirName, boxSize, nv, numBins = 20, plot=True):
             nextId = vId + 1
             if(vId == idList[-1]):
                 nextId = idList[0]
-            delta = ucorr.pbcDistance(pos[nextId,:], currentPos, boxSize)
+            delta = utils.pbcDistance(pos[nextId,:], currentPos, boxSize)
             nextPos = pos[nextId,:] + delta
             moment[pId,0] += delta[0]**2
             moment[pId,1] += delta[0]*delta[1]
@@ -183,12 +171,12 @@ def computeParticleElongation(pos, boxSize):
         for j in range(i):
             if(distances[i,j] > longestDistance):
                 longestDistance = distances[i,j]
-                longestDelta = ucorr.pbcDistance(pos[i], pos[j], boxSize)
+                longestDelta = utils.pbcDistance(pos[i], pos[j], boxSize)
     longestPerpendicularDistance = 0
     highestSinangle = 0
     for i in range(pos.shape[0]):
         for j in range(i):
-            delta = ucorr.pbcDistance(pos[i], pos[j], boxSize)
+            delta = utils.pbcDistance(pos[i], pos[j], boxSize)
             sinangle = np.sin(np.dot(delta, longestDelta) / (distances[i,j] * longestDistance))
             if(sinangle > highestSinangle):
                 highestSisngle = sinangle

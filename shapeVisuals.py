@@ -10,9 +10,8 @@ from matplotlib import cm
 import itertools
 import sys
 import os
-import computeCorrelation
-import shapeDescriptors
-import shapeGraphics
+import utils
+import shapeDescriptors as shape
 
 def setAxis2D(ax):
     ax.set_xticklabels([])
@@ -76,8 +75,8 @@ def plotShapeDirectors(dirName, figureName, alpha = 0.2):
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     numParticles = nv.shape[0]
     # find largest eigenvector of moment of inertia
-    eigs, eigv, pPos = shapeDescriptors.computeInertiaTensor(dirName, boxSize, nv, plot=False)
-    numParticles = int(computeCorrelation.readFromParams(dirName, "numParticles"))
+    eigs, eigv, pPos = shape.computeInertiaTensor(dirName, boxSize, nv, plot=False)
+    numParticles = int(utils.readFromParams(dirName, "numParticles"))
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     pPos -= np.floor(pPos/boxSize) * boxSize
     eigvmax = np.zeros((numParticles, 2))
@@ -98,8 +97,8 @@ def plotShapeAlignment(dirName, angleTh, figureName="directors", alpha = 0.6, pl
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     numParticles = nv.shape[0]
     # find largest eigenvector of moment of inertia
-    eigvmax, pPos = shapeDescriptors.getShapeDirections(dirName, boxSize, nv)
-    intensity = shapeDescriptors.getVectorFieldAlignement(dirName, eigvmax, angleTh, 2, numParticles)
+    eigvmax, pPos = shape.getShapeDirections(dirName, boxSize, nv)
+    intensity = shape.getVectorFieldAlignement(dirName, eigvmax, angleTh, 2, numParticles)
     colorList = [[1-x, 1-x, 1] for x in intensity]
     edgeColorList = np.ones((numParticles,3))
     edgeColorList[intensity==1] *= 0.2
@@ -114,9 +113,9 @@ def plotShapeClusters(dirName, figureName, angleTh, alpha = 0.6, plot=True):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     numParticles = nv.shape[0]
-    eigvmax, pPos = shapeDescriptors.getShapeDirections(dirName, boxSize, nv)
-    intensity = shapeDescriptors.getVectorFieldAlignement(dirName, eigvmax, angleTh, 2, numParticles)
-    clusterList, particleLabel, clusterAngle = shapeDescriptors.clusterVectorField(dirName, eigvmax, intensity, angleTh, numParticles)
+    eigvmax, pPos = shape.getShapeDirections(dirName, boxSize, nv)
+    intensity = shape.getVectorFieldAlignement(dirName, eigvmax, angleTh, 2, numParticles)
+    clusterList, particleLabel, clusterAngle = shape.clusterVectorField(dirName, eigvmax, intensity, angleTh, numParticles)
     # plot clusters
     clusterList = np.array(clusterList)
     colorLabel = cm.get_cmap('hsv', 90)
@@ -146,7 +145,7 @@ def makeShapeClusterVideo(dirName, figureName, angleTh, numFrames = 20, firstSte
         return gcf.artists
     frameTime = 200
     frames = []
-    stepList = shapeGraphics.getStepList(numFrames, firstStep, freqPower)
+    stepList = utils.getStepList(numFrames, firstStep, freqPower)
     print(stepList)
     #frame figure
     figFrame = plt.figure(dpi=150)
@@ -173,12 +172,12 @@ def makeShapeClusterVideo(dirName, figureName, angleTh, numFrames = 20, firstSte
         setDPMAxes(boxSize, axFrame)
         plotDeformableParticles(axFrame, pos, rad, nv, faceColor = [1,1,1], edgeColor = [0.8,0.8,0.8], colorMap = False, edgeColorMap = False, alpha = 0.4, highlightList=highlightList)
         #plot clusters
-        eigvmax, pPos = shapeDescriptors.getShapeDirections(dirName + os.sep + "t" + str(i), boxSize, nv)
-        intensity = shapeDescriptors.getVectorFieldAlignement(dirName + os.sep + "t" + str(i), eigvmax, angleTh, 2, numParticles)
+        eigvmax, pPos = shape.getShapeDirections(dirName + os.sep + "t" + str(i), boxSize, nv)
+        intensity = shape.getVectorFieldAlignement(dirName + os.sep + "t" + str(i), eigvmax, angleTh, 2, numParticles)
         if(intensity[intensity==1].shape[0] == 0):
             print("no aligned particles at time step ", i)
         else:
-            clusterList, particleLabel, clusterAngle = shapeDescriptors.clusterVectorField(dirName + os.sep + "t" + str(i), eigvmax, intensity, angleTh, numParticles)
+            clusterList, particleLabel, clusterAngle = shape.clusterVectorField(dirName + os.sep + "t" + str(i), eigvmax, intensity, angleTh, numParticles)
             for c in range(clusterList.shape[0]):
                 label = clusterList[c]
                 if(particleLabel[particleLabel==label].shape[0]>3):
@@ -192,11 +191,11 @@ def makeShapeClusterVideo(dirName, figureName, angleTh, numFrames = 20, firstSte
     anim.save("/home/francesco/Pictures/dpm/packings/cluster-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def stressShapeVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04):
-    stepList = shapeGraphics.getStepList(numFrames, firstStep, stepFreq)
+    stepList = utils.getStepList(numFrames, firstStep, stepFreq)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     nv = np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int)
     numParticles = nv.shape[0]
-    contactdiff = shapeGraphics.getContactDiff(dirName, numParticles, stepList)
+    contactdiff = utils.getContactDiff(dirName, numParticles, stepList)
     rearrangeId = np.argwhere(contactdiff==2)[1]
     print(rearrangeId)
     #numContactList = []
@@ -210,10 +209,10 @@ def stressShapeVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, step
         area = np.loadtxt(dirName + os.sep + "t" + str(i) + "/areas.dat")
         perimeter = np.loadtxt(dirName + os.sep + "t" + str(i) + "/perimeters.dat")
         shapeParam.append(perimeter[rearrangeId]**2/(4*np.pi*area[rearrangeId]))
-        #eigs, _, _ = shapeDescriptors.computeInertiaTensor(dirName + os.sep + "t" + str(i), boxSize, nv, plot=False)
+        #eigs, _, _ = shape.computeInertiaTensor(dirName + os.sep + "t" + str(i), boxSize, nv, plot=False)
         #eigMaxList.append(eigs[rearrangeId,1])
         #eigMinList.append(eigs[rearrangeId,0])
-        eigsStress, _ = shapeDescriptors.computeStressTensor(dirName + os.sep + "t" + str(i), nv, plot=False)
+        eigsStress, _ = shape.computeStressTensor(dirName + os.sep + "t" + str(i), nv, plot=False)
         eigMaxStressList.append(eigsStress[rearrangeId,1])
     #numContactList = np.array(numContactList)
     shapeParam = np.array(shapeParam)
@@ -258,19 +257,19 @@ def stressShapeVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, step
     anim.save("/home/francesco/Pictures/dpm/packings/contactShape-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def checkShapeVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04):
-    stepList = shapeGraphics.getStepList(numFrames, firstStep, stepFreq)
+    stepList = utils.getStepList(numFrames, firstStep, stepFreq)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     nv = np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int)
     numParticles = nv.shape[0]
     shapeParam = []
     pos0 = np.loadtxt(dirName + "/positions.dat")
-    _, perimeter0 = shapeDescriptors.getAreaAndPerimeterList(pos0, boxSize, nv)
+    _, perimeter0 = shape.getAreaAndPerimeterList(pos0, boxSize, nv)
     area0 = np.loadtxt(dirName + "/areas.dat")
     shapeParam0 = np.mean(perimeter0**2/(4*np.pi*area0))
     data = np.loadtxt(dirName + os.sep + "energy.dat")
     for i in stepList:
         pos = np.loadtxt(dirName + os.sep + "t" + str(i) + "/positions.dat")
-        _, perimeter = shapeDescriptors.getAreaAndPerimeterList(pos, boxSize, nv)
+        _, perimeter = shape.getAreaAndPerimeterList(pos, boxSize, nv)
         area = np.loadtxt(dirName + os.sep + "t" + str(i) + "/areas.dat")
         shapeParam.append(np.mean(perimeter**2/(4*np.pi*area)))
     # animation
@@ -298,7 +297,7 @@ def checkShapeVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepF
     anim.save("/home/francesco/Pictures/dpm/packings/checkShape-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
 
 def makeVelocityMapVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, numBins = 40, vertex = True):
-    stepList = shapeGraphics.getStepList(numFrames, firstStep, stepFreq)
+    stepList = utils.getStepList(numFrames, firstStep, stepFreq)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     xbin = np.linspace(0,boxSize[0],numBins)
     ybin = np.linspace(0,boxSize[1],numBins)
@@ -319,7 +318,7 @@ def makeVelocityMapVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, 
             pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepList[i]) + os.sep + "positions.dat"))
         else:
             pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepList[i]) + os.sep + "particlePos.dat"))
-            vel = computeCorrelation.computeParticleVelocities(vel, nv)
+            vel = utils.computeParticleVelocities(vel, nv)
         pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
         pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
         for id in range(pos.shape[0]):

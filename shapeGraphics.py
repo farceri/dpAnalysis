@@ -10,26 +10,8 @@ from matplotlib import cm
 import itertools
 import sys
 import os
-import utilsCorr as ucorr
-import utilsPlot as uplot
-import shapeDescriptors
-
-def getContactDiff(dirName, numParticles, stepList):
-    initialContacts = np.loadtxt(dirName + os.sep + "t" + str(stepList[0]) + "/contacts.dat", dtype=int)
-    initialContacts = np.flip(np.sort(initialContacts, axis=1), axis=1)
-    finalContacts = np.loadtxt(dirName + os.sep + "t" + str(stepList[-1]) + "/contacts.dat", dtype=int)
-    finalContacts = np.flip(np.sort(finalContacts, axis=1), axis=1)
-    contactdiff = np.zeros(numParticles)
-    for i in range(numParticles):
-        isdiff = True
-        for c in initialContacts[i]:
-            if(c != -1):
-                for b in finalContacts[i]:
-                    if(c == b):
-                        isdiff = False
-            if(isdiff == True):
-                contactdiff[i] += 1
-    return contactdiff
+import shape
+import utils
 
 def plotErrorBar(ax, x, y, err, xlabel, ylabel, color = 'k', logx = False, logy = False):
     ax.errorbar(x, y, err, marker='.', color=color, markersize=5, markeredgecolor='k', markeredgewidth=0.7, linewidth=1.2, elinewidth=1, capsize=4)
@@ -51,16 +33,16 @@ def plotElongationVSActivity(dirName, figureName, numBins=20):
     legendList  = []
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/corr-log.dat")):
-            Teff = ucorr.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/", "temperature")
+            Teff = utils.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/", "temperature")
             legendList.append("$T_{eff}=$" + str(np.format_float_scientific(Teff, 2)))
             boxSize = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + os.sep + "boxSize.dat")
             nv = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + os.sep + "numVertexInParticleList.dat", dtype=int)
-            dirList = np.sort(ucorr.getDirectories(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/"))
+            dirList = np.sort(utils.getDirectories(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/"))
             elong = []
             for dir in dirList[-9:]:
-                elong.append(shapeDescriptors.computeElongation(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + dir, boxSize, nv))
+                elong.append(shape.computeElongation(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + dir, boxSize, nv))
             data = np.array(elong)
-            pdf, bins = shapeDescriptors.computePDF(data, np.linspace(np.min(data), np.max(data), numBins))
+            pdf, bins = shape.computePDF(data, np.linspace(np.min(data), np.max(data), numBins))
             ax.plot(bins, pdf, linewidth=1.2, color = colorList[i])
     ax.legend(legendList, loc ="upper right", fontsize=11)
     ax.tick_params(axis='both', labelsize=12)
@@ -79,16 +61,16 @@ def plotElongationVSPhi(dirName, v0String, figureName, numBins=20):
     legendList  = []
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/corr-log.dat")):
-            phi = ucorr.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
+            phi = utils.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
             legendList.append("$\\varphi=$" + str(np.format_float_positional(phi, 4)))
             boxSize = np.loadtxt(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics" + os.sep + "boxSize.dat")
             nv = np.loadtxt(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics" + os.sep + "numVertexInParticleList.dat", dtype=int)
-            dirList = np.sort(ucorr.getDirectories(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics"))
+            dirList = np.sort(utils.getDirectories(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics"))
             elong = []
             for dir in dirList[-9:]:
-                elong.append(shapeDescriptors.computeElongation(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/" + dir, boxSize, nv))
+                elong.append(shape.computeElongation(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/" + dir, boxSize, nv))
             data = np.array(elong)
-            pdf, bins = shapeDescriptors.computePDF(data, np.linspace(np.min(data), np.max(data), numBins))
+            pdf, bins = shape.computePDF(data, np.linspace(np.min(data), np.max(data), numBins))
             ax.plot(bins, pdf, linewidth=1.2, color = colorList(i/dataSetList.shape[0]))
     ax.legend(legendList, loc ="upper right", fontsize=11)
     ax.tick_params(axis='both', labelsize=12)
@@ -105,22 +87,22 @@ def plotShapeMomentsVSActivity(dirName, figureName, numBins=20):
     legendList  = []
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/corr-log.dat")):
-            Teff = ucorr.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "temperature")
+            Teff = utils.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "temperature")
             legendList.append("$T_{eff}=$" + str(np.format_float_scientific(Teff, 2)))
             boxSize = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics" + os.sep + "boxSize.dat")
             nv = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics" + os.sep + "numVertexInParticleList.dat", dtype=int)
-            dirList = np.sort(ucorr.getDirectories(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics"))
+            dirList = np.sort(utils.getDirectories(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics"))
             first = []
             second = []
             third = []
             for dir in dirList[-49:]:
-                moments = shapeDescriptors.computeShapeMoments(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + dir, boxSize, nv)
+                moments = shape.computeShapeMoments(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + dir, boxSize, nv)
                 first.append(moments[0])
                 second.append(moments[1])
                 third.append(moments[2])
             data = np.array((np.array(first).flatten(), np.array(second).flatten(), np.array(third).flatten()))
             for m in range(data.shape[0]):
-                pdf, bins = shapeDescriptors.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
+                pdf, bins = shape.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
                 ax[m].plot(bins, pdf, linewidth=1.2, color = colorList[i])
     ax[2].legend(legendList, loc ="upper right", fontsize=12)
     for i in range(3):
@@ -142,22 +124,22 @@ def plotShapeMomentsVSPhi(dirName, v0String, figureName, numBins=20):
     legendList  = []
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/corr-log.dat")):
-            phi = ucorr.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
+            phi = utils.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
             legendList.append("$\\varphi=$" + str(np.format_float_positional(phi, 4)))
             boxSize = np.loadtxt(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics" + os.sep + "boxSize.dat")
             nv = np.loadtxt(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics" + os.sep + "numVertexInParticleList.dat", dtype=int)
-            dirList = np.sort(ucorr.getDirectories(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics"))
+            dirList = np.sort(utils.getDirectories(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics"))
             first = []
             second = []
             third = []
             for dir in dirList[-49:]:
-                moments = shapeDescriptors.computeShapeMoments(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/" + dir, boxSize, nv)
+                moments = shape.computeShapeMoments(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/" + dir, boxSize, nv)
                 first.append(moments[0])
                 second.append(moments[1])
                 third.append(moments[2])
             data = np.array((np.array(first).flatten(), np.array(second).flatten(), np.array(third).flatten()))
             for m in range(data.shape[0]):
-                pdf, bins = shapeDescriptors.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
+                pdf, bins = shape.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
                 ax[m].plot(bins, pdf, linewidth=1.2, color = colorList(i/dataSetList.shape[0]))
     ax[2].legend(legendList, loc ="upper right", fontsize=11)
     for i in range(3):
@@ -178,20 +160,20 @@ def plotInertiaVSActivity(dirName, figureName, numBins=20):
     legendList  = []
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/corr-log.dat")):
-            Teff = ucorr.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "temperature")
+            Teff = utils.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "temperature")
             legendList.append("$T_{eff}=$" + str(np.format_float_scientific(Teff, 2)))
             boxSize = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics" + os.sep + "boxSize.dat")
             nv = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics" + os.sep + "numVertexInParticleList.dat", dtype=int)
-            dirList = np.sort(ucorr.getDirectories(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics"))
+            dirList = np.sort(utils.getDirectories(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics"))
             first = []
             second = []
             for dir in dirList[-49:]:
-                moments, _ = shapeDescriptors.computeInertiaTensor(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + dir, boxSize, nv, plot=False)
+                moments, _ = shape.computeInertiaTensor(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/" + dir, boxSize, nv, plot=False)
                 first.append(moments[:,0])
                 second.append(moments[:,1])
             data = np.array((np.array(first).flatten(), np.array(second).flatten()))
             for m in range(data.shape[0]):
-                pdf, bins = shapeDescriptors.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
+                pdf, bins = shape.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
                 ax[m].plot(bins, pdf, linewidth=1.2, color = colorList[i])
                 ax[m].tick_params(axis='both', labelsize=14)
                 #ax[m].set_xlim(-0.002,0.037)
@@ -214,20 +196,20 @@ def plotInertiaVSPhi(dirName, v0String, figureName, numBins=20):
     legendList  = []
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/corr-log.dat")):
-            phi = ucorr.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
+            phi = utils.readFromParams(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics", "phi")
             legendList.append("$\\varphi=$" + str(np.format_float_positional(phi, 4)))
             boxSize = np.loadtxt(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics" + os.sep + "boxSize.dat")
             nv = np.loadtxt(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics" + os.sep + "numVertexInParticleList.dat", dtype=int)
-            dirList = np.sort(ucorr.getDirectories(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics"))
+            dirList = np.sort(utils.getDirectories(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics"))
             first = []
             second = []
             for dir in dirList[-49:]:
-                moments, _ = shapeDescriptors.computeInertiaTensor(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/" + dir, boxSize, nv, plot=False)
+                moments, _ = shape.computeInertiaTensor(dirName + dataSetList[i] + "/ab/Dr1e-01-v0" + v0String + "/dynamics/" + dir, boxSize, nv, plot=False)
                 first.append(moments[:,0])
                 second.append(moments[:,1])
             data = np.array((np.array(first).flatten(), np.array(second).flatten()))
             for m in range(data.shape[0]):
-                pdf, bins = shapeDescriptors.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
+                pdf, bins = shape.computePDF(data[m], np.linspace(np.min(data[m]), np.max(data[m]), numBins))
                 ax[m].plot(bins, pdf, linewidth=1.2, color = colorList(i/dataSetList.shape[0]))
                 ax[m].tick_params(axis='both', labelsize=14)
                 #ax[m].set_xlim(-0.002,0.037)
@@ -251,8 +233,8 @@ def plotShapeCorrelation(dirName, figureName):
     legendList  = []
     for i in range(dataSetList.shape[0]):
         if(os.path.exists(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/corr-shape.dat")):
-            Teff = ucorr.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/", "temperature")
-            timeStep = ucorr.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "dt")
+            Teff = utils.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/", "temperature")
+            timeStep = utils.readFromParams(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics", "dt")
             legendList.append("$v_0=$" + dataSetList[i])
             #legendList.append("$T_{eff}=$" + str(np.format_float_scientific(Teff, 2)))
             data = np.loadtxt(dirName + "/Dr1e-01-v0" + dataSetList[i] + "/dynamics/corr-shape.dat")
@@ -275,12 +257,12 @@ def plotShapeCorrelation(dirName, figureName):
     plt.show()
 
 def plotShapeStressCorrelation(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, numBins=30):
-    stepList = uplot.getStepList(numFrames, firstStep, stepFreq)
+    stepList = utils.getStepList(numFrames, firstStep, stepFreq)
     boxSize = np.array(np.loadtxt(dirName + os.sep + "boxSize.dat"))
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype=int)
     numParticles = nv.shape[0]
     # get list of most rearranging particles
-    contactdiff = getContactDiff(dirName, numParticles, stepList)
+    contactdiff = utils.getContactDiff(dirName, numParticles, stepList)
     print(contactdiff[contactdiff>0])
     rearrangeList = np.argwhere(contactdiff>=2)
     rearrangeList = rearrangeList[:,0]
@@ -299,19 +281,19 @@ def plotShapeStressCorrelation(dirName, figureName, numFrames = 20, firstStep = 
     #ax = plt.gca()
     for step in stepList:
         if(os.path.isdir(dirName + os.sep + "t" + str(step))):
-            eigs, eigvShape, _ = shapeDescriptors.computeInertiaTensor(dirName + os.sep + "t" + str(step), boxSize, nv, plot=False)
+            eigs, eigvShape, _ = shape.computeInertiaTensor(dirName + os.sep + "t" + str(step), boxSize, nv, plot=False)
             asphericity.append(eigs[rearrangeList,1])
             perimeter = np.loadtxt(dirName + os.sep + "t" + str(step) + "/perimeters.dat")
             area = np.loadtxt(dirName + os.sep + "t" + str(step) + "/areas.dat")
             shapeparam.append(perimeter[rearrangeList]**2/(4*np.pi*area[rearrangeList]))
-            eigs, eigvStress = shapeDescriptors.computeStressTensor(dirName + os.sep + "t" + str(step), nv, plot=False)
+            eigs, eigvStress = shape.computeStressTensor(dirName + os.sep + "t" + str(step), nv, plot=False)
             eigsStress.append(eigs[rearrangeList,1])
             for i in rearrangeList:
                 eigvShapeMax[i] = eigvShape[i,1]
                 eigvStressMax[i] = eigvStress[i,1]
                 angle = np.arccos(np.sum((eigvShapeMax[i]/np.linalg.norm(eigvShapeMax[i])) * (eigvStressMax[i]/np.linalg.norm(eigvStressMax[i]))))
                 angles.append(np.degrees(angle))
-    pdf, bins = shapeDescriptors.computePDF(angles, np.linspace(np.min(angles), np.max(angles), numBins))
+    pdf, bins = shape.computePDF(angles, np.linspace(np.min(angles), np.max(angles), numBins))
     ax[0].plot(bins, pdf, linewidth=1.2, color = 'b')
     ax[1].scatter(shapeparam, eigsStress, color = 'b', linewidth=1.2, alpha=0.5, marker='o')
     ax[0].tick_params(axis="both", labelsize=14)

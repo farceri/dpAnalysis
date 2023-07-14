@@ -6,34 +6,11 @@ Created by Francesco
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
-import utilsCorr as ucorr
 import utilsPlot as uplot
+import utils
 import shapeDescriptors
 import sys
 import os
-
-########################### Pair Correlation Function ##########################
-def computePairCorr(dirName, plot=True):
-    boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
-    phi = readFromParams(dirName, "phi")
-    rad = np.loadtxt(dirName + os.sep + "particleRad.dat")
-    meanRad = np.mean(rad)
-    pos = np.loadtxt(dirName + os.sep + "particlePos.dat")
-    pos = np.array(pos)
-    pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
-    pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
-    distance = ucorr.computeDistances(pos[rad>np.mean(rad)], boxSize).flatten()
-    distance = distance[distance>0]
-    bins = np.linspace(np.min(distance), np.max(distance), 50)
-    pairCorr, edges = np.histogram(distance, bins=bins, density=True)
-    binCenter = 0.5 * (edges[:-1] + edges[1:])
-    pairCorr /= (phi * 2 * np.pi * binCenter)
-    firstPeak = binCenter[np.argmax(pairCorr)]
-    print("First peak of pair corr is at distance:", firstPeak, "equal to", firstPeak/meanRad, "times the mean radius:", meanRad)
-    if(plot == True):
-        uplot.plotCorrelation(binCenter, pairCorr, "$Pair$ $correlation$ $function,$ $g(r)$")
-    else:
-        return firstPeak
 
 ############################### Self Correlations ##############################
 def computeSelfCorr(dirName, maxPower):
@@ -48,7 +25,7 @@ def computeSelfCorr(dirName, maxPower):
     particleCorr = []
     vertexCorr = []
     # get trajectory directories
-    stepRange = ucorr.getDirectories(dirName)
+    stepRange = utils.getDirectories(dirName)
     stepRange = np.array(np.char.strip(stepRange, 't'), dtype=int)
     stepRange = np.sort(stepRange)
     pPos0 = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[0]) + "/particlePos.dat"))
@@ -57,16 +34,16 @@ def computeSelfCorr(dirName, maxPower):
     for i in range(1,stepRange.shape[0]):
         pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/particlePos.dat"))
         pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepRange[i]) + "/positions.dat"))
-        particleCorr.append(computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, boxSize))
-        vertexCorr.append(computeCorrFunctions(pos, pos0, boxSize, waveVector, boxSize))
+        particleCorr.append(utils.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, boxSize))
+        vertexCorr.append(utils.computeCorrFunctions(pos, pos0, boxSize, waveVector, boxSize))
     particleCorr = np.array(particleCorr).reshape((stepRange.shape[0]-1,3))
     vertexCorr = np.array(vertexCorr).reshape((stepRange.shape[0]-1,3))
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-lin.dat", np.column_stack((stepRange, particleCorr, vertexCorr)))
     uplot.plotCorrelation(stepRange, particleCorr[:,1], "$ISF$", "$Simulation$ $step$", logx = True, color='k')
 
-########## Check Self Correlations by logarithmically spaced blocks ############
-def checkSelfCorr(dirName, numBlocks, maxPower):
+########### Plot Self Correlations by logarithmically spaced blocks ############
+def plotSelfCorr(dirName, numBlocks, maxPower):
     colorList = cm.get_cmap('viridis', 10)
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype = int)
@@ -77,7 +54,7 @@ def checkSelfCorr(dirName, numBlocks, maxPower):
     pWaveVector = np.pi / (np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
     waveVector = np.pi / meanRad
     # get trajectory directories
-    stepRange = ucorr.getDirectories(dirName)
+    stepRange = utils.getDirectories(dirName)
     stepRange = np.array(np.char.strip(stepRange, 't'), dtype=int)
     stepRange = np.sort(stepRange)
     start = np.argwhere(stepRange==0)[0,0]
@@ -95,8 +72,8 @@ def checkSelfCorr(dirName, numBlocks, maxPower):
         for i in range(1,stepBlock.shape[0]):
             pPos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepBlock[i]) + "/particlePos.dat"))
             pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepBlock[i]) + "/positions.dat"))
-            particleCorr.append(computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, boxSize))
-            vertexCorr.append(computeCorrFunctions(pos, pos0, boxSize, waveVector, boxSize))
+            particleCorr.append(utils.computeCorrFunctions(pPos, pPos0, boxSize, pWaveVector, boxSize))
+            vertexCorr.append(utils.computeCorrFunctions(pos, pos0, boxSize, waveVector, boxSize))
         particleCorr = np.array(particleCorr).reshape((stepBlock.shape[0]-1,3))
         vertexCorr = np.array(vertexCorr).reshape((stepBlock.shape[0]-1,3))
         stepBlock = stepBlock[1:]-(block-1)*decade#discard initial time
@@ -130,11 +107,11 @@ def computeLogSelfCorr(dirName, startBlock, maxPower, freqPower):
             numPairs = 0
             for multiple in range(startBlock, numBlocks):
                 for i in range(stepRange.shape[0]-1):
-                    if(ucorr.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
+                    if(utils.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
                         #print(multiple, i, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        pPos1, pos1, pPos2, pos2 = ucorr.readPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        stepParticleCorr.append(computeCorrFunctions(pPos1, pPos2, boxSize, pWaveVector, boxSize))
-                        stepVertexCorr.append(computeCorrFunctions(pos1, pos2, boxSize, waveVector, boxSize))
+                        pPos1, pos1, pPos2, pos2 = utils.readPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
+                        stepParticleCorr.append(utils.computeCorrFunctions(pPos1, pPos2, boxSize, pWaveVector, boxSize))
+                        stepVertexCorr.append(utils.computeCorrFunctions(pos1, pos2, boxSize, waveVector, boxSize))
                         numPairs += 1
             if(numPairs > 0):
                 stepList.append(spacing*spacingDecade)
@@ -175,11 +152,11 @@ def computeBlockSelfCorr(dirName, startBlock, maxPower, freqPower):
             stepVertexCorr = []
             numPairs = 0
             for multiple in range(startBlock, numBlocks):
-                if(ucorr.checkPair(dirName, multiple*freqDecade, multiple*freqDecade + stepRange[i])):
+                if(utils.checkPair(dirName, multiple*freqDecade, multiple*freqDecade + stepRange[i])):
                     #print(multiple*freqDecade, multiple*freqDecade + stepRange[i])
-                    pPos1, pos1, pPos2, pos2 = ucorr.readPair(dirName, multiple*freqDecade, multiple*freqDecade + stepRange[i])
-                    stepParticleCorr.append(computeCorrFunctions(pPos1, pPos2, boxSize, pWaveVector, boxSize))
-                    stepVertexCorr.append(computeCorrFunctions(pos1, pos2, boxSize, waveVector, boxSize))
+                    pPos1, pos1, pPos2, pos2 = utils.readPair(dirName, multiple*freqDecade, multiple*freqDecade + stepRange[i])
+                    stepParticleCorr.append(utils.computeCorrFunctions(pPos1, pPos2, boxSize, pWaveVector, boxSize))
+                    stepVertexCorr.append(utils.computeCorrFunctions(pos1, pos2, boxSize, waveVector, boxSize))
                     numPairs += 1
             if(numPairs > 0):
                 particleCorr.append(np.mean(stepParticleCorr, axis=0))
@@ -202,7 +179,7 @@ def computeShapeCorr(dirName, maxPower):
     numParticles = nv.shape[0]
     shapeCorr = []
     # get trajectory directories
-    stepRange = ucorr.getDirectories(dirName)
+    stepRange = utils.getDirectories(dirName)
     stepRange = np.array(np.char.strip(stepRange, 't'), dtype=int)
     stepRange = np.sort(stepRange)
     stepRange = stepRange[stepRange<int(10**maxPower)]
@@ -210,7 +187,7 @@ def computeShapeCorr(dirName, maxPower):
     shape0 = shapeDescriptors.readShape(dirName + os.sep + "t" + str(stepRange[0]), boxSize, nv)
     for i in range(1,stepRange.shape[0]):
         shape = shapeDescriptors.readShape(dirName + os.sep + "t" + str(stepRange[i]), boxSize, nv)
-        shapeCorr.append(ucorr.computeShapeCorrFunction(shape0, shape))
+        shapeCorr.append(utils.computeShapeCorrFunction(shape0, shape))
     shapeCorr = np.array(shapeCorr)
     stepRange = stepRange[1:]#discard initial time
     np.savetxt(dirName + os.sep + "corr-shape.dat", np.column_stack((stepRange, shapeCorr)))
@@ -234,9 +211,9 @@ def computeLogVelCorr(dirName, startBlock, maxPower, freqPower):
             numPairs = 0
             for multiple in range(startBlock, numBlocks):
                 for i in range(stepRange.shape[0]-1):
-                    if(ucorr.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
+                    if(utils.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
                         #print(multiple, i, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
-                        pVel1, pVel2 = readVelPair(dirName, multiple*freqDecade, multiple*freqDecade + stepRange[i], nv)
+                        pVel1, pVel2 = utils.readVelPair(dirName, multiple*freqDecade, multiple*freqDecade + stepRange[i], nv)
                         stepVelCorr.append(computeVelCorrFunction(vel1, vel2))
                         numPairs += 1
             if(numPairs > 0):
@@ -253,7 +230,7 @@ def computeLogVelCorr(dirName, startBlock, maxPower, freqPower):
 def computeVelCorrContact(dirName, nv):
     numParticles = nv.shape[0]
     vel = np.array(np.loadtxt(dirName + os.sep + "velocities.dat"))
-    pVel = ucorr.computeParticleVelocities(vel, nv)
+    pVel = utils.computeParticleVelocities(vel, nv)
     meanVel = np.linalg.norm(np.mean(pVel, axis=0))
     contacts = np.array(np.loadtxt(dirName + os.sep + "neighbors.dat"), dtype = int)
     velcontact = np.zeros(numParticles)
@@ -271,10 +248,10 @@ def computeVelCorrDistance(dirName, boxSize, nv, distanceTh = 0.1):
     #distanceTh *= boxSize[0]
     numParticles = nv.shape[0]
     vel = np.array(np.loadtxt(dirName + os.sep + "velocities.dat"))
-    pVel = ucorr.computeParticleVelocities(vel, nv)
+    pVel = utils.computeParticleVelocities(vel, nv)
     meanVel = np.linalg.norm(np.mean(pVel, axis=0))
     pPos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    distance = ucorr.computeDistances(pPos, boxSize) / boxSize[0]
+    distance = utils.computeDistances(pPos, boxSize) / boxSize[0]
     veldistance = np.zeros(numParticles)
     for i in range(numParticles):
         distList = np.argwhere(distance[i]<distanceTh)[:,0]
@@ -284,51 +261,19 @@ def computeVelCorrDistance(dirName, boxSize, nv, distanceTh = 0.1):
         veldistance[i] /= distList.shape[0]-1
     return veldistance
 
-############################# Velocity Correlation #############################
-def computeVelocityHistogram(dirName, boxSize, nv, numBins):
-    numParticles = nv.shape[0]
-    vel = np.array(np.loadtxt(dirName + os.sep + "velocities.dat"))
-    pVel = np.zeros((numParticles, 2))
-    pPos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    distance = ucorr.computeDistances(pPos, boxSize) / boxSize[0] # only works for square box
-    bins = np.linspace(np.min(distance[distance>0]), np.max(distance), numBins)
-    binCenter = 0.5 * (bins[:-1] + bins[1:])
-    velCorr = []
-    firstVertex = 0
-    for pId in range(numParticles):
-        idList = np.arange(firstVertex, firstVertex+nv[pId], 1)
-        pVel[pId] = [np.mean(vel[firstVertex:firstVertex+nv[pId],0]), np.mean(vel[firstVertex:firstVertex+nv[pId],1])]
-        firstVertex += nv[pId]
-    for i in range(1, numParticles):
-        pvelcorr = np.zeros(numBins-1)
-        pcounts = np.zeros(numBins-1)
-        for j in range(i):
-            for k in range(numBins-1):
-                if(distance[i,j] > bins[k] and distance[i,j] <= bins[k+1]):
-                    pvelcorr[k] += np.dot(pVel[i]/np.linalg.norm(pVel[i]), pVel[j]/np.linalg.norm(pVel[j]))
-                    pcounts[k] += 1
-        pvelcorr[pcounts>0] /= pcounts[pcounts>0]
-        velCorr.append(pvelcorr)
-    velCorr = np.array(velCorr)
-    velCorr = np.mean(velCorr, axis=0)
-    return binCenter, velCorr
-
 
 if __name__ == '__main__':
     dirName = sys.argv[1]
     whichCorr = sys.argv[2]
 
-    if(whichCorr == "paircorr"):
-        computePairCorr(dirName)
-
     elif(whichCorr == "lincorr"):
         maxPower = int(sys.argv[3])
         computeSelfCorr(dirName, maxPower)
 
-    elif(whichCorr == "checkcorr"):
+    elif(whichCorr == "plotcorr"):
         numBlocks = int(sys.argv[3])
         maxPower = int(sys.argv[4])
-        checkSelfCorr(dirName, numBlocks, maxPower)
+        plotSelfCorr(dirName, numBlocks, maxPower)
 
     elif(whichCorr == "logcorr"):
         startBlock = int(sys.argv[3])
@@ -345,12 +290,6 @@ if __name__ == '__main__':
     elif(whichCorr == "linshape"):
         maxPower = int(sys.argv[3])
         computeShapeCorr(dirName, maxPower)
-
-    elif(whichCorr == "logshape"):
-        startBlock = int(sys.argv[3])
-        maxPower = int(sys.argv[4])
-        freqPower = int(sys.argv[5])
-        computeLogShapeCorr(dirName, startBlock, maxPower, freqPower)
 
     elif(whichCorr == "logvel"):
         startBlock = int(sys.argv[3])

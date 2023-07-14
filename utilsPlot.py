@@ -89,15 +89,6 @@ def plotCorrelation(x, y, ylabel, xlabel = "$Distance,$ $r$", logy = False, logx
     if(show == True):
         plt.pause(0.5)
 
-def getStepList(numFrames, firstStep, stepFreq):
-    maxStep = int(firstStep + stepFreq * numFrames)
-    stepList = np.arange(firstStep, maxStep, stepFreq, dtype=int)
-    if(stepList.shape[0] < numFrames):
-        numFrames = stepList.shape[0]
-    else:
-        stepList = stepList[-numFrames:]
-    return stepList
-
 def getDirLabelColorMarker(dirName, sampleName, index, fixed):
     DrList = np.array(["1", "1e-01", "1e-02"])
     f0List = np.array(["1", "40", "80"])
