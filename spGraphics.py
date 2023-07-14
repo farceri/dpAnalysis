@@ -299,7 +299,9 @@ def plotSimplexDensity(dirName, figureName, pad = 1, logy=False):
     if(os.path.exists(dirName + os.sep + 'simplexDensity.dat')):
         simplexDensity = np.loadtxt(dirName + os.sep + 'simplexDensity.dat')
     else:
-        _, simplexDensity = spCorr.computeDelaunayCluster(dirName)
+        _, simplexDensity = spCorr.computeDelaunayCluster(dirName, threshold=0.84, filter=True)
+    denseSimplexList = np.loadtxt(dirName + os.sep + 'denseSimplexList.dat')
+    #simplexDensity = simplexDensity[denseSimplexList==1]
     fig, ax = plt.subplots(1, 2, figsize=(9,4), dpi=150)
     ax[0].plot(np.arange(1, simplexDensity.shape[0]+1, 1), np.sort(simplexDensity), color='k', marker='.', markersize=8, lw=0.8, fillstyle='none')
     ax[0].tick_params(axis='both', labelsize=12)
@@ -309,19 +311,24 @@ def plotSimplexDensity(dirName, figureName, pad = 1, logy=False):
     pdf, edges = np.histogram(simplexDensity, bins=np.linspace(0, 1, numBins), density=True)
     edges = (edges[1:] + edges[:-1])/2
     ax[1].plot(edges, pdf, color='k', marker='.', markersize=8, lw=0.8, fillstyle='none')
-    ax[1].plot(np.ones(100)*0.906899682, np.linspace(np.min(pdf)-pad, np.max(pdf)+pad, 100), ls='dotted', color='k', lw=1, label='$Triangular$ $lattice$')
-    ax[1].plot(np.ones(100)*0.785398163, np.linspace(np.min(pdf)-pad, np.max(pdf)+pad, 100), ls='dashdot', color='k', lw=1, label='$Square$ $lattice$')
-    ax[1].legend(fontsize=10, loc='best')
+    y = np.linspace(np.min(pdf)-pad, np.max(pdf)+pad, 100)
     if(logy == 'logy'):
         ax[1].set_yscale('log')
-        ax[1].set_ylim(np.min(pdf), np.max(pdf)+pad/2)
+        #ax[1].set_ylim(np.min(pdf), np.max(pdf)+pad/2)
+        ax[1].set_ylim(6.4e-03, 50.6)
+        y = np.linspace(1e-04, 100, 100)
     else:
-        ax[1].set_ylim(np.min(pdf)-pad/2, np.max(pdf)+pad/2)
+        #ax[1].set_ylim(np.min(pdf)-pad/2, np.max(pdf)+pad/2)
+        ax[1].set_ylim(-2.8, 43.2)
+        y = np.linspace(-5, 50, 100)
+    ax[1].plot(np.ones(100)*0.906899682, y, ls='dotted', color='k', lw=1, label='$Triangular$ $lattice$')
+    ax[1].plot(np.ones(100)*0.785398163, y, ls='dashdot', color='k', lw=1, label='$Square$ $lattice$')
+    ax[1].legend(fontsize=10, loc='best')
     ax[1].tick_params(axis='both', labelsize=12)
     ax[1].set_ylabel('$PDF(\\varphi^{Simplex})$', fontsize=16)
     ax[1].set_xlabel('$\\varphi^{Simplex}$', fontsize=16)
     fig.tight_layout()
-    fig.subplots_adjust(wspace=0.2)
+    fig.subplots_adjust(wspace=0.3)
     plt.savefig("/home/francesco/Pictures/soft/DelaunayDensityPDF" + figureName + ".png", transparent=True, format="png")
     plt.show()
 
@@ -2087,7 +2094,7 @@ def plotSPClusterDensity(dirName, figureName, fixed=False, which='1e-03'):
             dirList = np.array(['1e-01', '5e-02', '2e-02', '1e-02', '5e-03', '2e-03', '1e-03', '7e-04', '5e-04', '2e-04', '1e-04', '7e-05', '5e-05', '2e-05', '1e-05', '5e-06', '2e-06', '1e-06', '5e-07', '2e-07', '1e-07'])
     elif(fixed=="Dr"):
         #dirList = np.array(['thermal25', 'thermal30', 'thermal35', 'thermal40', 'thermal45', 'thermal52', 'thermal58', 'thermal62', 'thermal67', 'thermal72',  'thermal78', 'thermal85',  'thermal94', 'thermal1'])
-        dirList = np.array(['0.25', '0.26', '0.27', '0.28', '0.29', '0.30', '0.31', '0.32', '0.35', '0.40', '0.45', '0.50', '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
+        dirList = np.array(['0.25', '0.26', '0.27', '0.28', '0.30', '0.31', '0.32', '0.35', '0.40', '0.45', '0.50', '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
         colorList = cm.get_cmap('viridis', dirList.shape[0])
         phi = np.zeros(dirList.shape[0])
     else:
@@ -2103,7 +2110,7 @@ def plotSPClusterDensity(dirName, figureName, fixed=False, which='1e-03'):
             #dirSample = dirName + os.sep + dirList[d] + "/langevin/T0.001/iod10/active-langevin/Dr" + which + "/dynamics/"
             dirSample = dirName + os.sep + dirList[d] + "/active-langevin/Dr" + which + "/dynamics/"
             #phi[d] = ucorr.readFromParams(dirSample, "phi")
-            phi[d] = np.loadtxt(dirSample + 'localDelaunayDensity-N16-stats.dat')[0]#'localDensity-N16-stats.dat'
+            #phi[d] = np.loadtxt(dirSample + 'localDelaunayDensity-N16-stats.dat')[0]#'localDensity-N16-stats.dat'
             if(d==0):
                 numParticles = ucorr.readFromParams(dirSample, "numParticles")
         if(os.path.exists(dirSample + "delaunayDensity.dat")):
@@ -2157,6 +2164,13 @@ def plotSPClusterDensity(dirName, figureName, fixed=False, which='1e-03'):
     ax.errorbar(x[fluidDensity[:,0]>0], fluidDensity[fluidDensity[:,0]>0,0], fluidDensity[fluidDensity[:,0]>0,1], color='b', lw=1.2, marker='s', markersize = 8, fillstyle='none', elinewidth=1, capsize=4, label='$Fluid$')
     ax.errorbar(x[gasDensity[:,0]>0], gasDensity[gasDensity[:,0]>0,0], gasDensity[gasDensity[:,0]>0,1], color='g', lw=1.2, marker='o', markersize = 8, fillstyle='none', elinewidth=1, capsize=4, label='$Gas$')
     ax.legend(fontsize=14, loc='best')
+    ax.set_ylim(-0.18, 1.02)
+    y = np.linspace(-0.2, 1.05, 100)
+    dirSample = dirName + os.sep + "0.30/active-langevin/Dr" + which + "/dynamics/"
+    phi1 = np.mean(np.loadtxt(dirSample + "delaunayDensity.dat")[:,3])
+    dirSample = dirName + os.sep + "0.31/active-langevin/Dr" + which + "/dynamics/"
+    phi2 = np.mean(np.loadtxt(dirSample + "delaunayDensity.dat")[:,3])
+    ax.plot(np.ones(100)*(phi1+phi2)/2, y, ls='dotted', color='k', lw=1)
     if(fixed!="Dr"):
         ax.set_xscale('log')
     #ax.set_xlim(5.8e-06, 2.8e03)
@@ -2308,7 +2322,7 @@ def plotSPClusterMixingTime(dirName, figureName, fixed=False, which='1e-03'):
         else:
             dirList = np.array(['1e-01', '5e-02', '2e-02', '1e-02', '5e-03', '2e-03', '1e-03', '7e-04', '5e-04', '2e-04', '1e-04', '7e-05', '5e-05', '2e-05', '1e-05', '5e-06', '2e-06', '1e-06', '5e-07', '2e-07', '1e-07'])
     elif(fixed=="Dr"):
-        dirList = np.array(['0.25', '0.26', '0.27', '0.28', '0.29', '0.30', '0.31', '0.32', '0.35', '0.40', '0.45', '0.50'])#, '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
+        dirList = np.array(['0.26', '0.28', '0.30', '0.32', '0.35', '0.40', '0.45', '0.50'])#, '0.55', '0.60', '0.65', '0.70', '0.75', '0.80', '0.82', '0.84', '0.86', '0.88', '0.90', '0.92', '0.94', '0.96'])
         colorList = cm.get_cmap('viridis', dirList.shape[0])
         phi = np.zeros(dirList.shape[0])
     else:
@@ -2335,7 +2349,7 @@ def plotSPClusterMixingTime(dirName, figureName, fixed=False, which='1e-03'):
         #xlabel = "$Persistence$ $time,$ $\\tau_p$"
         figureName = "/home/francesco/Pictures/nve-nvt-nva/pMixingTime-vsDr-" + figureName
     ax.tick_params(axis='both', labelsize=14)
-    ax.legend(fontsize=12, loc='best')
+    ax.legend(fontsize=11, loc='best')
     ax.set_xlabel("$Elapsed$ $time,$ $\\Delta t$", fontsize=18)
     ax.set_ylabel("$Mixing$ $ratio$", fontsize=18)
     fig.tight_layout()
@@ -2591,14 +2605,16 @@ def plotSPPhaseDiagram(dirName, numBins, figureName, which='16', log=False):
         for j in range(Dr.shape[0]):
             dirSample = dirName + 'thermal' + phi[i] + '/langevin/T0.001/iod10/active-langevin/Dr' + Dr[j] + '/dynamics/'
             deltaFile = dirSample + 'localVoroDensity-N' + which + '-stats.dat'#'localDensity-N16-stats.dat'
-            phiFile = dirSample + 'voronoiDensity.dat'
+            #phiFile = dirSample + 'voronoiDensity.dat'
+            phiFile = dirSample + 'delaunayDensity.dat'
             if(os.path.exists(deltaFile)):
+                #data = np.loadtxt(phiFile)
+                #meanPhi[i,j] = np.mean(data[:,3])
                 data = np.loadtxt(deltaFile)
                 meanPhi[i,j] = data[0]
                 deltaPhi[i,j] = data[1]
                 taup[i,j] = 1/(ucorr.readFromDynParams(dirSample, 'Dr')*ucorr.readFromDynParams(dirSample, 'sigma'))
     # assign color based on deltaPhi
-    ax.plot(np.ones(50)*1e06, np.linspace(0,1.2,50), ls='dotted', color='k', lw=0.7)
     colorId = np.zeros((phi.shape[0], Dr.shape[0]))
     min = np.min(deltaPhi)
     max = np.max(deltaPhi)
@@ -2621,6 +2637,7 @@ def plotSPPhaseDiagram(dirName, numBins, figureName, which='16', log=False):
     ax.set_ylabel("$Average$ $local$ $density,$ $\\langle \\varphi_l \\rangle$", fontsize=18)
     ax.set_xlabel("$Persistence$ $time,$ $\\tau_p$", fontsize=18)
     ax.set_ylim(0.22, 0.95)
+    ax.plot(np.ones(50)*1e06, np.linspace(0,1.2,50), ls='dotted', color='k', lw=0.7)
     colorBar = cm.ScalarMappable(cmap=colorMap)
     cb = plt.colorbar(colorBar)
     label = "$\\Delta \\varphi_l$"#"$\\Delta \\varphi^2_{16}}$"

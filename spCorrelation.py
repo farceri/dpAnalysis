@@ -1743,8 +1743,8 @@ def computeClusterMixingTime(dirName, plot=False, dirSpacing=1):
     dirList = dirList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     timeList = timeList[np.argwhere(timeList%dirSpacing==0)[:,0]]
     # first get cluster at initial condition
-    if(os.path.exists(dirName + os.sep + "t0/denseList.dat")):
-        initDenseList = np.loadtxt(dirName + os.sep + "t0/denseList.dat")
+    if(os.path.exists(dirName + os.sep + "t0/delaunayList.dat")):
+        initDenseList = np.loadtxt(dirName + os.sep + "t0/delaunayList.dat")
     else:
         initDenseList,_ = computeVoronoiCluster(dirName + os.sep + "t0/")
     initParticlesInCluster = initDenseList[initDenseList==1].shape[0]
@@ -1752,8 +1752,8 @@ def computeClusterMixingTime(dirName, plot=False, dirSpacing=1):
     for d in range(dirList.shape[0]):
         sharedParticles = 0
         dirSample = dirName + os.sep + dirList[d]
-        if(os.path.exists(dirSample + os.sep + "denseList.dat")):
-            denseList = np.loadtxt(dirSample + os.sep + "denseList.dat")
+        if(os.path.exists(dirSample + os.sep + "delaunayList.dat")):
+            denseList = np.loadtxt(dirSample + os.sep + "delaunayList.dat")
         else:
             denseList,_ = computeVoronoiCluster(dirSample)
         # check whether the particles in the cluster have changed by threshold
@@ -1764,7 +1764,7 @@ def computeClusterMixingTime(dirName, plot=False, dirSpacing=1):
         #print(timeList[d], fraction[d])
     np.savetxt(dirName + os.sep + "mixingTime.dat", np.column_stack((timeList, fraction)))
     if(plot=='plot'):
-        uplot.plotCorrelation(timeList, fraction, "$N_c^0(t) / N_c^0$", xlabel = "$Simulation$ $time$", color='k')
+        uplot.plotCorrelation(timeList[fraction>0], fraction[fraction>0], "$N_c^0(t) / N_c^0$", xlabel = "$Simulation$ $time$", color='k')
         plt.show()
 
 ################## Cluster mixing time averaged in time blocks #################
@@ -3320,6 +3320,7 @@ def computeDelaunayCluster(dirName, threshold=0.84, filter='filter', plot=False)
             denseSimplexList[i] = 1
     # if all the simplices touching a particle are dense then the particle is dense
     for i in range(numParticles):
+        count = 0
         indices = np.argwhere(simplices==i)[:,0]
         for sIndex in indices:
             if(denseSimplexList[sIndex] == 1):
@@ -3328,7 +3329,7 @@ def computeDelaunayCluster(dirName, threshold=0.84, filter='filter', plot=False)
     if(filter=='filter'):
         connectList = np.zeros(numParticles)
         for i in range(numParticles):
-            if(np.sum(contacts[i]!=-1)>4):
+            if(np.sum(contacts[i]!=-1)>5):
                 denseContacts = 0
                 for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
                     if(denseList[c] == 1):
@@ -3338,30 +3339,30 @@ def computeDelaunayCluster(dirName, threshold=0.84, filter='filter', plot=False)
                     connectList[i] = 1
         denseList[connectList==0] = 0
         # this is to include contacts of particles belonging to the cluster
-        for times in range(2):
+        for times in range(5):
             for i in range(numParticles):
                 if(denseList[i] == 1):
                     for c in contacts[i, np.argwhere(contacts[i]!=-1)[:,0]]:
                         if(denseList[c] != 1):
                             denseList[c] = 1
-    # look for rattles inside the fluid and label them as dense particles
-    neighborCount = np.zeros(numParticles)
-    denseNeighborCount = np.zeros(numParticles)
-    for i in range(numParticles):
-        if(denseList[i]==0):
-            for sIndex in np.argwhere(simplices==i)[:,0]:
-                indices = np.delete(simplices[sIndex], np.argwhere(simplices[sIndex]==i)[0,0])
-                for index in indices:
-                    neighborCount[i] += 1
-                    if(denseList[index] == 1):
-                        denseNeighborCount[i] += 1
-    rattlerList = np.zeros(numParticles)
-    for i in range(numParticles):
-        if(denseList[i]==0):
-            if(neighborCount[i] == denseNeighborCount[i]):
-                rattlerList[i] = 1
-    denseList[rattlerList==1] = 1
-    #print("Number of dense particles after contact filter: ", denseList[denseList==1].shape[0])
+        # look for rattles inside the fluid and label them as dense particles
+        neighborCount = np.zeros(numParticles)
+        denseNeighborCount = np.zeros(numParticles)
+        for i in range(numParticles):
+            if(denseList[i]==0):
+                for sIndex in np.argwhere(simplices==i)[:,0]:
+                    indices = np.delete(simplices[sIndex], np.argwhere(simplices[sIndex]==i)[0,0])
+                    for index in indices:
+                        neighborCount[i] += 1
+                        if(denseList[index] == 1):
+                            denseNeighborCount[i] += 1
+        rattlerList = np.zeros(numParticles)
+        for i in range(numParticles):
+            if(denseList[i]==0):
+                if(neighborCount[i] == denseNeighborCount[i]):
+                    rattlerList[i] = 1
+        denseList[rattlerList==1] = 1
+        #print("Number of dense particles after contact filter: ", denseList[denseList==1].shape[0])
     # need to update denseSimplexList after the applied filters
     for sIndex in range(simplices.shape[0]):
         indexCount = 0

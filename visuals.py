@@ -353,13 +353,14 @@ def plotSPStressMapPacking(dirName, figureName, which='total', droplet=False, l1
     plt.savefig(figureName, transparent=True, format = "png")
     plt.show()
 
-def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
+def plotSPVoronoiPacking(dirName, figureName, dense=False, threshold=0.84, filter=True, alpha=0.7):
     sep = ucorr.getDirSep(dirName, "boxSize")
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
     xBounds = np.array([0, boxSize[0]])
     yBounds = np.array([0, boxSize[1]])
     rad = np.array(np.loadtxt(dirName + sep + "particleRad.dat"))
     pos = ucorr.getPBCPositions(dirName + os.sep + "particlePos.dat", boxSize)
+    pos = ucorr.shiftPositions(pos, boxSize, 0.1, -0.3)
     # compute voronoi tessellation of particle positions
     #vor = Voronoi(pos)
     #fig = voronoi_plot_2d(vor, show_points=False, show_vertices=False, line_colors='k', line_width=0.5, line_alpha=1, point_size=2)
@@ -373,11 +374,21 @@ def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
     #setBigBoxAxes(boxSize, ax, 0.1)
     newPos, newRad, newIndices = ucorr.augmentPacking(pos, rad)
     colorId = getRadColorList(newRad)
-    for particleId in range(newRad.shape[0]):
-        x = newPos[particleId,0]
-        y = newPos[particleId,1]
-        r = newRad[particleId]
-        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth='0.3'))
+    if(dense==True):
+        if(os.path.exists(dirName + os.sep + "delaunayList!.dat")):
+            denseList = np.loadtxt(dirName + os.sep + "delaunayList.dat")
+        else:
+            denseList,_ = spCorr.computeDelaunayCluster(dirName, threshold, filter=filter)
+        #if(os.path.exists(dirName + os.sep + "denseList!.dat")):
+        #    denseList = np.loadtxt(dirName + os.sep + "denseList.dat")
+        #else:
+        #    denseList,_ = spCorr.computeVoronoiCluster(dirName, threshold, filter=filter)
+        colorId = getDenseColorList(denseList)
+    for particleId in range(rad.shape[0]):
+        x = pos[particleId,0]
+        y = pos[particleId,1]
+        r = rad[particleId]
+        ax.add_artist(plt.Circle([x, y], r, edgecolor='k', facecolor=colorId[particleId], alpha=alpha, linewidth=0.3))
         #if(particleId > rad.shape[0]):
         #    plt.plot(pos[newIndices[particleId],0], pos[newIndices[particleId],1], '*', markersize=8, markeredgecolor='k', markeredgewidth = 0.6, color='skyblue')
     #cells = pyvoro.compute_2d_voronoi(pos, [[0, boxSize[0]], [0, boxSize[1]]], 1, radii=rad)
@@ -386,7 +397,7 @@ def plotSPVoronoiPacking(dirName, figureName, alpha=0.7):
     #    ax.fill(*zip(*polygon), facecolor = 'none', edgecolor='k', lw=0.2)
     delaunay = Delaunay(newPos)
     insideIndex = ucorr.getInsideBoxDelaunaySimplices(delaunay.simplices, newPos, boxSize)
-    plt.triplot(newPos[:,0], newPos[:,1], delaunay.simplices[insideIndex==1], lw=0.5, color='k')
+    plt.triplot(newPos[:,0], newPos[:,1], delaunay.simplices[insideIndex==1], lw=0.2, color='k')
     #plt.plot(pos[:,0], pos[:,1], 'o', markersize=0.2, markeredgecolor='k', color='r')
     #plt.plot(pos[14730,0], pos[14730,1], '*', markersize=10, markeredgecolor='k', color='b')
     #plt.plot(pos[595,0], pos[595,1], '*', markersize=10, markeredgecolor='k', color='r')
@@ -1006,6 +1017,11 @@ if __name__ == '__main__':
 
     elif(whichPlot == "ssvoro"):
         plotSPVoronoiPacking(dirName, figureName)
+
+    elif(whichPlot == "ssdeldense"):
+        threshold = float(sys.argv[4])
+        filter = sys.argv[5]
+        plotSPVoronoiPacking(dirName, figureName, dense=True, threshold=threshold, filter=filter)
 
     elif(whichPlot == "ssvideo"):
         numFrames = int(sys.argv[4])
