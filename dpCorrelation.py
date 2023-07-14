@@ -7,10 +7,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
 import utilsPlot as uplot
-import utils
-import shapeDescriptors
 import sys
 import os
+import utils
 
 ############################### Self Correlations ##############################
 def computeSelfCorr(dirName, maxPower):

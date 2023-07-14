@@ -11,7 +11,7 @@ import itertools
 import sys
 import os
 import utils
-import shapeDescriptors as shape
+import dpShape as shape
 
 def setAxis2D(ax):
     ax.set_xticklabels([])

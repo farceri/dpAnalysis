@@ -2,7 +2,7 @@
 Created by Francesco
 12 October 2021
 '''
-#functions and script to visualize a 2d dpm packing
+#functions for deformable packing analysis visualization
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm

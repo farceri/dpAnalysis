@@ -2,7 +2,7 @@
 Created by Francesco
 22 March 2022
 '''
-#functions and script to visualize a 2d dpm packing
+#functions for shape analysis visualization
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation
@@ -10,7 +10,7 @@ from matplotlib import cm
 import itertools
 import sys
 import os
-import shape
+import dpShape as shape
 import utils
 
 def plotErrorBar(ax, x, y, err, xlabel, ylabel, color = 'k', logx = False, logy = False):
