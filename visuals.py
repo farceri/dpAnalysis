@@ -21,6 +21,14 @@ def setAxes2D(ax):
     ax.set_xticks([])
     ax.set_yticks([])
 
+def setPackingAxes(boxSize, ax):
+    xBounds = np.array([0, boxSize[0]])
+    yBounds = np.array([0, boxSize[1]])
+    ax.set_xlim(xBounds[0], xBounds[1])
+    ax.set_ylim(yBounds[0], yBounds[1])
+    ax.set_aspect('equal', adjustable='box')
+    setAxes2D(ax)
+
 def setGridAxes(bins, ax):
     xBounds = np.array([bins[0], bins[-1]])
     yBounds = np.array([bins[0], bins[-1]])
@@ -96,6 +104,7 @@ def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     plotDeformableParticles(ax, pos, rad, nv, faceColor, edgeColor, colorMap, edgeColorMap, alpha)
+    plt.tight_layout()
     if(save == True):
         plt.savefig("/home/francesco/Pictures/dpm/packings/" + figureName + ".png", transparent=True, format = "png")
     if(plot == True):
