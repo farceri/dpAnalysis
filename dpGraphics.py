@@ -29,21 +29,48 @@ def plotDPCorr(ax, x, y1, y2, ylabel, color, legendLabel = None, logx = True, lo
         ax.set_yscale('log')
 
 ############################ check energy and force ############################
-def plotEnergy(dirName):
+def plotEnergy(dirName, figureName):
     energy = np.loadtxt(dirName + os.sep + "energy.dat")
+    print("error over mean:", np.std(energy[:,4])/np.mean(energy[:,4]))
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
-    ax.plot(energy[:,0], energy[:,2], linewidth=1.5, color='k')
-    ax.plot(energy[:,0], energy[:,3], linewidth=1.5, color='r', linestyle='--')
-    ax.plot(energy[:,0], energy[:,2]+energy[:,3], linewidth=1.5, color='b', linestyle='dotted')
-    ax.set_yscale('log')
+    ax.plot(energy[:,0], energy[:,2], linewidth=1.2, color='k')
+    ax.plot(energy[:,0], energy[:,3], linewidth=1.2, color='r', linestyle='--')
+    ax.plot(energy[:,0], energy[:,4], linewidth=1.2, color='b', linestyle='dotted')
+    #ax.set_yscale('log')
     #ax.set_xscale('log')
     ax.tick_params(axis='both', labelsize=12)
-    ax.set_xlabel("$Simulation$ $step$", fontsize=15)
-    #ax.set_ylabel("$Potential$ $energy$", fontsize=15)
-    ax.set_ylabel("$Energy$", fontsize=15)
-    #ax.legend(("$E_{pot}$", "$E_{tot}$"), fontsize=15, loc="lower right")
-    ax.legend(("$E_{pot}$", "$E_{kin}$", "$E_{tot}$"), fontsize=15, loc="lower right")
+    ax.set_xlabel("$Simulation$ $step$", fontsize=14)
+    ax.set_ylabel("$Energy$", fontsize=14)
+    ax.legend(("$E_{pot}$", "$E_{kin}$", "$E_{tot}$"), fontsize=12, loc="best")
+    plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/dpm/energy-" + figureName + ".png", transparent=False, format = "png")
+    plt.show()
+
+def plotTest2Forces(dirName):
+    timeStep = utils.readFromParams(dirName, "dt")
+    dirList, timeList = utils.getOrderedDirectories(dirName)
+    timeList = np.array(timeList)# * timeStep
+    fig, ax = plt.subplots(2, 2, figsize = (15, 7), dpi = 120)
+    forces = np.zeros((timeList.shape[0], 40, 2))
+    for d in range(dirList.shape[0]):
+        force = np.loadtxt(dirName + os.sep + dirList[d] + "/forces.dat")
+        forces[d,:,0] = force[:,0]
+        forces[d,:,1] = force[:,1]
+    idList = np.array([[5,6,7,8], [35, 36, 37, 38]])
+    for pId in range(2):
+        for id in idList[pId]:
+            #print(pId, id)
+            ax[pId,0].plot(timeList, forces[:,id,0], color='k', marker='o', fillstyle='none', label="$v$" + str(id) + "$, x$")
+            ax[pId,1].plot(timeList, forces[:,id,1], color='k', marker='v', fillstyle='none', label="$v$" + str(id) + "$, y$")
+        ax[pId,0].legend(fontsize=10, loc='best')
+        ax[pId,0].tick_params(axis='both', labelsize=12)
+        ax[pId,0].set_xlabel("$Simulation$ $step$", fontsize=15)
+        ax[pId,0].set_ylabel("$Forces$", fontsize=15)
+        ax[pId,1].legend(fontsize=10, loc='best')
+        ax[pId,1].tick_params(axis='both', labelsize=12)
+        ax[pId,1].set_xlabel("$Simulation$ $step$", fontsize=15)
+        ax[pId,1].set_ylabel("$Forces$", fontsize=15)
     plt.tight_layout()
     plt.show()
 
@@ -100,6 +127,62 @@ def compareEnergy(dirName1, dirName2, figureName):
     ax2.set_ylabel("$Force$ $difference$", fontsize=15)
     plt.tight_layout()
     plt.savefig("/home/francesco/Pictures/dpm/force" + figureName + ".png", transparent=False, format = "png")
+    plt.show()
+
+########################## plot forces for checking energy conservation #########################
+def plotForces(dirName, index0, index1, index2, dim, th=1e-03):
+    dirList, timeList = utils.getOrderedDirectories(dirName)
+    force0 = []
+    force1 = []
+    force2 = []
+    if(th != 0):
+        # check if there is a jump
+        rad = np.loadtxt(dirName + "radii.dat")
+        numVertices = rad.shape[0]
+        for i in range(numVertices):
+            forcex = []
+            forcey = []
+            for d in range(dirList.shape[0]):
+                force = np.loadtxt(dirName + os.sep + dirList[d] + "/forces.dat")
+                forcex.append(force[i,0])
+                forcey.append(force[i,1])
+            forcex = np.array(forcex)
+            forcey = np.array(forcey)
+            #print(np.mean(np.abs(forcex[1:]-forcex[:-1])))
+            #print(np.mean(np.abs(forcey[1:]-forcey[:-1])))
+            for d in range(1,forcex.shape[0]):
+                neighbors = np.loadtxt(dirName + os.sep + dirList[d] + "/neighbors.dat").astype(np.int64)
+                numNeighbors = np.argwhere(neighbors[i]!=-1)[:,0].shape[0]
+                if(numNeighbors!=0):
+                    if(np.abs(forcex[d]-forcex[d-1])>th):
+                        print("Vertex", i, "neighbors:", neighbors[i])
+                        print("time", dirList[d], "force jump on x:", np.abs(forcex[d]-forcex[d-1]))
+                        index0 = i 
+                        index1 = neighbors[i,0]
+                        index2 = neighbors[i,1]
+                        d = forcex.shape[0]
+                    if(np.abs(forcey[d]-forcey[d-1])>th):
+                        print("Vertex", i, "neighbors:", neighbors[i])
+                        print("time", dirList[d], "force jump on y:", np.abs(forcey[d]-forcey[d-1]))
+                        index0 = i 
+                        index1 = neighbors[i,0]
+                        index2 = neighbors[i,1]
+                        d = forcex.shape[0]
+    for d in range(dirList.shape[0]):
+        force = np.loadtxt(dirName + os.sep + dirList[d] + "/forces.dat")
+        force0.append(force[index0,dim])
+        force1.append(force[index1,dim])
+        force2.append(force[index2,dim])
+    fig = plt.figure(figsize = (7, 5), dpi = 120)
+    ax = fig.gca()
+    ax.plot(timeList, force0, linewidth=1, color='k', marker='o', fillstyle='none', label="$vertex$" + " " + str(index0))
+    ax.plot(timeList, force1, linewidth=1, color='b', marker='o', fillstyle='none', label="$vertex$" + " " + str(index1))
+    ax.plot(timeList, force2, linewidth=1, color='g', marker='o', fillstyle='none', label="$vertex$" + " " + str(index2))
+    ax.legend(fontsize=12, loc='best')
+    ax.tick_params(axis='both', labelsize=12)
+    ax.set_xlabel("$Simulation$ $step$", fontsize=14)
+    ax.set_ylabel("$Forces$", fontsize=14)
+    plt.tight_layout()
     plt.show()
 
 # this only works for one deformable particle
@@ -468,7 +551,11 @@ if __name__ == '__main__':
 
 ############################ check energy and force ############################
     if(whichPlot == "energy"):
-        plotEnergy(dirName)
+        figureName = sys.argv[3]
+        plotEnergy(dirName, figureName)
+
+    elif(whichPlot == "test2"):
+        plotTest2Forces(dirName)
 
     elif(whichPlot == "energyscale"):
         figureName = sys.argv[3]
@@ -479,6 +566,14 @@ if __name__ == '__main__':
         dirName1 = dirName + os.sep + sys.argv[4]
         dirName2 = dirName + os.sep + sys.argv[5]
         compareEnergy(dirName1, dirName2, figureName)
+
+    elif(whichPlot == "forces"):
+        index0 = int(sys.argv[3])
+        index1 = int(sys.argv[4])
+        index2 = int(sys.argv[5])
+        dim = int(sys.argv[6])
+        th = float(sys.argv[7])
+        plotForces(dirName, index0, index1, index2, dim, th)
 
     elif(whichPlot == "compareforce"):
         fileName = dirName + os.sep + sys.argv[3]

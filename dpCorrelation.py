@@ -10,6 +10,7 @@ import utilsPlot as uplot
 import sys
 import os
 import utils
+import dpShape as shape
 
 ############################### Self Correlations ##############################
 def computeSelfCorr(dirName, maxPower):
@@ -17,7 +18,7 @@ def computeSelfCorr(dirName, maxPower):
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype = int)
     numParticles = nv.shape[0]
     numVertices = np.sum(nv)
-    phi = readFromParams(dirName, "phi")
+    phi = utils.readFromParams(dirName, "phi")
     meanRad = np.mean(np.loadtxt(dirName + os.sep + "radii.dat"))
     pWaveVector = np.pi / (np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
     waveVector = np.pi / meanRad
@@ -48,7 +49,7 @@ def plotSelfCorr(dirName, numBlocks, maxPower):
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype = int)
     numParticles = nv.shape[0]
     numVertices = np.sum(nv)
-    phi = readFromParams(dirName, "phi")
+    phi = utils.readFromParams(dirName, "phi")
     meanRad = np.mean(np.loadtxt(dirName + os.sep + "radii.dat"))
     pWaveVector = np.pi / (np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
     waveVector = np.pi / meanRad
@@ -85,7 +86,7 @@ def computeLogSelfCorr(dirName, startBlock, maxPower, freqPower):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype = int)
     numParticles = nv.shape[0]
-    phi = readFromParams(dirName, "phi")
+    phi = utils.readFromParams(dirName, "phi")
     meanRad = np.mean(np.loadtxt(dirName + os.sep + "radii.dat"))
     pWaveVector = np.pi / (np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
     waveVector = np.pi / meanRad
@@ -133,7 +134,7 @@ def computeBlockSelfCorr(dirName, startBlock, maxPower, freqPower):
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat"), dtype = int)
     numParticles = nv.shape[0]
-    phi = readFromParams(dirName, "phi")
+    phi = utils.readFromParams(dirName, "phi")
     meanRad = np.mean(np.loadtxt(dirName + os.sep + "radii.dat"))
     pWaveVector = np.pi / (np.sqrt(boxSize[0] * boxSize[1] * phi / (np.pi * numParticles)))
     waveVector = np.pi / meanRad
@@ -183,9 +184,9 @@ def computeShapeCorr(dirName, maxPower):
     stepRange = np.sort(stepRange)
     stepRange = stepRange[stepRange<int(10**maxPower)]
     # initial shape parameter
-    shape0 = shapeDescriptors.readShape(dirName + os.sep + "t" + str(stepRange[0]), boxSize, nv)
+    shape0 = shape.readShape(dirName + os.sep + "t" + str(stepRange[0]), boxSize, nv)
     for i in range(1,stepRange.shape[0]):
-        shape = shapeDescriptors.readShape(dirName + os.sep + "t" + str(stepRange[i]), boxSize, nv)
+        shape = shape.readShape(dirName + os.sep + "t" + str(stepRange[i]), boxSize, nv)
         shapeCorr.append(utils.computeShapeCorrFunction(shape0, shape))
     shapeCorr = np.array(shapeCorr)
     stepRange = stepRange[1:]#discard initial time
@@ -213,12 +214,12 @@ def computeLogVelCorr(dirName, startBlock, maxPower, freqPower):
                     if(utils.checkPair(dirName, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])):
                         #print(multiple, i, multiple*freqDecade + stepRange[i], multiple*freqDecade + stepRange[i+1])
                         pVel1, pVel2 = utils.readVelPair(dirName, multiple*freqDecade, multiple*freqDecade + stepRange[i], nv)
-                        stepVelCorr.append(computeVelCorrFunction(vel1, vel2))
+                        stepVelCorr.append(utils.computeVelCorrFunction(pVel1, pVel2))
                         numPairs += 1
             if(numPairs > 0):
                 velCorr.append(np.mean(stepVelCorr))
                 stepList.append(stepRange[i])
-        print(decade, stepList[-1])
+        print(decadeSpacing, stepList[-1])
     stepList = np.array(stepList)
     velCorr = np.array(velCorr)
     velCorr = velCorr[np.argsort(stepList)]
@@ -265,7 +266,7 @@ if __name__ == '__main__':
     dirName = sys.argv[1]
     whichCorr = sys.argv[2]
 
-    elif(whichCorr == "lincorr"):
+    if(whichCorr == "lincorr"):
         maxPower = int(sys.argv[3])
         computeSelfCorr(dirName, maxPower)
 

@@ -65,7 +65,7 @@ def computeVelocityHistogram(dirName, boxSize, nv, numBins):
     vel = np.array(np.loadtxt(dirName + os.sep + "velocities.dat"))
     pVel = np.zeros((numParticles, 2))
     pPos = np.array(np.loadtxt(dirName + os.sep + "particlePos.dat"))
-    distance = utils.computeDistances(pPos, boxSize) / boxSize[0] # only works for square box
+    distance = computeDistances(pPos, boxSize) / boxSize[0] # only works for square box
     bins = np.linspace(np.min(distance[distance>0]), np.max(distance), numBins)
     binCenter = 0.5 * (bins[:-1] + bins[1:])
     velCorr = []
@@ -172,7 +172,7 @@ def getStepList(numFrames, firstStep, stepFreq):
 def getDirectories(dirName):
     listDir = []
     for dir in os.listdir(dirName):
-        if(os.path.isdir(dirName + os.sep + dir) and (dir != "short" and dir != "dynamics")):
+        if(os.path.isdir(dirName + os.sep + dir) and (dir != "short" and dir != "dynamics" and dir != "start")):
             listDir.append(dir)
     return listDir
 
@@ -180,7 +180,7 @@ def getOrderedDirectories(dirName):
     listDir = []
     listScalar = []
     for dir in os.listdir(dirName):
-        if(os.path.isdir(dirName + os.sep + dir) and (dir != "short" and dir != "dynamics")):
+        if(os.path.isdir(dirName + os.sep + dir) and (dir != "short" and dir != "dynamics" and dir != "start")):
             listDir.append(dir)
             listScalar.append(dir.strip('t'))
     listScalar = np.array(listScalar, dtype=np.int64)
@@ -252,13 +252,6 @@ def shiftPositions(pos, boxSize, xshift, yshift):
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos
-
-def readShape(dirName, boxSize, nv):
-    pos = np.array(np.loadtxt(dirName + os.sep + "positions.dat"))
-    area = np.loadtxt(dirName + os.sep + "areas.dat")
-    _, perimeter = shapeDescriptors.getAreaAndPerimeterList(pos, boxSize, nv)
-    np.savetxt(dirName + os.sep + "perimeters.dat", perimeter)
-    return perimeter**2/(4*np.pi*area)
 
 
 if __name__ == '__main__':
