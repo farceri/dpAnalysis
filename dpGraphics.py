@@ -29,40 +29,87 @@ def plotDPCorr(ax, x, y1, y2, ylabel, color, legendLabel = None, logx = True, lo
         ax.set_yscale('log')
 
 ############################ check energy and force ############################
-def plotEnergy(dirName, figureName):
+def plotEnergy(dirName, figureName, which='all'):
     energy = np.loadtxt(dirName + os.sep + "energy.dat")
     print("error over mean:", np.std(energy[:,4])/np.mean(energy[:,4]))
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
-    ax.plot(energy[:,0], energy[:,2], linewidth=1.2, color='k')
-    ax.plot(energy[:,0], energy[:,3], linewidth=1.2, color='r', linestyle='--')
-    ax.plot(energy[:,0], energy[:,4], linewidth=1.2, color='b', linestyle='dotted')
+    if(which=='all'):
+        ax.plot(energy[:,0], energy[:,2], linewidth=1.2, color='k', label="$E_{pot}$")
+        ax.plot(energy[:,0], energy[:,3], linewidth=1.2, color='r', linestyle='--', label="$E_{kin}$")
+    ax.plot(energy[:,0], energy[:,2]+energy[:,3], linewidth=1.2, color='b', linestyle='dotted', label="$E_{tot}$")
+    ax.plot(energy[:,0], energy[:,4], linewidth=3, color='b', linestyle='solid', alpha=0.2)
     #ax.set_yscale('log')
     #ax.set_xscale('log')
     ax.tick_params(axis='both', labelsize=12)
     ax.set_xlabel("$Simulation$ $step$", fontsize=14)
     ax.set_ylabel("$Energy$", fontsize=14)
-    ax.legend(("$E_{pot}$", "$E_{kin}$", "$E_{tot}$"), fontsize=12, loc="best")
+    ax.legend(fontsize=12, loc="best")
     plt.tight_layout()
     plt.savefig("/home/francesco/Pictures/dpm/energy-" + figureName + ".png", transparent=False, format = "png")
     plt.show()
 
-def plotTest2Forces(dirName):
+def computeForces(rad, pos, boxSize, nv, time, ec = 1e-02):
+    numParticles = nv.shape[0]
+    numVertices = np.sum(nv)
+    firstVertex = 0
+    lastVertex = nv[0]
+    interaction = np.zeros(pos.shape)
+    for pId in range(numParticles):
+        if(pId == 0):
+            otherFirst = firstVertex + nv[pId]
+            otherLast = lastVertex + nv[pId]
+        else:
+            otherFirst = 0
+            otherLast = nv[0]
+        for vId in range(firstVertex, lastVertex):
+            thisPos = pos[vId]
+            thisRad = rad[vId]
+            for otherId in range(otherFirst, otherLast):
+                otherPos = pos[otherId]
+                otherRad = rad[otherId]
+                radSum = thisRad + otherRad
+                delta = utils.pbcDistance(thisPos, otherPos, boxSize)
+                distance = np.linalg.norm(delta)
+                overlap = 1 - distance / radSum
+                if(overlap > 0):
+                    #print(time, vId, otherId, "overlap: ", overlap)
+                    gradMultiple = ec * overlap / radSum
+                    interaction[vId] += gradMultiple * delta / distance
+        firstVertex += nv[pId]
+        lastVertex += nv[pId]
+    return interaction
+
+def plotTest2Forces(dirName, figureName, compare=False):
     timeStep = utils.readFromParams(dirName, "dt")
     dirList, timeList = utils.getOrderedDirectories(dirName)
     timeList = np.array(timeList)# * timeStep
-    fig, ax = plt.subplots(2, 2, figsize = (15, 7), dpi = 120)
+    fig, ax = plt.subplots(2, 2, figsize = (14, 6.5), dpi = 120)
     forces = np.zeros((timeList.shape[0], 40, 2))
+    inters = np.zeros((timeList.shape[0], 40, 2))
     for d in range(dirList.shape[0]):
         force = np.loadtxt(dirName + os.sep + dirList[d] + "/forces.dat")
         forces[d,:,0] = force[:,0]
         forces[d,:,1] = force[:,1]
-    idList = np.array([[5,6,7,8], [35, 36, 37, 38]])
+        if(compare == 'compare'):
+            pos = np.loadtxt(dirName + os.sep + dirList[d] + "/positions.dat")
+            rad = np.loadtxt(dirName + os.sep + dirList[d] + "/radii.dat")
+            boxSize = np.loadtxt(dirName + os.sep + dirList[d] + "/boxSize.dat")
+            nv = np.loadtxt(dirName + os.sep + dirList[d] + "/numVertexInParticleList.dat").astype(np.int64)
+            inter = computeForces(rad, pos, boxSize, nv, dirList[d])
+            inters[d,:,0] = inter[:,0]
+            inters[d,:,1] = inter[:,1]
+    idList = np.array([[35,36,37], [5,6,7]])
+    colorList = ['r', 'b', 'g', 'k']
     for pId in range(2):
-        for id in idList[pId]:
+        for i in range(idList[pId].shape[0]):
             #print(pId, id)
-            ax[pId,0].plot(timeList, forces[:,id,0], color='k', marker='o', fillstyle='none', label="$v$" + str(id) + "$, x$")
-            ax[pId,1].plot(timeList, forces[:,id,1], color='k', marker='v', fillstyle='none', label="$v$" + str(id) + "$, y$")
+            if(compare == 'compare'):
+                ax[pId,0].plot(timeList, forces[:,idList[pId,i],0]-inters[:,idList[pId,i],0], color=colorList[i], ls='solid', label="$v$" + str(idList[pId,i]) + "$, x$")
+                ax[pId,1].plot(timeList, forces[:,idList[pId,i],1]-inters[:,idList[pId,i],1], color=colorList[i], ls='solid', label="$v$" + str(idList[pId,i]) + "$, y$")
+            else:
+                ax[pId,0].plot(timeList, forces[:,idList[pId,i],0], color=colorList[i], ls='solid', label="$v$" + str(idList[pId,i]) + "$, x$")
+                ax[pId,1].plot(timeList, forces[:,idList[pId,i],1], color=colorList[i], ls='solid', label="$v$" + str(idList[pId,i]) + "$, y$")
         ax[pId,0].legend(fontsize=10, loc='best')
         ax[pId,0].tick_params(axis='both', labelsize=12)
         ax[pId,0].set_xlabel("$Simulation$ $step$", fontsize=15)
@@ -72,6 +119,7 @@ def plotTest2Forces(dirName):
         ax[pId,1].set_xlabel("$Simulation$ $step$", fontsize=15)
         ax[pId,1].set_ylabel("$Forces$", fontsize=15)
     plt.tight_layout()
+    plt.savefig("/home/francesco/Pictures/dpm/forces-" + figureName + ".png", transparent=False, format = "png")
     plt.show()
 
 def plotEnergyScale(dirName, figureName):
@@ -552,10 +600,13 @@ if __name__ == '__main__':
 ############################ check energy and force ############################
     if(whichPlot == "energy"):
         figureName = sys.argv[3]
-        plotEnergy(dirName, figureName)
+        which = sys.argv[4]
+        plotEnergy(dirName, figureName, which)
 
     elif(whichPlot == "test2"):
-        plotTest2Forces(dirName)
+        figureName = sys.argv[3]
+        compare = sys.argv[4]
+        plotTest2Forces(dirName, figureName, compare)
 
     elif(whichPlot == "energyscale"):
         figureName = sys.argv[3]

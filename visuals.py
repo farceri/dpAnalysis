@@ -45,7 +45,15 @@ def setBigBoxAxes(boxSize, ax, delta=0.1):
     ax.set_aspect('equal', adjustable='box')
     setAxes2D(ax)
 
-def plotDeformableParticles(ax, pos, rad, nv, faceColor = [0,0.5,1], edgeColor = [0.3,0.3,0.3], colorMap = False, edgeColorMap = False, alpha = 0.7, ls = '-', lw = 0.2):
+def setAxes(ax):
+    xBounds = np.array([4, 6.5])
+    yBounds = np.array([4, 7])
+    ax.set_xlim(xBounds[0], xBounds[1])
+    ax.set_ylim(yBounds[0], yBounds[1])
+    ax.set_aspect('equal', adjustable='box')
+    setAxes2D(ax)
+
+def plotDeformableParticles(ax, pos, rad, nv, force, faceColor = [0,0.5,1], edgeColor = [0.3,0.3,0.3], colorMap = False, edgeColorMap = False, quiverForce = False, alpha = 0.7, ls = '-', lw = 0.2):
     start = 0
     colorList = cm.get_cmap('viridis', nv.shape[0])
     colorId = np.zeros((nv.shape[0], 4))
@@ -70,18 +78,19 @@ def plotDeformableParticles(ax, pos, rad, nv, faceColor = [0,0.5,1], edgeColor =
                     ax.add_artist(plt.Circle([x, y], r, edgecolor = edgeColor, facecolor = faceColor(particleId/nv.shape[0]), alpha = alpha, linestyle = ls, linewidth = lw))
             else:
                 ax.add_artist(plt.Circle([x, y], r, edgecolor = edgeColor, facecolor = faceColor, alpha = alpha, linestyle = ls, linewidth = lw))
-            #fx = force[start + vertexId,0]
-            #fy = force[start + vertexId,1]
-            #ax.quiver(x, y, fx, fy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
-            label = ax.annotate(str(start + vertexId), xy=(x, y), fontsize=4, verticalalignment="center", horizontalalignment="center")
+            if(quiverForce == True):
+                fx = force[start + vertexId,0]
+                fy = force[start + vertexId,1]
+                ax.quiver(x, y, fx, fy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
+                label = ax.annotate(str(start + vertexId), xy=(x, y), fontsize=5, verticalalignment="center", horizontalalignment="center")
         start += nv[particleId]
-        print("Particle:", particleId, "location:", com/nv[particleId])
+        #print("Particle:", particleId, "location:", com/nv[particleId])
     #index = 133
     #ax.add_artist(plt.Circle([pos[0,0], pos[0,1]], rad[0], edgecolor = edgeColor, facecolor = 'k', alpha = alpha, linestyle = ls, linewidth = lw))
     #ax.add_artist(plt.Circle([pos[index,0], pos[index,1]], rad[index], edgecolor = edgeColor, facecolor = 'r', alpha = alpha, linestyle = ls, linewidth = lw))
 
 def plotSmoothDeformableParticles(ax, pos, rad, nv, cellId, boxSize):
-    numCells = 3136
+    numCells = 121
     start = 0
     colorList = cm.get_cmap('viridis', nv.shape[0])
     colorId = np.zeros((nv.shape[0], 4))
@@ -95,7 +104,7 @@ def plotSmoothDeformableParticles(ax, pos, rad, nv, cellId, boxSize):
             vpos = pos[start + vertexId]
             r = rad[start + vertexId]
             ax.add_artist(plt.Circle(vpos, r, edgecolor = [0.3,0.3,0.3], facecolor = colorId[particleId], alpha = 0.7, ls = '-', linewidth = 1.2))
-            label = ax.annotate(cellId[start + vertexId,0] * numCells + cellId[start + vertexId,1], xy=vpos, fontsize=4, verticalalignment="center", horizontalalignment="center")
+            label = ax.annotate(cellId[start + vertexId,0] * numCells + cellId[start + vertexId,1], xy=vpos, fontsize=5, verticalalignment="center", horizontalalignment="center")
             #previousId = (start + vertexId - 1)
             #if(previousId < start):
             #    previousId = start + nv[particleId] - 1
@@ -145,7 +154,7 @@ def trackDeformableParticles(ax, pos, rad, nv, edgeColor = [0.3,0.3,0.3], alpha 
                 ax.add_artist(plt.Circle([x, y], r, edgecolor = edgeColor, facecolor = [0.9,0.9,0.9], alpha = alpha, linestyle = ls, linewidth = lw))
         start += nv[particleId]
 
-def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,0.3,0.3], colorMap = False, edgeColorMap = False, alpha = 0.7, save = True, plot = True):
+def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,0.3,0.3], colorMap = False, edgeColorMap = False, quiverForce = False, alpha = 0.7, save = True, plot = True):
     fig = plt.figure(0, dpi = 150)
     ax = fig.gca()
     pos = np.array(np.loadtxt(dirName + os.sep + "positions.dat"))
@@ -156,13 +165,18 @@ def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,
     rad = np.array(np.loadtxt(dirName + sep + "radii.dat"))
     nv = np.array(np.loadtxt(dirName + sep + "numVertexInParticleList.dat"), dtype=int)
     boxSize = np.loadtxt(dirName + sep + "boxSize.dat")
-    force = np.array(np.loadtxt(dirName + sep + "forces.dat"))
+    if(quiverForce == True):
+        force = np.array(np.loadtxt(dirName + sep + "forces.dat"))
+    else:
+        force = []
     print(boxSize)
     setPackingAxes(boxSize, ax)
+    #setAxes(ax)
     #setBigBoxAxes(boxSize, ax)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
-    plotDeformableParticles(ax, pos, rad, nv, faceColor, edgeColor, colorMap, edgeColorMap, alpha)
+    #pos = utils.shiftPositions(pos, boxSize, 0.2*boxSize[0], 0.5*boxSize[1])
+    plotDeformableParticles(ax, pos, rad, nv, force, faceColor, edgeColor, colorMap, edgeColorMap, quiverForce, alpha)
     plt.tight_layout()
     if(save == True):
         plt.savefig("/home/francesco/Pictures/dpm/packings/" + figureName + ".png", transparent=True, format = "png")
@@ -186,6 +200,7 @@ def plotSmoothDPMPacking(dirName, figureName, save = True, plot = True):
     force = np.array(np.loadtxt(dirName + sep + "forces.dat"))
     print(boxSize)
     setPackingAxes(boxSize, ax)
+    #setAxes(ax)
     #setBigBoxAxes(boxSize, ax)
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
@@ -215,19 +230,20 @@ def compareDPMPackings(dirName1, dirName2, figureName):
     plt.savefig("/home/francesco/Pictures/dpm/packings/" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
-def makeDeformablePackingFrame(pos, rad, nv, boxSize, figFrame, frames):
+def makeDeformablePackingFrame(pos, rad, nv, force, boxSize, figFrame, frames, quiverForce = False):
     pos[:,0] -= np.floor(pos[:,0]/boxSize[0]) * boxSize[0]
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     gcfFrame = plt.gcf()
     gcfFrame.clear()
     axFrame = figFrame.gca()
     setPackingAxes(boxSize, axFrame)
-    plotDeformableParticles(axFrame, pos, rad, nv, colorMap = True)
+    #setAxes(axFrame)
+    plotDeformableParticles(axFrame, pos, rad, nv, force, colorMap = True, quiverForce = quiverForce)
     plt.tight_layout()
     axFrame.remove()
     frames.append(axFrame)
 
-def makeDPMPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False):
+def makeDPMPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04, logSpaced = False, quiverForce = False):
     def animate(i):
         frames[i].figure=fig
         fig.axes.append(frames[i])
@@ -258,17 +274,26 @@ def makeDPMPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, s
     ax = fig.gca()
     boxSize = np.loadtxt(dirName + os.sep + "boxSize.dat")
     setPackingAxes(boxSize, ax)
+    #setAxes(ax)
     nv = np.array(np.loadtxt(dirName + os.sep + "numVertexInParticleList.dat", dtype=int))
     rad = np.array(np.loadtxt(dirName + os.sep + "radii.dat"))
     # the first configuration gets two frames for better visualization
-    pos = np.array(np.loadtxt(dirName + os.sep + "t10000/positions.dat"))
-    makeDeformablePackingFrame(pos, rad, nv, boxSize, figFrame, frames)
+    pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepList[0]) + "/positions.dat"))
+    #pos = utils.shiftPositions(pos, boxSize, 0.2*boxSize[0], 0.5*boxSize[1])
+    force = []
+    if(quiverForce == True):
+        force = np.array(np.loadtxt(dirName + os.sep + "t" + str(stepList[0]) + "/forces.dat"))
+    makeDeformablePackingFrame(pos, rad, nv, force, boxSize, figFrame, frames, quiverForce)
     numVertices = rad.shape[0]
     for i in stepList:
         pos = np.array(np.loadtxt(dirName + os.sep + "t" + str(i) + "/positions.dat"))
-        makeDeformablePackingFrame(pos, rad, nv, boxSize, figFrame, frames)
+        #pos = utils.shiftPositions(pos, boxSize, 0.2*boxSize[0], 0.5*boxSize[1])
+        if(quiverForce == True):
+            force = np.array(np.loadtxt(dirName + os.sep + "t" + str(i) + "/forces.dat"))
+        makeDeformablePackingFrame(pos, rad, nv, force, boxSize, figFrame, frames, quiverForce)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
-    anim.save("/home/francesco/Pictures/dpm/packings/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
+    anim.save(f"/home/francesco/Pictures/dpm/packings/{figureName}.gif", writer='imagemagick', dpi=fig.dpi)
+    #anim.save(f"/home/francesco/Pictures/dpm/packings/{figureName}.mov", writer='ffmpeg', dpi=fig.dpi)
 
 def compareDPMPackingsVideo(dirName, fileName, figureName):
     def animate(i):
@@ -448,6 +473,9 @@ if __name__ == '__main__':
     if(whichPlot == "dpm"):
         plotDPMPacking(dirName, figureName, colorMap = True)
 
+    elif(whichPlot == "dpmforce"):
+        plotDPMPacking(dirName, figureName, colorMap = True, quiverForce = True)
+
     elif(whichPlot == "smooth"):
         plotSmoothDPMPacking(dirName, figureName)
 
@@ -456,6 +484,12 @@ if __name__ == '__main__':
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
         makeDPMPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq)
+
+    elif(whichPlot == "forcevideo"):
+        numFrames = int(sys.argv[4])
+        firstStep = float(sys.argv[5])
+        stepFreq = float(sys.argv[6])
+        makeDPMPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, quiverForce = True)
 
     elif(whichPlot == "comparedpm"):
         dirSample = dirName + os.sep + sys.argv[4]

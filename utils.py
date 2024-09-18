@@ -253,6 +253,27 @@ def shiftPositions(pos, boxSize, xshift, yshift):
     pos[:,1] -= np.floor(pos[:,1]/boxSize[1]) * boxSize[1]
     return pos
 
+def centerCOM(pos, rad, boxSize):
+    center = np.mean(pos, axis=0)[0]
+    height = 0.5*np.pi*np.sum(rad**2) / boxSize[1]
+    isOutside = 0
+    for i in range(pos.shape[0]):
+        delta = np.abs(pbcDistance(center, pos[i,0], boxSize[0]))
+        if(delta > height):
+            isOutside += 1
+    corrected = False
+    if(isOutside > int(pos.shape[0]*0.5)):
+        corrected = True
+        pos = shiftPositions(pos, boxSize, boxSize[0]*0.5, 0)
+    center = np.mean(pos, axis=0)[0]
+    if(corrected==True):
+        pos = shiftPositions(pos, boxSize, boxSize[0]*0.5-center, 0)
+    else:
+        pos = shiftPositions(pos, boxSize, boxSize[0]*0.5-center, 0)
+        center = np.mean(pos, axis=0)[0]
+        pos = shiftPositions(pos, boxSize, boxSize[0]*0.5-center, 0)
+    return pos
+
 
 if __name__ == '__main__':
     print("library for correlation function utilities")
