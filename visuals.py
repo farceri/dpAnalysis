@@ -82,7 +82,7 @@ def plotDeformableParticles(ax, pos, rad, nv, force, faceColor = [0,0.5,1], edge
                 fx = force[start + vertexId,0]
                 fy = force[start + vertexId,1]
                 ax.quiver(x, y, fx, fy, facecolor='k', width=0.002, scale=10)#width=0.002, scale=3)20
-                label = ax.annotate(str(start + vertexId), xy=(x, y), fontsize=5, verticalalignment="center", horizontalalignment="center")
+                ax.annotate(str(start + vertexId), xy=(x, y), fontsize=5, verticalalignment="center", horizontalalignment="center")
         start += nv[particleId]
         #print("Particle:", particleId, "location:", com/nv[particleId])
     #index = 133
@@ -179,7 +179,7 @@ def plotDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.3,
     plotDeformableParticles(ax, pos, rad, nv, force, faceColor, edgeColor, colorMap, edgeColorMap, quiverForce, alpha)
     plt.tight_layout()
     if(save == True):
-        plt.savefig("/home/francesco/Pictures/dpm/packings/" + figureName + ".png", transparent=True, format = "png")
+        plt.savefig("/home/francesco/Pictures/rings/packings/" + figureName + ".png", transparent=True, format = "png")
     if(plot == True):
         plt.show()
     else:
@@ -207,7 +207,7 @@ def plotSmoothDPMPacking(dirName, figureName, save = True, plot = True):
     plotSmoothDeformableParticles(ax, pos, rad, nv, cellId, boxSize)
     plt.tight_layout()
     if(save == True):
-        plt.savefig("/home/francesco/Pictures/dpm/packings/" + figureName + ".png", transparent=True, format = "png")
+        plt.savefig("/home/francesco/Pictures/rings/packings/" + figureName + ".png", transparent=True, format = "png")
     if(plot == True):
         plt.show()
     else:
@@ -227,7 +227,7 @@ def compareDPMPackings(dirName1, dirName2, figureName):
         rad = np.array(np.loadtxt(dirNameList[i] + os.sep + "radii.dat"))
         nv = np.array(np.loadtxt(dirNameList[i] + os.sep + "numVertexInParticleList.dat"), dtype=int)
         plotDeformableParticles(ax, pos, rad, nv, colorList[i])
-    plt.savefig("/home/francesco/Pictures/dpm/packings/" + figureName + ".png", transparent=True, format = "png")
+    plt.savefig("/home/francesco/Pictures/rings/packings/" + figureName + ".png", transparent=True, format = "png")
     plt.show()
 
 def makeDeformablePackingFrame(pos, rad, nv, force, boxSize, figFrame, frames, quiverForce = False):
@@ -292,8 +292,8 @@ def makeDPMPackingVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, s
             force = np.array(np.loadtxt(dirName + os.sep + "t" + str(i) + "/forces.dat"))
         makeDeformablePackingFrame(pos, rad, nv, force, boxSize, figFrame, frames, quiverForce)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames+1, interval=frameTime, blit=False)
-    anim.save(f"/home/francesco/Pictures/dpm/packings/{figureName}.gif", writer='imagemagick', dpi=fig.dpi)
-    #anim.save(f"/home/francesco/Pictures/dpm/packings/{figureName}.mov", writer='ffmpeg', dpi=fig.dpi)
+    anim.save(f"/home/francesco/Pictures/rings/packings/{figureName}.gif", writer='pillow', dpi=fig.dpi)
+    #anim.save(f"/home/francesco/Pictures/rings/packings/{figureName}.mov", writer='ffmpeg', dpi=fig.dpi)
 
 def compareDPMPackingsVideo(dirName, fileName, figureName):
     def animate(i):
@@ -336,7 +336,7 @@ def compareDPMPackingsVideo(dirName, fileName, figureName):
         axFrame.remove()
         frames.append(axFrame)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames, interval=frameTime, blit=False)
-    anim.save("/home/francesco/Pictures/dpm/packings/" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
+    anim.save("/home/francesco/Pictures/rings/packings/" + figureName + ".gif", writer='pillow', dpi=fig.dpi)
 
 def makeCompressionVideo(dirName, figureName, numFrames = 50):
     phiList = np.sort(os.listdir(dirName))[60::4]
@@ -375,7 +375,7 @@ def makeCompressionVideo(dirName, figureName, numFrames = 50):
         axFrame.remove()
         frames.append(axFrame)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames, interval=frameTime, blit=False)
-    anim.save("/home/francesco/Pictures/dpm/packings/comp-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
+    anim.save("/home/francesco/Pictures/rings/packings/comp-" + figureName + ".gif", writer='pillow', dpi=fig.dpi)
 
 def makeRearrengementsVideo(dirName, figureName, numFrames = 20, firstStep = 1e07, stepFreq = 1e04):
     def animate(i):
@@ -424,7 +424,7 @@ def makeRearrengementsVideo(dirName, figureName, numFrames = 20, firstStep = 1e0
         axFrame.remove()
         frames.append(axFrame)
         anim = animation.FuncAnimation(fig, animate, frames=numFrames, interval=frameTime, blit=False)
-    anim.save("/home/francesco/Pictures/dpm/packings/rearrange-" + figureName + ".gif", writer='imagemagick', dpi=plt.gcf().dpi)
+    anim.save("/home/francesco/Pictures/rings/packings/rearrange-" + figureName + ".gif", writer='ffmpeg', dpi=fig.dpi)
 
 def plotSoftParticles(ax, pos, rad, alpha = 0.6, colorMap = True, lw = 0.5):
     colorId = np.zeros((rad.shape[0], 4))
@@ -461,7 +461,7 @@ def plotSPDPMPacking(dirName, figureName, faceColor = [0,0.5,1], edgeColor = [0.
     plotSoftParticles(ax, pos, rad, alpha = 0.8, colorMap = False, lw = 0.5)
     plt.tight_layout()
     if(save == True):
-        plt.savefig("/home/francesco/Pictures/spdpm/" + figureName + ".png", transparent=False, format = "png")
+        plt.savefig("/home/francesco/Pictures/rings/" + figureName + ".png", transparent=False, format = "png")
     plt.show()
 
 
@@ -470,16 +470,16 @@ if __name__ == '__main__':
     whichPlot = sys.argv[2]
     figureName = sys.argv[3]
 
-    if(whichPlot == "dpm"):
+    if(whichPlot == "plot"):
         plotDPMPacking(dirName, figureName, colorMap = True)
 
-    elif(whichPlot == "dpmforce"):
+    elif(whichPlot == "force"):
         plotDPMPacking(dirName, figureName, colorMap = True, quiverForce = True)
 
     elif(whichPlot == "smooth"):
         plotSmoothDPMPacking(dirName, figureName)
 
-    elif(whichPlot == "dpmvideo"):
+    elif(whichPlot == "video"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
@@ -491,7 +491,7 @@ if __name__ == '__main__':
         stepFreq = float(sys.argv[6])
         makeDPMPackingVideo(dirName, figureName, numFrames, firstStep, stepFreq, quiverForce = True)
 
-    elif(whichPlot == "comparedpm"):
+    elif(whichPlot == "comparering"):
         dirSample = dirName + os.sep + sys.argv[4]
         compareDPMPackings(dirName, dirSample, figureName)
 
@@ -504,13 +504,13 @@ if __name__ == '__main__':
         numFrames = int(sys.argv[4])
         makeCompressionVideo(dirName, figureName, numFrames)
 
-    elif(whichPlot == "dpmrearrange"):
+    elif(whichPlot == "ringrearrange"):
         numFrames = int(sys.argv[4])
         firstStep = float(sys.argv[5])
         stepFreq = float(sys.argv[6])
         makeRearrengementsVideo(dirName, figureName, numFrames, firstStep, stepFreq)
 
-    elif(whichPlot == "spdpm"):
+    elif(whichPlot == "mixture"):
         plotSPDPMPacking(dirName, figureName)
 
     else:
